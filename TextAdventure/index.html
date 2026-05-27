@@ -1,0 +1,768 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>诅咒古堡 - 文字冒险RPG</title>
+  <style>
+    /* ===== 基础重置 ===== */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    @font-face {
+      font-family: 'GameFont';
+      src: local('Microsoft YaHei'), local('PingFang SC'), local('Noto Sans SC');
+    }
+
+    :root {
+      --bg-primary: #0a0a0f;
+      --bg-secondary: #12121a;
+      --bg-card: #1a1a28;
+      --bg-hover: #252538;
+      --text-primary: #e0d8c8;
+      --text-secondary: #8a8498;
+      --text-dim: #5a5468;
+      --accent: #c9a84c;
+      --accent-dim: #8a7030;
+      --danger: #c44040;
+      --danger-dim: #6a2020;
+      --success: #4caf50;
+      --border: #2a2a3a;
+      --glow: rgba(201, 168, 76, 0.15);
+      --shadow: rgba(0, 0, 0, 0.6);
+    }
+
+    body {
+      font-family: 'GameFont', 'Microsoft YaHei', sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      overflow-x: hidden;
+      line-height: 1.8;
+    }
+
+    /* ===== 背景纹理 ===== */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background:
+        radial-gradient(ellipse at 20% 50%, rgba(100, 60, 20, 0.08) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 20%, rgba(60, 40, 100, 0.06) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 80%, rgba(80, 40, 40, 0.06) 0%, transparent 50%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ===== 主布局 ===== */
+    .game-container {
+      display: grid;
+      grid-template-columns: 1fr 280px;
+      grid-template-rows: auto 1fr;
+      height: 100vh;
+      max-width: 1200px;
+      margin: 0 auto;
+      gap: 0;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ===== 顶部栏 ===== */
+    .top-bar {
+      grid-column: 1 / -1;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 20px;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .game-title {
+      font-size: 1.3em;
+      color: var(--accent);
+      letter-spacing: 3px;
+      text-shadow: 0 0 20px var(--glow);
+    }
+
+    .top-controls {
+      display: flex;
+      gap: 8px;
+    }
+
+    .top-controls button {
+      background: var(--bg-card);
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.9em;
+      transition: all 0.2s;
+    }
+
+    .top-controls button:hover {
+      background: var(--bg-hover);
+      color: var(--text-primary);
+      border-color: var(--accent-dim);
+    }
+
+    #skip-btn {
+      display: none;
+      background: rgba(201, 168, 76, 0.15);
+      border-color: var(--accent-dim);
+      color: var(--accent);
+    }
+
+    /* ===== 章节标题 ===== */
+    .chapter-header {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 10px;
+      background: linear-gradient(90deg, transparent, var(--bg-card), transparent);
+      border-bottom: 1px solid var(--border);
+    }
+
+    #chapter-title {
+      font-size: 1.1em;
+      color: var(--accent);
+      letter-spacing: 5px;
+      opacity: 0.9;
+    }
+
+    #chapter-title.fade-in {
+      animation: fadeSlideIn 1s ease;
+    }
+
+    /* ===== 主内容区 ===== */
+    .main-content {
+      grid-column: 1;
+      grid-row: 3;
+      display: flex;
+      flex-direction: column;
+      padding: 24px 32px;
+      overflow-y: auto;
+    }
+
+    /* ===== 文本区域 ===== */
+    #text-area {
+      flex: 1;
+      padding: 20px;
+      min-height: 200px;
+      line-height: 2;
+      font-size: 1.05em;
+      color: var(--text-primary);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    #text-area.active {
+      opacity: 1;
+    }
+
+    #text-area p {
+      margin-bottom: 0.8em;
+      text-indent: 2em;
+    }
+
+    #text-area p:first-child {
+      text-indent: 0;
+    }
+
+    /* ===== 选择区域 ===== */
+    #choices-area {
+      padding: 16px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .choice-btn {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      padding: 14px 20px;
+      background: var(--bg-card);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 1em;
+      text-align: left;
+      cursor: pointer;
+      transition: all 0.3s;
+      animation: choiceFadeIn 0.4s ease backwards;
+      font-family: inherit;
+      line-height: 1.6;
+    }
+
+    .choice-btn:hover:not(.disabled) {
+      background: var(--bg-hover);
+      border-color: var(--accent);
+      box-shadow: 0 0 15px var(--glow);
+      transform: translateX(6px);
+    }
+
+    .choice-btn.selected {
+      background: var(--accent-dim);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .choice-btn.disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .choice-number {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      background: var(--accent-dim);
+      color: var(--accent);
+      border-radius: 50%;
+      font-size: 0.85em;
+      font-weight: bold;
+      flex-shrink: 0;
+    }
+
+    /* ===== 侧边栏 ===== */
+    .sidebar {
+      grid-column: 2;
+      grid-row: 3;
+      background: var(--bg-secondary);
+      border-left: 1px solid var(--border);
+      padding: 16px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .sidebar-section {
+      background: var(--bg-card);
+      border-radius: 8px;
+      padding: 14px;
+      border: 1px solid var(--border);
+    }
+
+    .sidebar-title {
+      font-size: 0.85em;
+      color: var(--accent);
+      letter-spacing: 2px;
+      margin-bottom: 10px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* HP 条 */
+    .hp-bar-container {
+      background: var(--bg-primary);
+      border-radius: 10px;
+      height: 20px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      position: relative;
+    }
+
+    .hp-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #4caf50, #66bb6a);
+      transition: width 0.5s ease;
+      border-radius: 10px;
+    }
+
+    .hp-fill.low {
+      background: linear-gradient(90deg, #ff9800, #ffb74d);
+    }
+
+    .hp-fill.critical {
+      background: linear-gradient(90deg, #c44040, #e55555);
+      animation: hpPulse 1s ease infinite;
+    }
+
+    #hp-text {
+      text-align: center;
+      font-size: 0.8em;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+
+    /* 属性 */
+    .stat-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 0;
+      font-size: 0.9em;
+    }
+
+    .stat-icon {
+      font-size: 1.1em;
+      width: 24px;
+      text-align: center;
+    }
+
+    .stat-name {
+      color: var(--text-secondary);
+      flex: 1;
+    }
+
+    .stat-value {
+      color: var(--accent);
+      font-weight: bold;
+      min-width: 20px;
+      text-align: right;
+    }
+
+    /* 物品栏 */
+    #inventory-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .inventory-item {
+      background: var(--bg-hover);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 0.8em;
+      color: var(--text-secondary);
+      transition: all 0.2s;
+    }
+
+    .inventory-item:hover {
+      border-color: var(--accent-dim);
+      color: var(--text-primary);
+    }
+
+    .empty-inventory {
+      color: var(--text-dim);
+      font-size: 0.85em;
+      text-align: center;
+      padding: 10px;
+    }
+
+    /* ===== 战斗面板 ===== */
+    #combat-panel {
+      display: none;
+      flex-direction: column;
+      gap: 16px;
+      padding: 20px;
+      animation: fadeSlideIn 0.5s ease;
+    }
+
+    #combat-panel.active {
+      display: flex;
+    }
+
+    #enemy-info {
+      text-align: center;
+      padding: 16px;
+      background: var(--bg-card);
+      border-radius: 10px;
+      border: 1px solid var(--danger-dim);
+    }
+
+    .enemy-name {
+      font-size: 1.3em;
+      color: var(--danger);
+      margin-bottom: 10px;
+      letter-spacing: 2px;
+    }
+
+    .enemy-hp-bar {
+      background: var(--bg-primary);
+      border-radius: 10px;
+      height: 16px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    .enemy-hp-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--danger), #e55555);
+      transition: width 0.4s ease;
+      border-radius: 10px;
+    }
+
+    .enemy-hp-text {
+      font-size: 0.85em;
+      color: var(--text-secondary);
+      margin-top: 6px;
+    }
+
+    #combat-log {
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+      max-height: 250px;
+      overflow-y: auto;
+      font-size: 0.95em;
+      line-height: 1.8;
+    }
+
+    .combat-log-line {
+      padding: 2px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+    }
+
+    .combat-log-line.fade-in {
+      animation: fadeSlideIn 0.3s ease;
+    }
+
+    #combat-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .combat-btn {
+      flex: 1;
+      min-width: 100px;
+      padding: 12px 16px;
+      background: var(--bg-card);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.95em;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: inherit;
+    }
+
+    .combat-btn:hover {
+      background: var(--bg-hover);
+      border-color: var(--accent);
+      box-shadow: 0 0 10px var(--glow);
+    }
+
+    .combat-btn.back-btn {
+      background: var(--bg-primary);
+      color: var(--text-secondary);
+    }
+
+    .item-select-title {
+      width: 100%;
+      color: var(--accent);
+      font-size: 0.9em;
+      margin-bottom: 6px;
+    }
+
+    /* ===== 主菜单 ===== */
+    #menu-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: var(--bg-primary);
+      z-index: 100;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 30px;
+    }
+
+    #menu-overlay.active {
+      display: flex;
+    }
+
+    .menu-title {
+      font-size: 2.8em;
+      color: var(--accent);
+      text-shadow: 0 0 40px var(--glow), 0 0 80px rgba(201, 168, 76, 0.1);
+      letter-spacing: 8px;
+      animation: titleGlow 3s ease infinite;
+    }
+
+    .menu-subtitle {
+      color: var(--text-dim);
+      font-size: 1em;
+      letter-spacing: 4px;
+      margin-top: -15px;
+    }
+
+    .menu-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      min-width: 260px;
+    }
+
+    .menu-btn {
+      padding: 16px 30px;
+      background: var(--bg-card);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-size: 1.1em;
+      cursor: pointer;
+      transition: all 0.3s;
+      letter-spacing: 3px;
+      font-family: inherit;
+    }
+
+    .menu-btn:hover {
+      background: var(--bg-hover);
+      border-color: var(--accent);
+      box-shadow: 0 0 20px var(--glow);
+      transform: translateY(-2px);
+    }
+
+    /* ===== 结局画面 ===== */
+    #ending-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(10, 10, 15, 0.95);
+      z-index: 100;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      padding: 40px;
+    }
+
+    #ending-overlay.active {
+      display: flex;
+    }
+
+    #ending-title {
+      font-size: 2.2em;
+      color: var(--accent);
+      letter-spacing: 5px;
+      text-shadow: 0 0 30px var(--glow);
+    }
+
+    #ending-type {
+      font-size: 1em;
+      color: var(--text-secondary);
+      letter-spacing: 3px;
+    }
+
+    #ending-desc {
+      max-width: 600px;
+      text-align: center;
+      line-height: 2;
+      font-size: 1.05em;
+      color: var(--text-primary);
+    }
+
+    .ending-entry {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 16px;
+      background: var(--bg-card);
+      border-radius: 8px;
+      margin: 6px 0;
+      border: 1px solid var(--border);
+      text-align: left;
+    }
+
+    .ending-entry.locked {
+      opacity: 0.5;
+    }
+
+    .ending-icon {
+      font-size: 1.5em;
+      min-width: 30px;
+    }
+
+    .ending-name {
+      font-weight: bold;
+      color: var(--accent);
+    }
+
+    .ending-desc-mini {
+      font-size: 0.8em;
+      color: var(--text-secondary);
+      display: block;
+      margin-top: 4px;
+    }
+
+    #ending-close {
+      padding: 14px 40px;
+      background: var(--bg-card);
+      color: var(--accent);
+      border: 1px solid var(--accent-dim);
+      border-radius: 10px;
+      font-size: 1em;
+      cursor: pointer;
+      transition: all 0.3s;
+      letter-spacing: 2px;
+      font-family: inherit;
+      margin-top: 20px;
+    }
+
+    #ending-close:hover {
+      background: var(--accent-dim);
+      box-shadow: 0 0 20px var(--glow);
+    }
+
+    /* ===== 消息提示 ===== */
+    #message-toast {
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: var(--bg-card);
+      color: var(--accent);
+      border: 1px solid var(--accent-dim);
+      padding: 12px 28px;
+      border-radius: 10px;
+      font-size: 0.95em;
+      z-index: 200;
+      transition: transform 0.4s ease;
+      pointer-events: none;
+      box-shadow: 0 4px 20px var(--shadow);
+    }
+
+    #message-toast.show {
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* ===== 滚动条 ===== */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--bg-primary);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 3px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--text-dim);
+    }
+
+    /* ===== 动画 ===== */
+    @keyframes fadeSlideIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes choiceFadeIn {
+      from { opacity: 0; transform: translateX(-15px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    @keyframes titleGlow {
+      0%, 100% { text-shadow: 0 0 40px var(--glow), 0 0 80px rgba(201, 168, 76, 0.1); }
+      50% { text-shadow: 0 0 60px var(--glow), 0 0 120px rgba(201, 168, 76, 0.2); }
+    }
+
+    @keyframes hpPulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+
+    /* ===== 响应式 ===== */
+    @media (max-width: 768px) {
+      .game-container {
+        grid-template-columns: 1fr;
+      }
+      .sidebar {
+        grid-column: 1;
+        border-left: none;
+        border-top: 1px solid var(--border);
+        max-height: 200px;
+      }
+      .main-content {
+        padding: 16px;
+      }
+      .menu-title {
+        font-size: 2em;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- 主菜单 -->
+  <div id="menu-overlay" class="active">
+    <div class="menu-title">诅咒古堡</div>
+    <div class="menu-subtitle">文字冒险RPG</div>
+    <div class="menu-buttons">
+      <button id="menu-new-game" class="menu-btn">开始冒险</button>
+      <button id="menu-continue" class="menu-btn">继续旅程</button>
+      <button id="menu-endings" class="menu-btn">结局收集</button>
+    </div>
+  </div>
+
+  <!-- 结局画面 -->
+  <div id="ending-overlay">
+    <div id="ending-title"></div>
+    <div id="ending-type"></div>
+    <div id="ending-desc"></div>
+    <button id="ending-close">返回主菜单</button>
+  </div>
+
+  <!-- 消息提示 -->
+  <div id="message-toast"></div>
+
+  <!-- 游戏主界面 -->
+  <div class="game-container">
+    <!-- 顶部栏 -->
+    <div class="top-bar">
+      <div class="game-title">诅咒古堡</div>
+      <div class="top-controls">
+        <button id="skip-btn" title="跳过打字动画 (Space)">跳过 ▶▶</button>
+        <button id="sound-btn" title="开关音效">🔊</button>
+        <button id="save-btn" title="保存进度">💾</button>
+      </div>
+    </div>
+
+    <!-- 章节标题 -->
+    <div class="chapter-header">
+      <div id="chapter-title"></div>
+    </div>
+
+    <!-- 主内容 -->
+    <div class="main-content">
+      <div id="text-area"></div>
+      <div id="choices-area"></div>
+
+      <!-- 战斗面板 -->
+      <div id="combat-panel">
+        <div id="enemy-info"></div>
+        <div id="combat-log"></div>
+        <div id="combat-actions"></div>
+      </div>
+    </div>
+
+    <!-- 侧边栏 -->
+    <div class="sidebar">
+      <div class="sidebar-section">
+        <div class="sidebar-title">生命值</div>
+        <div class="hp-bar-container">
+          <div id="hp-bar" class="hp-fill" style="width: 100%"></div>
+        </div>
+        <div id="hp-text">HP: 100 / 100</div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-title">角色属性</div>
+        <div id="stats-display"></div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-title">背包</div>
+        <div id="inventory-list">
+          <div class="empty-inventory">背包为空</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+<script>
+if(location.protocol==="file:"){document.body.innerHTML='<div style="position:fixed;inset:0;background:#0a0a0a;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px;font-family:sans-serif;color:#fff;z-index:9999"><div style="font-size:48px;margin-bottom:20px">⚠️</div><h2 style="color:#ff6b4a;font-size:20px;margin-bottom:12px">需要启动HTTP服务器</h2><p style="color:#888;font-size:13px;line-height:1.8;max-width:400px">此游戏使用ES Modules，无法通过file://打开。<br>请在游戏目录运行:</p><div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:12px 20px;margin:16px;font-family:monospace;color:#4aeaff;font-size:13px">python -m http.server 8000</div><p style="color:#666;font-size:12px">然后访问 http://localhost:8000</p><a href="../index.html" style="margin-top:16px;color:#ff6b4a;font-size:13px;text-decoration:none">← 返回游戏合集</a></div>'}
+</script>
+</body>
+</html>

@@ -1,0 +1,70 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>地牢探险 - Roguelike Dungeon RPG</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #0a0e14;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      font-family: 'Microsoft YaHei', monospace;
+      overflow: hidden;
+    }
+
+    #gameContainer {
+      position: relative;
+      border: 2px solid rgba(80, 120, 180, 0.4);
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 0 40px rgba(0, 50, 100, 0.3);
+    }
+
+    #gameCanvas {
+      display: block;
+      image-rendering: pixelated;
+      cursor: default;
+    }
+
+    #controls {
+      position: absolute;
+      bottom: 90px;
+      left: 10px;
+      font-size: 11px;
+      color: rgba(150, 170, 190, 0.6);
+      pointer-events: none;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+    }
+
+    #title-bar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, #3366cc, #cc3366, #33cc66);
+      opacity: 0.6;
+    }
+  </style>
+</head>
+<body>
+  <div id="gameContainer">
+    <div id="title-bar"></div>
+    <canvas id="gameCanvas"></canvas>
+    <div id="controls">WASD/方向键:移动 | I:背包 | Q:属性 | F:远程 | 数字键:道具 | Enter:下楼</div>
+  </div>
+  <script type="module" src="js/main.js"></script>
+<script>
+if(location.protocol==="file:"){document.body.innerHTML='<div style="position:fixed;inset:0;background:#0a0a0a;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px;font-family:sans-serif;color:#fff;z-index:9999"><div style="font-size:48px;margin-bottom:20px">⚠️</div><h2 style="color:#ff6b4a;font-size:20px;margin-bottom:12px">需要启动HTTP服务器</h2><p style="color:#888;font-size:13px;line-height:1.8;max-width:400px">此游戏使用ES Modules，无法通过file://打开。<br>请在游戏目录运行:</p><div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:12px 20px;margin:16px;font-family:monospace;color:#4aeaff;font-size:13px">python -m http.server 8000</div><p style="color:#666;font-size:12px">然后访问 http://localhost:8000</p><a href="../index.html" style="margin-top:16px;color:#ff6b4a;font-size:13px;text-decoration:none">← 返回游戏合集</a></div>'}
+</script>
+</body>
+</html>

@@ -1,0 +1,551 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WordGuess - 猜词游戏</title>
+  <style>
+    /* ===== 基础样式 ===== */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: #121213;
+      color: #ffffff;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* ===== 标题栏 ===== */
+    .header {
+      width: 100%;
+      max-width: 500px;
+      padding: 12px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #3a3a3c;
+    }
+
+    .header h1 {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: 2px;
+    }
+
+    .header-controls {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .mode-label {
+      font-size: 12px;
+      padding: 4px 8px;
+      background: #538d4e;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+
+    .daily-badge {
+      font-size: 10px;
+      padding: 2px 6px;
+      background: #b59f3b;
+      border-radius: 4px;
+      font-weight: 600;
+      display: none;
+    }
+
+    .icon-btn {
+      background: none;
+      border: none;
+      color: #ffffff;
+      font-size: 20px;
+      cursor: pointer;
+      padding: 4px;
+      opacity: 0.8;
+      transition: opacity 0.2s;
+    }
+
+    .icon-btn:hover {
+      opacity: 1;
+    }
+
+    /* ===== 工具栏 ===== */
+    .toolbar {
+      width: 100%;
+      max-width: 500px;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .tool-btn {
+      font-size: 12px;
+      padding: 6px 12px;
+      background: #3a3a3c;
+      color: #ffffff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .tool-btn:hover {
+      background: #565658;
+    }
+
+    .tool-btn.active {
+      background: #538d4e;
+    }
+
+    /* ===== 消息区域 ===== */
+    #message-container {
+      position: fixed;
+      top: 60px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      pointer-events: none;
+    }
+
+    .message {
+      padding: 12px 20px;
+      background: #ffffff;
+      color: #121213;
+      font-size: 14px;
+      font-weight: 600;
+      border-radius: 4px;
+      animation: slideDown 0.3s ease;
+    }
+
+    .message-success { background: #538d4e; color: #fff; }
+    .message-error { background: #c0392b; color: #fff; }
+    .message-info { background: #565658; color: #fff; }
+    .message.fade-out { opacity: 0; transition: opacity 0.3s; }
+
+    @keyframes slideDown {
+      from { transform: translateY(-20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    /* ===== 游戏板 ===== */
+    #board {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      padding: 10px;
+    }
+
+    .board-row {
+      display: flex;
+      gap: 5px;
+    }
+
+    .cell {
+      width: 62px;
+      height: 62px;
+      perspective: 600px;
+    }
+
+    .cell-inner {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      transition: transform 0.5s;
+      transform-style: preserve-3d;
+    }
+
+    .cell.flipping .cell-inner {
+      transform: rotateX(180deg);
+    }
+
+    .cell-front, .cell-back {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      font-weight: 700;
+      text-transform: uppercase;
+      backface-visibility: hidden;
+      border: 2px solid #3a3a3c;
+    }
+
+    .cell-front {
+      background: #121213;
+    }
+
+    .cell.filled .cell-front {
+      border-color: #565658;
+    }
+
+    .cell-back {
+      transform: rotateX(180deg);
+    }
+
+    .cell-back.correct {
+      background: #538d4e;
+      border-color: #538d4e;
+    }
+
+    .cell-back.present {
+      background: #b59f3b;
+      border-color: #b59f3b;
+    }
+
+    .cell-back.absent {
+      background: #3a3a3c;
+      border-color: #3a3a3c;
+    }
+
+    /* 抖动动画 */
+    .shake {
+      animation: shake 0.5s;
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      10%, 50%, 90% { transform: translateX(-4px); }
+      30%, 70% { transform: translateX(4px); }
+    }
+
+    /* 弹跳动画 */
+    .bounce {
+      animation: bounce 0.5s ease;
+    }
+
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-20px); }
+    }
+
+    /* ===== 键盘 ===== */
+    #keyboard {
+      width: 100%;
+      max-width: 500px;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .keyboard-row {
+      display: flex;
+      justify-content: center;
+      gap: 5px;
+    }
+
+    .key {
+      min-width: 35px;
+      height: 52px;
+      background: #818384;
+      color: #ffffff;
+      border: none;
+      border-radius: 4px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s;
+      text-transform: uppercase;
+    }
+
+    .key:hover {
+      background: #6a6a6c;
+    }
+
+    .key-wide {
+      min-width: 65px;
+      font-size: 12px;
+    }
+
+    .key.correct {
+      background: #538d4e;
+    }
+
+    .key.present {
+      background: #b59f3b;
+    }
+
+    .key.absent {
+      background: #3a3a3c;
+    }
+
+    /* 中文输入区域 */
+    .chinese-input-area {
+      text-align: center;
+      padding: 16px;
+    }
+
+    .input-hint {
+      font-size: 14px;
+      color: #818384;
+      margin-bottom: 12px;
+    }
+
+    /* 隐藏的中文输入框 */
+    #chinese-input {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    /* ===== 弹窗 ===== */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+    }
+
+    .modal-overlay.show {
+      display: flex;
+    }
+
+    .modal {
+      background: #1a1a1b;
+      border-radius: 12px;
+      padding: 24px;
+      max-width: 400px;
+      width: 90%;
+      text-align: center;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    }
+
+    .modal-title {
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .modal-title.win { color: #538d4e; }
+    .modal-title.lose { color: #c0392b; }
+
+    .modal-answer {
+      font-size: 16px;
+      color: #818384;
+      margin-bottom: 8px;
+    }
+
+    .modal-stats {
+      font-size: 14px;
+      color: #ffffff;
+      margin-bottom: 20px;
+    }
+
+    .modal-buttons {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+    }
+
+    .btn {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    .btn:hover {
+      opacity: 0.9;
+    }
+
+    .btn-primary {
+      background: #538d4e;
+      color: #ffffff;
+    }
+
+    .btn-secondary {
+      background: #565658;
+      color: #ffffff;
+    }
+
+    /* ===== 统计面板 ===== */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+
+    .stat-item {
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 28px;
+      font-weight: 700;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      color: #818384;
+    }
+
+    .guess-distribution {
+      margin-bottom: 20px;
+    }
+
+    .dist-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+
+    .dist-label {
+      width: 16px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .dist-bar {
+      background: #3a3a3c;
+      color: #ffffff;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 4px 8px;
+      min-width: 30px;
+      text-align: right;
+      border-radius: 2px;
+    }
+
+    .close-btn {
+      background: #538d4e;
+      color: #ffffff;
+      border: none;
+      padding: 12px 32px;
+      border-radius: 4px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    /* ===== 响应式 ===== */
+    @media (max-width: 400px) {
+      .cell {
+        width: 52px;
+        height: 52px;
+      }
+
+      .cell-front, .cell-back {
+        font-size: 22px;
+      }
+
+      .key {
+        min-width: 28px;
+        height: 48px;
+        font-size: 12px;
+      }
+
+      .key-wide {
+        min-width: 52px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- 标题栏 -->
+  <header class="header">
+    <h1>WordGuess</h1>
+    <div class="header-controls">
+      <span id="mode-label" class="mode-label">英文模式</span>
+      <span id="daily-label" class="daily-badge">每日挑战</span>
+      <button id="btn-stats" class="icon-btn" title="统计">&#x1F4CA;</button>
+    </div>
+  </header>
+
+  <!-- 工具栏 -->
+  <div class="toolbar">
+    <button id="btn-mode-chinese" class="tool-btn">中文模式</button>
+    <button id="btn-mode-english" class="tool-btn active">英文模式</button>
+    <button id="btn-daily" class="tool-btn">每日挑战</button>
+    <button id="btn-new-game" class="tool-btn">新游戏</button>
+  </div>
+
+  <!-- 消息区域 -->
+  <div id="message-container"></div>
+
+  <!-- 游戏板 -->
+  <div id="board"></div>
+
+  <!-- 中文输入框（隐藏） -->
+  <input id="chinese-input" type="text" autocomplete="off" />
+
+  <!-- 键盘 -->
+  <div id="keyboard"></div>
+
+  <!-- 游戏结束弹窗 -->
+  <div id="game-over-modal" class="modal-overlay">
+    <div class="modal">
+      <h2 class="modal-title"></h2>
+      <p class="modal-answer"></p>
+      <p class="modal-stats"></p>
+      <div class="modal-buttons">
+        <button class="btn btn-secondary btn-share">分享结果</button>
+        <button class="btn btn-primary btn-new-game">再来一局</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 统计弹窗 -->
+  <div id="stats-modal" class="modal-overlay">
+    <div class="modal">
+      <h2 class="modal-title">游戏统计</h2>
+      <div class="stats-grid">
+        <div class="stat-item">
+          <div class="stat-value">0</div>
+          <div class="stat-label">游戏次数</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">0%</div>
+          <div class="stat-label">胜率</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">0</div>
+          <div class="stat-label">当前连胜</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">0</div>
+          <div class="stat-label">最大连胜</div>
+        </div>
+      </div>
+      <h3 style="margin-bottom: 8px; font-size: 16px;">猜测分布</h3>
+      <div class="guess-distribution"></div>
+      <button id="stats-close" class="close-btn">关闭</button>
+    </div>
+  </div>
+
+  <!-- 加载游戏模块 -->
+  <script type="module" src="js/main.js"></script>
+<script>
+if(location.protocol==="file:"){document.body.innerHTML='<div style="position:fixed;inset:0;background:#0a0a0a;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px;font-family:sans-serif;color:#fff;z-index:9999"><div style="font-size:48px;margin-bottom:20px">⚠️</div><h2 style="color:#ff6b4a;font-size:20px;margin-bottom:12px">需要启动HTTP服务器</h2><p style="color:#888;font-size:13px;line-height:1.8;max-width:400px">此游戏使用ES Modules，无法通过file://打开。<br>请在游戏目录运行:</p><div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:12px 20px;margin:16px;font-family:monospace;color:#4aeaff;font-size:13px">python -m http.server 8000</div><p style="color:#666;font-size:12px">然后访问 http://localhost:8000</p><a href="../index.html" style="margin-top:16px;color:#ff6b4a;font-size:13px;text-decoration:none">← 返回游戏合集</a></div>'}
+</script>
+</body>
+</html>

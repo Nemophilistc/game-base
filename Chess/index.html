@@ -1,0 +1,450 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>国际象棋 - MIMO</title>
+  <style>
+    /* ============================================================
+       全局样式
+       ============================================================ */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #1a1a2e;
+      color: #eee;
+      font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+    }
+
+    /* ============================================================
+       主布局
+       ============================================================ */
+    .game-wrapper {
+      display: flex;
+      gap: 20px;
+      align-items: flex-start;
+      max-width: 1100px;
+      padding: 15px;
+    }
+
+    /* 左侧面板 */
+    .left-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-width: 200px;
+    }
+
+    /* 棋盘容器 */
+    .board-area {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+
+    #board-container {
+      position: relative;
+      background: #16213e;
+      border-radius: 8px;
+      padding: 8px;
+      box-shadow: 0 0 30px rgba(0,0,0,0.5);
+    }
+
+    #chess-canvas {
+      display: block;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+
+    /* 右侧面板 */
+    .right-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-width: 200px;
+      max-width: 220px;
+    }
+
+    /* ============================================================
+       面板卡片
+       ============================================================ */
+    .panel-card {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      padding: 14px;
+      backdrop-filter: blur(10px);
+    }
+
+    .panel-card h3 {
+      font-size: 14px;
+      color: #aaa;
+      margin-bottom: 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      padding-bottom: 6px;
+    }
+
+    /* ============================================================
+       模式选择
+       ============================================================ */
+    .mode-buttons {
+      display: flex;
+      gap: 8px;
+    }
+
+    .mode-btn {
+      flex: 1;
+      padding: 10px 8px;
+      border: 2px solid rgba(255,255,255,0.2);
+      border-radius: 8px;
+      background: rgba(255,255,255,0.05);
+      color: #ccc;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+    }
+
+    .mode-btn:hover {
+      background: rgba(255,255,255,0.1);
+      border-color: rgba(255,255,255,0.3);
+    }
+
+    .mode-btn.active {
+      background: rgba(100, 180, 255, 0.2);
+      border-color: #64b4ff;
+      color: #fff;
+    }
+
+    /* 难度选择 */
+    #difficulty-panel {
+      display: none;
+      align-items: center;
+      gap: 8px;
+    }
+
+    #difficulty-panel label {
+      font-size: 13px;
+      color: #aaa;
+    }
+
+    #difficulty-select {
+      flex: 1;
+      padding: 6px 10px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 6px;
+      color: #eee;
+      font-size: 13px;
+      outline: none;
+    }
+
+    #difficulty-select option {
+      background: #1a1a2e;
+      color: #eee;
+    }
+
+    /* ============================================================
+       控制按钮
+       ============================================================ */
+    .control-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .ctrl-btn {
+      padding: 10px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+      color: #fff;
+    }
+
+    .ctrl-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+
+    .ctrl-btn:active {
+      transform: translateY(0);
+    }
+
+    #btn-undo {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+    }
+
+    #btn-restart {
+      background: linear-gradient(135deg, #f093fb, #f5576c);
+    }
+
+    #btn-resign {
+      background: linear-gradient(135deg, #4facfe, #00f2fe);
+    }
+
+    /* ============================================================
+       状态显示
+       ============================================================ */
+    #status-text {
+      font-size: 15px;
+      text-align: center;
+      color: #fff;
+      padding: 8px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 6px;
+    }
+
+    #turn-indicator {
+      font-size: 16px;
+      font-weight: bold;
+      text-align: center;
+      padding: 8px;
+      border-radius: 6px;
+    }
+
+    .turn-white {
+      background: rgba(255,255,255,0.15);
+      color: #fff;
+    }
+
+    .turn-black {
+      background: rgba(0,0,0,0.3);
+      color: #ccc;
+    }
+
+    /* ============================================================
+       走法历史
+       ============================================================ */
+    #move-history {
+      max-height: 320px;
+      overflow-y: auto;
+      font-size: 13px;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255,255,255,0.2) transparent;
+    }
+
+    #move-history::-webkit-scrollbar {
+      width: 5px;
+    }
+
+    #move-history::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    #move-history::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.2);
+      border-radius: 3px;
+    }
+
+    .history-row {
+      display: flex;
+      gap: 6px;
+      padding: 3px 4px;
+      border-radius: 3px;
+    }
+
+    .history-row:nth-child(odd) {
+      background: rgba(255,255,255,0.02);
+    }
+
+    .history-num {
+      color: #666;
+      min-width: 28px;
+      text-align: right;
+    }
+
+    .history-move {
+      color: #ccc;
+      min-width: 60px;
+    }
+
+    /* ============================================================
+       兵升变覆盖层
+       ============================================================ */
+    #promotion-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .promo-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      padding: 16px 20px;
+      margin: 0 8px;
+      background: rgba(255,255,255,0.1);
+      border: 2px solid rgba(255,255,255,0.3);
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+      color: #fff;
+    }
+
+    .promo-btn:hover {
+      background: rgba(100,180,255,0.3);
+      border-color: #64b4ff;
+      transform: translateY(-4px);
+    }
+
+    .promo-piece {
+      font-size: 48px;
+      line-height: 1;
+    }
+
+    .promo-label {
+      font-size: 14px;
+      color: #aaa;
+    }
+
+    /* ============================================================
+       游戏结束覆盖层
+       ============================================================ */
+    #gameover-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.75);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .gameover-box {
+      background: rgba(26, 26, 46, 0.95);
+      border: 2px solid rgba(255,255,255,0.2);
+      border-radius: 16px;
+      padding: 40px 60px;
+      text-align: center;
+      backdrop-filter: blur(20px);
+    }
+
+    .gameover-title {
+      font-size: 42px;
+      font-weight: bold;
+      color: #fff;
+      margin-bottom: 10px;
+    }
+
+    .gameover-subtitle {
+      font-size: 20px;
+      color: #aaa;
+      margin-bottom: 30px;
+    }
+
+    .gameover-btn {
+      padding: 12px 36px;
+      font-size: 16px;
+      border: none;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: #fff;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .gameover-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(102,126,234,0.4);
+    }
+
+    /* ============================================================
+       响应式
+       ============================================================ */
+    @media (max-width: 900px) {
+      .game-wrapper {
+        flex-direction: column;
+        align-items: center;
+      }
+      .left-panel, .right-panel {
+        flex-direction: row;
+        flex-wrap: wrap;
+        min-width: unset;
+        max-width: unset;
+        justify-content: center;
+      }
+      .right-panel {
+        order: 3;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="game-wrapper">
+    <!-- 左侧面板 -->
+    <div class="left-panel">
+      <!-- 模式选择 -->
+      <div class="panel-card">
+        <h3>游戏模式</h3>
+        <div class="mode-buttons">
+          <button class="mode-btn active" id="btn-pvp">双人对弈</button>
+          <button class="mode-btn" id="btn-ai">人机对弈</button>
+        </div>
+        <div id="difficulty-panel">
+          <label for="difficulty-select">AI难度:</label>
+          <select id="difficulty-select">
+            <option value="1">简单</option>
+            <option value="2" selected>中等</option>
+            <option value="3">困难</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- 控制按钮 -->
+      <div class="panel-card">
+        <h3>操作</h3>
+        <div class="control-buttons">
+          <button class="ctrl-btn" id="btn-undo">悔棋</button>
+          <button class="ctrl-btn" id="btn-restart">重新开始</button>
+          <button class="ctrl-btn" id="btn-resign">认输</button>
+        </div>
+      </div>
+
+      <!-- 状态 -->
+      <div class="panel-card">
+        <div id="turn-indicator" class="turn-white">白方走棋</div>
+        <div id="status-text" style="margin-top:8px;">白方走棋</div>
+      </div>
+    </div>
+
+    <!-- 棋盘 -->
+    <div class="board-area">
+      <div id="board-container">
+        <canvas id="chess-canvas"></canvas>
+      </div>
+    </div>
+
+    <!-- 右侧面板 -->
+    <div class="right-panel">
+      <div class="panel-card">
+        <h3>走法记录</h3>
+        <div id="move-history"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 兵升变覆盖层 -->
+  <div id="promotion-overlay"></div>
+
+  <!-- 游戏结束覆盖层 -->
+  <div id="gameover-overlay"></div>
+
+  <script type="module" src="js/main.js"></script>
+<script>
+if(location.protocol==="file:"){document.body.innerHTML='<div style="position:fixed;inset:0;background:#0a0a0a;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px;font-family:sans-serif;color:#fff;z-index:9999"><div style="font-size:48px;margin-bottom:20px">⚠️</div><h2 style="color:#ff6b4a;font-size:20px;margin-bottom:12px">需要启动HTTP服务器</h2><p style="color:#888;font-size:13px;line-height:1.8;max-width:400px">此游戏使用ES Modules，无法通过file://打开。<br>请在游戏目录运行:</p><div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:12px 20px;margin:16px;font-family:monospace;color:#4aeaff;font-size:13px">python -m http.server 8000</div><p style="color:#666;font-size:12px">然后访问 http://localhost:8000</p><a href="../index.html" style="margin-top:16px;color:#ff6b4a;font-size:13px;text-decoration:none">← 返回游戏合集</a></div>'}
+</script>
+</body>
+</html>

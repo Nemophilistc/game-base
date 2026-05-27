@@ -1,0 +1,462 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>尖塔卡牌 - Roguelike卡牌战斗</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0d1117;
+            color: #ecf0f1;
+            font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        .screen {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100vw;
+            height: 100vh;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        /* ===== 菜单 ===== */
+        #menuScreen {
+            background: linear-gradient(135deg, #0d1117 0%, #1a1a2e 50%, #16213e 100%);
+            display: flex;
+        }
+
+        .menu-title {
+            font-size: 52px;
+            font-weight: bold;
+            color: #e74c3c;
+            text-shadow: 0 0 30px rgba(231, 76, 60, 0.5);
+            margin-bottom: 10px;
+        }
+
+        .menu-subtitle {
+            font-size: 18px;
+            color: #95a5a6;
+            margin-bottom: 40px;
+        }
+
+        .menu-decor {
+            font-size: 80px;
+            margin-bottom: 20px;
+            filter: drop-shadow(0 0 20px rgba(231, 76, 60, 0.3));
+        }
+
+        .btn {
+            padding: 14px 40px;
+            font-size: 18px;
+            font-weight: bold;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            color: #fff;
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: #fff;
+        }
+
+        .btn-large {
+            padding: 18px 60px;
+            font-size: 22px;
+        }
+
+        .menu-info {
+            margin-top: 30px;
+            color: #7f8c8d;
+            font-size: 13px;
+            text-align: center;
+            line-height: 1.8;
+        }
+
+        /* ===== 地图 ===== */
+        #mapScreen {
+            justify-content: flex-start;
+            padding-top: 10px;
+        }
+
+        .map-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            max-width: 900px;
+            padding: 8px 16px;
+            background: rgba(26, 26, 46, 0.9);
+            border-radius: 10px;
+            margin-bottom: 10px;
+        }
+
+        .map-header .info {
+            font-size: 15px;
+            color: #bdc3c7;
+        }
+
+        .map-header .info span {
+            margin: 0 12px;
+        }
+
+        #mapCanvas {
+            background: #0d1117;
+            border-radius: 10px;
+            border: 1px solid #2d3748;
+            cursor: pointer;
+        }
+
+        /* ===== 战斗 ===== */
+        #combatScreen {
+            justify-content: space-between;
+            padding: 8px;
+        }
+
+        .combat-top {
+            width: 100%;
+            max-width: 900px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 12px;
+            background: rgba(26, 26, 46, 0.95);
+            border-radius: 8px;
+        }
+
+        .combat-top .player-info {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            font-size: 15px;
+        }
+
+        .combat-top .player-info .hp { color: #e74c3c; font-weight: bold; }
+        .combat-top .player-info .energy { color: #f39c12; font-weight: bold; }
+        .combat-top .player-info .armor { color: #3498db; }
+        .combat-top .player-info .turn { color: #95a5a6; }
+
+        .combat-middle {
+            width: 100%;
+            max-width: 900px;
+            display: flex;
+            gap: 12px;
+            flex: 1;
+        }
+
+        .combat-battle-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #mainCanvas {
+            border-radius: 8px;
+            background: #0d1117;
+        }
+
+        .enemy-names {
+            font-size: 14px;
+            color: #e74c3c;
+            margin-bottom: 4px;
+        }
+
+        .combat-sidebar {
+            width: 180px;
+            background: rgba(26, 26, 46, 0.95);
+            border-radius: 8px;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .combat-log-title {
+            font-size: 13px;
+            color: #95a5a6;
+            margin-bottom: 6px;
+            font-weight: bold;
+        }
+
+        #combatLog {
+            flex: 1;
+            overflow-y: auto;
+            font-size: 11px;
+            color: #7f8c8d;
+            line-height: 1.6;
+            max-height: 200px;
+        }
+
+        #combatLog div {
+            padding: 2px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .combat-bottom {
+            width: 100%;
+            max-width: 900px;
+            display: flex;
+            align-items: flex-end;
+            gap: 10px;
+        }
+
+        .hand-area {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+        }
+
+        #cardCanvas {
+            cursor: pointer;
+        }
+
+        .combat-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .potion-bar {
+            display: flex;
+            gap: 6px;
+        }
+
+        .potion-slot {
+            width: 36px;
+            height: 36px;
+            background: rgba(26, 26, 46, 0.9);
+            border: 1px solid #4a5568;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 18px;
+            transition: all 0.2s;
+        }
+
+        .potion-slot:hover {
+            border-color: #f39c12;
+            transform: scale(1.1);
+        }
+
+        #endTurnBtn {
+            padding: 10px 28px;
+            font-size: 16px;
+            white-space: nowrap;
+        }
+
+        /* ===== 覆盖层通用 ===== */
+        #shopScreen, #restScreen, #eventScreen, #rewardScreen, #cardSelectScreen {
+            display: none;
+            background: #0d1117;
+        }
+
+        #shopScreen canvas,
+        #restScreen canvas,
+        #eventScreen canvas,
+        #rewardScreen canvas,
+        #cardSelectScreen canvas {
+            border-radius: 10px;
+            border: 1px solid #2d3748;
+            cursor: pointer;
+        }
+
+        /* ===== 游戏结束 ===== */
+        #gameOverScreen {
+            background: linear-gradient(135deg, #1a0000 0%, #0d1117 50%, #1a0000 100%);
+        }
+
+        #victoryScreen {
+            background: linear-gradient(135deg, #0d1117 0%, #1a3a1a 50%, #0d1117 100%);
+        }
+
+        .game-over-title {
+            font-size: 48px;
+            font-weight: bold;
+            color: #e74c3c;
+            text-shadow: 0 0 30px rgba(231, 76, 60, 0.5);
+            margin-bottom: 10px;
+        }
+
+        .victory-title {
+            font-size: 48px;
+            font-weight: bold;
+            color: #2ecc71;
+            text-shadow: 0 0 30px rgba(46, 204, 113, 0.5);
+            margin-bottom: 10px;
+        }
+
+        .game-over-emoji {
+            font-size: 80px;
+            margin-bottom: 20px;
+        }
+
+        .game-over-info {
+            font-size: 18px;
+            color: #bdc3c7;
+            margin-bottom: 30px;
+        }
+
+        /* ===== 滚动条 ===== */
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #4a5568;
+            border-radius: 2px;
+        }
+
+        /* ===== 响应式 ===== */
+        @media (max-width: 768px) {
+            .menu-title { font-size: 36px; }
+            .menu-decor { font-size: 60px; }
+            .btn-large { padding: 14px 40px; font-size: 18px; }
+            .combat-sidebar { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <!-- ===== 菜单画面 ===== -->
+    <div id="menuScreen" class="screen">
+        <div class="menu-decor">⚔️🃏🛡️</div>
+        <div class="menu-title">尖塔卡牌</div>
+        <div class="menu-subtitle">Roguelike卡牌战斗游戏</div>
+        <button id="startBtn" class="btn btn-primary btn-large">开始冒险</button>
+        <div class="menu-info">
+            构建你的牌组，挑战层层敌人<br>
+            收集强力卡牌，击败最终BOSS
+        </div>
+    </div>
+
+    <!-- ===== 地图画面 ===== -->
+    <div id="mapScreen" class="screen">
+        <div class="map-header">
+            <div class="info">
+                <span id="floorDisplay">第一层</span>
+                <span id="mapHpDisplay">❤️ 80/80</span>
+                <span id="goldDisplay">💰 99</span>
+            </div>
+            <div class="info" style="font-size:12px; color:#7f8c8d;">点击可访问的节点前进</div>
+        </div>
+        <canvas id="mapCanvas"></canvas>
+    </div>
+
+    <!-- ===== 战斗画面 ===== -->
+    <div id="combatScreen" class="screen">
+        <div class="combat-top">
+            <div class="player-info">
+                <span id="hpDisplay">❤️ 80/80</span>
+                <span id="energyDisplay">⚡ 3/3</span>
+                <span id="armorDisplay"></span>
+                <span id="turnDisplay" class="turn">回合 1</span>
+            </div>
+            <div class="enemy-names" id="enemyNames"></div>
+        </div>
+
+        <div class="combat-middle">
+            <div class="combat-battle-area">
+                <canvas id="mainCanvas"></canvas>
+            </div>
+            <div class="combat-sidebar">
+                <div class="combat-log-title">战斗日志</div>
+                <div id="combatLog"></div>
+            </div>
+        </div>
+
+        <div class="combat-bottom">
+            <div class="hand-area">
+                <canvas id="cardCanvas"></canvas>
+            </div>
+            <div class="combat-actions">
+                <div class="potion-bar">
+                    <div class="potion-slot" title="药水槽1"></div>
+                    <div class="potion-slot" title="药水槽2"></div>
+                    <div class="potion-slot" title="药水槽3"></div>
+                </div>
+                <button id="endTurnBtn" class="btn btn-primary">结束回合</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== 商店画面 ===== -->
+    <div id="shopScreen" class="screen">
+        <canvas id="shopCanvas" width="900" height="500"></canvas>
+    </div>
+
+    <!-- ===== 休息画面 ===== -->
+    <div id="restScreen" class="screen">
+        <canvas id="restCanvas" width="900" height="400"></canvas>
+    </div>
+
+    <!-- ===== 事件画面 ===== -->
+    <div id="eventScreen" class="screen">
+        <canvas id="eventCanvas" width="900" height="400"></canvas>
+    </div>
+
+    <!-- ===== 奖励画面 ===== -->
+    <div id="rewardScreen" class="screen">
+        <canvas id="rewardCanvas" width="900" height="500"></canvas>
+    </div>
+
+    <!-- ===== 卡牌选择画面 ===== -->
+    <div id="cardSelectScreen" class="screen">
+        <canvas id="cardSelectCanvas" width="900" height="500"></canvas>
+    </div>
+
+    <!-- ===== 游戏结束画面 ===== -->
+    <div id="gameOverScreen" class="screen">
+        <div class="game-over-emoji">💀</div>
+        <div class="game-over-title">游戏结束</div>
+        <div class="game-over-info" id="finalFloor">到达: 第1层</div>
+        <button id="restartBtn" class="btn btn-primary btn-large">再来一次</button>
+    </div>
+
+    <!-- ===== 胜利画面 ===== -->
+    <div id="victoryScreen" class="screen">
+        <div class="game-over-emoji">🏆</div>
+        <div class="victory-title">胜利！</div>
+        <div class="game-over-info">你征服了尖塔！</div>
+        <button id="restartBtn2" class="btn btn-secondary btn-large">再来一次</button>
+    </div>
+
+    <script type="module" src="js/main.js"></script>
+<script>
+if(location.protocol==="file:"){document.body.innerHTML='<div style="position:fixed;inset:0;background:#0a0a0a;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px;font-family:sans-serif;color:#fff;z-index:9999"><div style="font-size:48px;margin-bottom:20px">⚠️</div><h2 style="color:#ff6b4a;font-size:20px;margin-bottom:12px">需要启动HTTP服务器</h2><p style="color:#888;font-size:13px;line-height:1.8;max-width:400px">此游戏使用ES Modules，无法通过file://打开。<br>请在游戏目录运行:</p><div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:12px 20px;margin:16px;font-family:monospace;color:#4aeaff;font-size:13px">python -m http.server 8000</div><p style="color:#666;font-size:12px">然后访问 http://localhost:8000</p><a href="../index.html" style="margin-top:16px;color:#ff6b4a;font-size:13px;text-decoration:none">← 返回游戏合集</a></div>'}
+</script>
+</body>
+</html>

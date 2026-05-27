@@ -1,0 +1,145 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>弹幕风暴 v2 - Bullet Hell</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{background:#0a0a0a;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'Segoe UI',Tahoma,sans-serif;overflow:hidden;color:#fff}
+        #gameCanvas{border:2px solid #333;border-radius:8px;box-shadow:0 0 40px rgba(0,150,255,0.3);background:#111;cursor:crosshair}
+        #hud{position:fixed;top:10px;left:10px;right:10px;display:flex;justify-content:space-between;align-items:flex-start;pointer-events:none;z-index:10}
+        .hud-left,.hud-right{display:flex;flex-direction:column;gap:6px}
+        .hud-item{background:rgba(0,0,0,0.7);padding:6px 12px;border-radius:6px;font-size:13px;border:1px solid rgba(255,255,255,0.1);backdrop-filter:blur(10px);white-space:nowrap}
+        .hud-item span{color:#00d4ff;font-weight:bold}
+        #comboDisplay{position:fixed;top:50%;right:30px;transform:translateY(-50%);text-align:right;pointer-events:none;z-index:10;opacity:0;transition:opacity 0.3s}
+        #comboDisplay.active{opacity:1}
+        #comboCount{font-size:48px;font-weight:bold;color:#ffd700;text-shadow:0 0 20px rgba(255,215,0,0.5)}
+        #comboLabel{font-size:16px;color:#ffa502}
+        #comboMult{font-size:24px;color:#ff6b6b;font-weight:bold}
+        #dashCooldown{position:fixed;bottom:60px;left:50%;transform:translateX(-50%);width:120px;height:8px;background:rgba(255,255,255,0.1);border-radius:4px;overflow:hidden;pointer-events:none;z-index:10}
+        #dashBar{height:100%;background:linear-gradient(90deg,#00d4ff,#00ff88);border-radius:4px;transition:width 0.1s}
+        #dashLabel{position:fixed;bottom:70px;left:50%;transform:translateX(-50%);font-size:11px;color:rgba(255,255,255,0.5);pointer-events:none;z-index:10}
+        .screen{position:fixed;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:300;transition:opacity 0.3s}
+        .screen.hidden{display:none}
+        #startScreen{background:linear-gradient(135deg,#0a0a0a 0%,#001a33 50%,#0a0a0a 100%)}
+        #gameTitle{font-size:64px;color:#00d4ff;margin-bottom:10px;text-shadow:0 0 40px rgba(0,212,255,0.6);letter-spacing:8px}
+        #gameSubtitle{font-size:18px;color:#666;margin-bottom:30px}
+        .menu-btn{background:linear-gradient(135deg,#00d4ff 0%,#0099cc 100%);border:none;padding:16px 44px;font-size:18px;color:#fff;border-radius:8px;cursor:pointer;transition:all 0.3s;pointer-events:auto;margin:8px}
+        .menu-btn:hover{transform:scale(1.08);box-shadow:0 0 30px rgba(0,212,255,0.5)}
+        .help-box{margin-top:25px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:20px 30px;max-width:500px;text-align:left;font-size:13px;color:#aaa;line-height:1.8;backdrop-filter:blur(5px)}
+        .help-box h3{color:#00d4ff;font-size:15px;margin-bottom:8px;text-align:center}
+        .help-box .row{display:flex;justify-content:space-between;padding:2px 0}
+        .help-box .key{color:#ffd700;min-width:80px}
+        #weaponSelect{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);display:none;flex-direction:column;align-items:center;justify-content:center;z-index:250;backdrop-filter:blur(10px)}
+        #weaponSelect.active{display:flex}
+        #weaponTitle{font-size:36px;color:#00d4ff;margin-bottom:30px}
+        .weapon-cards{display:flex;gap:20px;flex-wrap:wrap;justify-content:center}
+        .weapon-card{background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);border:2px solid #333;border-radius:12px;padding:24px;width:200px;cursor:pointer;transition:all 0.3s;text-align:center;pointer-events:auto}
+        .weapon-card:hover{transform:translateY(-5px);border-color:#00d4ff;box-shadow:0 10px 30px rgba(0,212,255,0.3)}
+        .weapon-icon{font-size:48px;margin-bottom:10px}
+        .weapon-name{font-size:18px;font-weight:bold;color:#00d4ff;margin-bottom:8px}
+        .weapon-desc{font-size:12px;color:#aaa;line-height:1.4}
+        #levelUpScreen{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);display:none;flex-direction:column;align-items:center;justify-content:center;z-index:100;backdrop-filter:blur(10px)}
+        #levelUpScreen.active{display:flex}
+        #levelUpTitle{font-size:36px;color:#ffd700;margin-bottom:30px;text-shadow:0 0 20px rgba(255,215,0,0.5)}
+        #upgradeOptions{display:flex;gap:20px;flex-wrap:wrap;justify-content:center;max-width:800px}
+        .upgrade-card{background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);border:2px solid #333;border-radius:12px;padding:20px;width:220px;cursor:pointer;transition:all 0.3s;pointer-events:auto}
+        .upgrade-card:hover{transform:translateY(-5px);border-color:#00d4ff;box-shadow:0 10px 30px rgba(0,212,255,0.3)}
+        .upgrade-icon{font-size:48px;margin-bottom:10px}
+        .upgrade-name{font-size:18px;font-weight:bold;color:#00d4ff;margin-bottom:8px}
+        .upgrade-desc{font-size:12px;color:#aaa;line-height:1.4}
+        #gameOverScreen{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);display:none;flex-direction:column;align-items:center;justify-content:center;z-index:200}
+        #gameOverScreen.active{display:flex}
+        #gameOverTitle{font-size:48px;color:#ff6b6b;margin-bottom:20px;text-shadow:0 0 30px rgba(255,107,107,0.5)}
+        #gameOverStats{font-size:20px;color:#aaa;margin-bottom:30px;text-align:center;line-height:1.8}
+        #bossWarning{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);font-size:48px;color:#ff0000;font-weight:bold;text-shadow:0 0 30px rgba(255,0,0,0.8);pointer-events:none;z-index:50;opacity:0;transition:opacity 0.3s}
+        #bossWarning.active{opacity:1}
+        #muteBtn{position:fixed;top:10px;right:10px;background:rgba(0,0,0,0.6);border:1px solid rgba(255,255,255,0.2);color:#fff;font-size:20px;padding:6px 10px;border-radius:6px;cursor:pointer;z-index:400;pointer-events:auto}
+        #restartBtn{position:fixed;top:10px;right:60px;background:rgba(0,0,0,0.6);border:1px solid rgba(255,255,255,0.2);color:#aaa;font-size:13px;padding:6px 12px;border-radius:6px;cursor:pointer;z-index:400;pointer-events:auto;transition:all 0.2s}
+        #restartBtn:hover{background:rgba(0,212,255,0.3);color:#00d4ff;border-color:#00d4ff}
+        #pauseOverlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:none;align-items:center;justify-content:center;z-index:150;flex-direction:column}
+        #pauseOverlay.active{display:flex}
+        #pauseText{font-size:48px;color:#ffd700;text-shadow:0 0 20px rgba(255,215,0,0.5)}
+        #pauseSub{font-size:16px;color:#888;margin-top:10px}
+        #controls{position:fixed;bottom:15px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,0.4);font-size:12px;text-align:center;pointer-events:none}
+    </style>
+</head>
+<body>
+    <button id="muteBtn">🔊</button>
+    <button id="restartBtn" title="重新开始 (R)">↺ 重新开始</button>
+
+    <!-- 开始界面 -->
+    <div id="startScreen" class="screen">
+        <div id="gameTitle">弹幕风暴</div>
+        <div id="gameSubtitle">v2.0 — 在弹幕中生存</div>
+        <button class="menu-btn">开始游戏</button>
+        <div class="help-box">
+            <h3>🎮 操作说明</h3>
+            <div class="row"><span class="key">WASD/方向键</span><span>移动飞机</span></div>
+            <div class="row"><span class="key">自动射击</span><span>持续发射子弹</span></div>
+            <div class="row"><span class="key">Shift</span><span>闪避冲刺（短暂无敌）</span></div>
+            <div class="row"><span class="key">B</span><span>炸弹（清屏+伤害）</span></div>
+            <div class="row"><span class="key">P / Esc</span><span>暂停</span></div>
+            <div class="row"><span class="key">M</span><span>静音切换</span></div>
+            <div class="row"><span class="key">R</span><span>重新开始</span></div>
+            <h3 style="margin-top:12px">🎯 游戏目标</h3>
+            <div style="text-align:center">击杀敌人获取经验 → 升级选择强化 → 挑战Boss → 活到最后</div>
+            <h3 style="margin-top:12px">💡 道具掉落</h3>
+            <div style="text-align:center">🛡️护盾 ⚡攻速 🔥散弹 💜追踪 ❤️回血 💣炸弹</div>
+        </div>
+    </div>
+
+    <!-- 武器选择 -->
+    <div id="weaponSelect">
+        <div id="weaponTitle">选择初始武器</div>
+        <div class="weapon-cards" id="weaponCards"></div>
+    </div>
+
+    <!-- 游戏主界面 -->
+    <div id="gameContainer">
+        <div id="hud">
+            <div class="hud-left">
+                <div class="hud-item">❤️ <span id="hp">100</span></div>
+                <div class="hud-item">🏆 <span id="score">0</span></div>
+                <div class="hud-item">⏱️ <span id="time">0:00</span></div>
+                <div class="hud-item">📊 Lv.<span id="level">1</span></div>
+            </div>
+            <div class="hud-right">
+                <div class="hud-item">🗡️ <span id="weapon">标准弹</span></div>
+                <div class="hud-item">💣 <span id="bombs">3</span></div>
+                <div class="hud-item">🛡️ <span id="shield">0</span></div>
+            </div>
+        </div>
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+    </div>
+
+    <div id="comboDisplay"><div id="comboCount">0</div><div id="comboLabel">COMBO</div><div id="comboMult">x1</div></div>
+    <div id="dashLabel">SHIFT 冲刺</div>
+    <div id="dashCooldown"><div id="dashBar" style="width:100%"></div></div>
+    <div id="bossWarning">⚠️ WARNING ⚠️<br><span style="font-size:24px">BOSS来袭</span></div>
+
+    <div id="levelUpScreen">
+        <div id="levelUpTitle">升级！选择强化</div>
+        <div id="upgradeOptions"></div>
+    </div>
+
+    <div id="gameOverScreen">
+        <div id="gameOverTitle">游戏结束</div>
+        <div id="gameOverStats"></div>
+        <button class="menu-btn">再来一局</button>
+    </div>
+
+    <div id="pauseOverlay">
+        <div id="pauseText">⏸ 暂停</div>
+        <div id="pauseSub">按 P 或 Esc 继续</div>
+    </div>
+
+    <div id="controls">WASD移动 | 自动射击 | Shift冲刺 | B炸弹 | P暂停 | M静音 | R重新开始</div>
+
+<script type="module" src="js/main.js"></script>
+<script>
+if(location.protocol==="file:"){document.body.innerHTML='<div style="position:fixed;inset:0;background:#0a0a0a;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px;font-family:sans-serif;color:#fff;z-index:9999"><div style="font-size:48px;margin-bottom:20px">⚠️</div><h2 style="color:#ff6b4a;font-size:20px;margin-bottom:12px">需要启动HTTP服务器</h2><p style="color:#888;font-size:13px;line-height:1.8;max-width:400px">此游戏使用ES Modules，无法通过file://打开。<br>请在游戏目录运行:</p><div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:12px 20px;margin:16px;font-family:monospace;color:#4aeaff;font-size:13px">python -m http.server 8000</div><p style="color:#666;font-size:12px">然后访问 http://localhost:8000</p><a href="../index.html" style="margin-top:16px;color:#ff6b4a;font-size:13px;text-decoration:none">← 返回游戏合集</a></div>'}
+</script>
+</body>
+</html>

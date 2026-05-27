@@ -1,0 +1,102 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>射箭大师 - MIMO游戏合集</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0a0a1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+        }
+
+        #gameContainer {
+            position: relative;
+            width: 100%;
+            max-width: 1200px;
+            aspect-ratio: 12 / 7;
+            max-height: 100vh;
+        }
+
+        #gameCanvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            cursor: crosshair;
+            border-radius: 8px;
+            box-shadow: 0 0 40px rgba(255, 165, 0, 0.15), 0 0 80px rgba(0, 0, 0, 0.5);
+        }
+
+        .back-link {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: #888;
+            text-decoration: none;
+            font-size: 14px;
+            z-index: 10;
+            background: rgba(0,0,0,0.5);
+            padding: 5px 10px;
+            border-radius: 4px;
+            transition: color 0.3s;
+        }
+
+        .back-link:hover {
+            color: #FFD700;
+        }
+
+        /* Responsive scaling */
+        @media (max-width: 1200px) {
+            #gameContainer {
+                max-width: 100vw;
+                max-height: 100vh;
+                border-radius: 0;
+            }
+            #gameCanvas {
+                border-radius: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <a href="../index.html" class="back-link">← 返回游戏合集</a>
+        <canvas id="gameCanvas" width="1200" height="700"></canvas>
+    </div>
+
+    <script type="module">
+        import './js/main.js';
+
+        // Initialize when page loads
+        window.addEventListener('DOMContentLoaded', () => {
+            if (window.startGame) window.startGame();
+        });
+
+        // Also init on first user interaction for audio
+        let initialized = false;
+        const initOnInteraction = () => {
+            if (initialized) return;
+            initialized = true;
+            if (window.startGame) window.startGame();
+            document.removeEventListener('click', initOnInteraction);
+            document.removeEventListener('touchstart', initOnInteraction);
+        };
+        document.addEventListener('click', initOnInteraction);
+        document.addEventListener('touchstart', initOnInteraction);
+    </script>
+<script>
+if(location.protocol==="file:"){document.body.innerHTML='<div style="position:fixed;inset:0;background:#0a0a0a;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px;font-family:sans-serif;color:#fff;z-index:9999"><div style="font-size:48px;margin-bottom:20px">⚠️</div><h2 style="color:#ff6b4a;font-size:20px;margin-bottom:12px">需要启动HTTP服务器</h2><p style="color:#888;font-size:13px;line-height:1.8;max-width:400px">此游戏使用ES Modules，无法通过file://打开。<br>请在游戏目录运行:</p><div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:12px 20px;margin:16px;font-family:monospace;color:#4aeaff;font-size:13px">python -m http.server 8000</div><p style="color:#666;font-size:12px">然后访问 http://localhost:8000</p><a href="../index.html" style="margin-top:16px;color:#ff6b4a;font-size:13px;text-decoration:none">← 返回游戏合集</a></div>'}
+</script>
+</body>
+</html>

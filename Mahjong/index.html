@@ -1,0 +1,233 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>麻将连连看 - Mahjong Link</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      background: #0d0d1a;
+      font-family: "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "SimHei", sans-serif;
+      color: #e8dcc8;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    #gameCanvas {
+      display: block;
+      width: 100%; height: 100%;
+    }
+
+    /* HUD */
+    #hud {
+      position: fixed; top: 0; left: 0; right: 0;
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 8px 16px;
+      background: linear-gradient(180deg, rgba(13,13,26,0.95) 0%, rgba(13,13,26,0.7) 80%, transparent 100%);
+      z-index: 10;
+      pointer-events: none;
+    }
+    #hud > * { pointer-events: auto; }
+
+    .hud-left, .hud-center, .hud-right {
+      display: flex; align-items: center; gap: 16px;
+    }
+    .hud-item {
+      display: flex; align-items: center; gap: 4px;
+      font-size: 14px; color: #b0a080;
+    }
+    .hud-item .val {
+      color: #f5c842; font-weight: bold; font-size: 16px;
+      min-width: 30px; text-align: center;
+    }
+    .hud-item .label { font-size: 12px; opacity: 0.7; }
+
+    .hud-btn {
+      padding: 5px 14px;
+      border: 1px solid rgba(245,200,66,0.4);
+      background: rgba(245,200,66,0.1);
+      color: #f5c842;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: inherit;
+    }
+    .hud-btn:hover:not(:disabled) {
+      background: rgba(245,200,66,0.25);
+      border-color: #f5c842;
+    }
+    .hud-btn:disabled {
+      opacity: 0.35; cursor: not-allowed;
+    }
+
+    /* Overlay */
+    #overlay {
+      position: fixed; inset: 0;
+      display: flex; justify-content: center; align-items: center;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(8px);
+      z-index: 100;
+      transition: opacity 0.3s;
+    }
+    #overlay.hidden {
+      opacity: 0; pointer-events: none;
+    }
+
+    .glass-panel {
+      background: rgba(20,20,40,0.92);
+      border: 1px solid rgba(245,200,66,0.25);
+      border-radius: 16px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05);
+      backdrop-filter: blur(12px);
+    }
+
+    .overlay-panel {
+      padding: 36px 44px;
+      text-align: center;
+      max-width: 460px;
+      width: 90vw;
+    }
+
+    .title {
+      font-size: 42px;
+      font-weight: 900;
+      background: linear-gradient(135deg, #f5c842 0%, #ff9500 50%, #f5c842 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      letter-spacing: 8px;
+      margin-bottom: 4px;
+      text-shadow: none;
+    }
+    .win-title {
+      background: linear-gradient(135deg, #4ade80 0%, #22d3ee 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+    }
+    .lose-title {
+      background: linear-gradient(135deg, #f87171 0%, #fb923c 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+    }
+    .subtitle {
+      font-size: 14px; color: #888; margin-bottom: 24px;
+    }
+
+    .option-group {
+      margin: 18px 0;
+    }
+    .option-group label {
+      display: block; font-size: 14px; color: #a09070;
+      margin-bottom: 8px; letter-spacing: 2px;
+    }
+    .btn-row {
+      display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
+    }
+    .opt-btn {
+      padding: 8px 20px;
+      border: 1px solid rgba(245,200,66,0.3);
+      background: rgba(245,200,66,0.05);
+      color: #b0a080;
+      border-radius: 8px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: inherit;
+    }
+    .opt-btn:hover { border-color: #f5c842; color: #f5c842; }
+    .opt-btn.active {
+      background: rgba(245,200,66,0.2);
+      border-color: #f5c842;
+      color: #f5c842;
+      font-weight: bold;
+    }
+
+    .start-btn {
+      display: inline-block;
+      margin-top: 24px;
+      padding: 12px 48px;
+      background: linear-gradient(135deg, #f5c842 0%, #e6a817 100%);
+      color: #1a1a2e;
+      border: none;
+      border-radius: 10px;
+      font-size: 18px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.25s;
+      letter-spacing: 4px;
+      font-family: inherit;
+    }
+    .start-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(245,200,66,0.4);
+    }
+
+    .help-box {
+      margin-top: 24px;
+      padding: 14px 18px;
+      background: rgba(0,0,0,0.3);
+      border-radius: 10px;
+      border: 1px solid rgba(245,200,66,0.1);
+      font-size: 13px;
+      line-height: 1.8;
+      color: #888;
+      text-align: left;
+    }
+    .help-box b { color: #b0a080; }
+    .gold { color: #f5c842 !important; -webkit-text-fill-color: #f5c842 !important; }
+
+    .stats-grid {
+      display: flex; justify-content: center; gap: 32px;
+      margin: 24px 0;
+    }
+    .stat-item {
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .stat-label {
+      font-size: 12px; color: #888; letter-spacing: 1px;
+    }
+    .stat-value {
+      font-size: 28px; font-weight: bold; color: #e8dcc8;
+    }
+
+    /* Mobile adjustments */
+    @media (max-width: 480px) {
+      .title { font-size: 28px; letter-spacing: 4px; }
+      .overlay-panel { padding: 24px 20px; }
+      .hud-item { font-size: 12px; }
+      .hud-item .val { font-size: 14px; }
+      .hud-btn { padding: 4px 10px; font-size: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="hud">
+    <div class="hud-left">
+      <div class="hud-item"><span class="label">分数</span><span class="val" id="hudScore">0</span></div>
+      <div class="hud-item"><span class="label">剩余</span><span class="val" id="hudPairs">0</span><span class="label">对</span></div>
+      <div class="hud-item"><span class="val" id="hudCombo"></span></div>
+    </div>
+    <div class="hud-center">
+      <div class="hud-item"><span class="label">时间</span><span class="val" id="hudTime">0:00</span></div>
+    </div>
+    <div class="hud-right">
+      <button class="hud-btn" id="hintBtn">提示 (3)</button>
+      <button class="hud-btn" id="shuffleBtn">重排 (2)</button>
+    </div>
+  </div>
+
+  <canvas id="gameCanvas"></canvas>
+
+  <div id="overlay" class="hidden"></div>
+
+  <script type="module" src="js/main.js"></script>
+<script>
+if(location.protocol==="file:"){document.body.innerHTML='<div style="position:fixed;inset:0;background:#0a0a0a;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px;font-family:sans-serif;color:#fff;z-index:9999"><div style="font-size:48px;margin-bottom:20px">⚠️</div><h2 style="color:#ff6b4a;font-size:20px;margin-bottom:12px">需要启动HTTP服务器</h2><p style="color:#888;font-size:13px;line-height:1.8;max-width:400px">此游戏使用ES Modules，无法通过file://打开。<br>请在游戏目录运行:</p><div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:12px 20px;margin:16px;font-family:monospace;color:#4aeaff;font-size:13px">python -m http.server 8000</div><p style="color:#666;font-size:12px">然后访问 http://localhost:8000</p><a href="../index.html" style="margin-top:16px;color:#ff6b4a;font-size:13px;text-decoration:none">← 返回游戏合集</a></div>'}
+</script>
+</body>
+</html>

@@ -1,0 +1,348 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>五子棋 — Gomoku</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    min-height: 100vh;
+    color: #e0e0e0;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 20px;
+}
+
+.game-container {
+    display: flex;
+    gap: 24px;
+    max-width: 1100px;
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+/* 左侧面板 */
+.panel-left {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    width: 260px;
+    flex-shrink: 0;
+}
+
+/* 棋盘区 */
+.board-wrapper {
+    position: relative;
+    flex-shrink: 0;
+}
+
+canvas#board {
+    display: block;
+    cursor: pointer;
+    border-radius: 6px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05);
+}
+
+/* 右侧面板 */
+.panel-right {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    width: 220px;
+    flex-shrink: 0;
+}
+
+/* 卡片样式 */
+.card {
+    background: rgba(255,255,255,0.06);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px;
+    padding: 16px;
+}
+
+.card h3 {
+    font-size: 14px;
+    color: #90caf9;
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* 状态栏 */
+#status {
+    font-size: 20px;
+    font-weight: bold;
+    text-align: center;
+    padding: 12px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.12);
+    color: #fff;
+    text-shadow: 0 0 10px rgba(100,181,246,0.4);
+}
+
+/* 按钮 */
+.btn-group {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.btn {
+    flex: 1;
+    padding: 10px 14px;
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 8px;
+    background: rgba(255,255,255,0.05);
+    color: #ccc;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+    min-width: 0;
+    text-align: center;
+}
+
+.btn:hover {
+    background: rgba(255,255,255,0.12);
+    color: #fff;
+    border-color: rgba(255,255,255,0.3);
+}
+
+.btn.active {
+    background: rgba(66,165,245,0.25);
+    border-color: #42a5f5;
+    color: #90caf9;
+    font-weight: bold;
+}
+
+.btn-action {
+    background: rgba(76,175,80,0.2);
+    border-color: rgba(76,175,80,0.4);
+    color: #81c784;
+}
+
+.btn-action:hover {
+    background: rgba(76,175,80,0.35);
+    color: #a5d6a7;
+}
+
+.btn-warn {
+    background: rgba(255,152,0,0.2);
+    border-color: rgba(255,152,0,0.4);
+    color: #ffb74d;
+}
+
+.btn-warn:hover {
+    background: rgba(255,152,0,0.35);
+    color: #ffcc80;
+}
+
+/* 下拉框 */
+select {
+    padding: 8px 12px;
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 8px;
+    background: rgba(255,255,255,0.05);
+    color: #ccc;
+    font-size: 14px;
+    font-family: inherit;
+    cursor: pointer;
+    outline: none;
+    width: 100%;
+}
+
+select:focus {
+    border-color: #42a5f5;
+}
+
+option {
+    background: #1a1a2e;
+    color: #ccc;
+}
+
+/* 历史记录 */
+#history {
+    max-height: 300px;
+    overflow-y: auto;
+    font-size: 13px;
+    line-height: 1.8;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.15) transparent;
+}
+
+#history::-webkit-scrollbar {
+    width: 5px;
+}
+
+#history::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.15);
+    border-radius: 3px;
+}
+
+.history-empty {
+    color: #666;
+    text-align: center;
+    padding: 16px;
+}
+
+.history-item {
+    padding: 2px 6px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.history-item:nth-child(odd) {
+    background: rgba(255,255,255,0.02);
+}
+
+.h-num {
+    color: #666;
+    font-family: 'Consolas', monospace;
+    font-size: 12px;
+    min-width: 24px;
+}
+
+.h-stone {
+    font-size: 12px;
+    width: 16px;
+    text-align: center;
+}
+
+.h-stone.black { color: #aaa; }
+.h-stone.white { color: #fff; }
+
+/* 覆盖层 */
+.overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(6px);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 24px;
+    border-radius: 6px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+}
+
+.overlay.show {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.overlay-msg {
+    font-size: 32px;
+    font-weight: bold;
+    text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+    text-align: center;
+}
+
+/* 空行分隔 */
+.spacer { height: 4px; }
+
+/* 响应式 */
+@media (max-width: 800px) {
+    .game-container {
+        flex-direction: column;
+        align-items: center;
+    }
+    .panel-left, .panel-right {
+        width: 100%;
+        max-width: 540px;
+    }
+}
+</style>
+</head>
+<body>
+
+<div class="game-container">
+    <!-- 左侧面板 -->
+    <div class="panel-left">
+        <div id="status" class="card">黑棋落子</div>
+
+        <div class="card">
+            <h3>游戏模式</h3>
+            <div class="btn-group">
+                <button class="btn" id="btn-pvp">双人对弈</button>
+                <button class="btn active" id="btn-pve">人机对弈</button>
+            </div>
+        </div>
+
+        <div class="card" id="color-group">
+            <h3>先手选择</h3>
+            <div class="btn-group">
+                <button class="btn active" id="btn-black">执黑（先手）</button>
+                <button class="btn" id="btn-white">执白（后手）</button>
+            </div>
+        </div>
+
+        <div class="card" id="difficulty-group">
+            <h3>AI 难度</h3>
+            <select id="difficulty">
+                <option value="easy">简单</option>
+                <option value="medium" selected>中等</option>
+                <option value="hard">困难</option>
+            </select>
+        </div>
+
+        <div class="card">
+            <h3>操作</h3>
+            <div class="btn-group" style="flex-direction:column">
+                <button class="btn btn-warn" id="btn-undo">⏪ 悔棋</button>
+                <button class="btn btn-action" id="btn-restart">🔄 新局</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 棋盘 -->
+    <div class="board-wrapper">
+        <canvas id="board"></canvas>
+        <div class="overlay" id="overlay">
+            <div class="overlay-msg" id="overlay-msg"></div>
+            <button class="btn btn-action" id="btn-play-again">再来一局</button>
+        </div>
+    </div>
+
+    <!-- 右侧面板 -->
+    <div class="panel-right">
+        <div class="card">
+            <h3>走法记录</h3>
+            <div id="history">
+                <div class="history-empty">暂无走法</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>规则说明</h3>
+            <div style="font-size:13px; line-height:1.7; color:#aaa;">
+                <p>15×15 棋盘，黑先白后</p>
+                <p>先连成五子者获胜</p>
+                <p>支持横/竖/斜方向</p>
+                <p class="spacer"></p>
+                <p><b>快捷操作：</b></p>
+                <p>点击棋盘落子</p>
+                <p>支持悔棋撤回</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="module" src="js/main.js"></script>
+<script>
+if(location.protocol==="file:"){document.body.innerHTML='<div style="position:fixed;inset:0;background:#0a0a0a;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px;font-family:sans-serif;color:#fff;z-index:9999"><div style="font-size:48px;margin-bottom:20px">⚠️</div><h2 style="color:#ff6b4a;font-size:20px;margin-bottom:12px">需要启动HTTP服务器</h2><p style="color:#888;font-size:13px;line-height:1.8;max-width:400px">此游戏使用ES Modules，无法通过file://打开。<br>请在游戏目录运行:</p><div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:12px 20px;margin:16px;font-family:monospace;color:#4aeaff;font-size:13px">python -m http.server 8000</div><p style="color:#666;font-size:12px">然后访问 http://localhost:8000</p><a href="../index.html" style="margin-top:16px;color:#ff6b4a;font-size:13px;text-decoration:none">← 返回游戏合集</a></div>'}
+</script>
+</body>
+</html>

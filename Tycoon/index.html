@@ -1,0 +1,166 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>MIMO 餐厅大亨</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #0a0a1a;
+      font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
+    }
+
+    #gameContainer {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(ellipse at center, #1a1a2e 0%, #0a0a1a 100%);
+    }
+
+    #gameCanvas {
+      display: block;
+      max-width: 100%;
+      max-height: 100%;
+      border-radius: 8px;
+      box-shadow:
+        0 0 30px rgba(255, 152, 0, 0.15),
+        0 0 60px rgba(0, 0, 0, 0.5);
+      cursor: pointer;
+      image-rendering: pixelated;
+    }
+
+    /* 启动画面 */
+    #splash {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: radial-gradient(ellipse at center, #1a1a2e 0%, #0a0a1a 100%);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 100;
+      transition: opacity 0.6s ease;
+    }
+
+    #splash.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    #splash h1 {
+      font-size: 48px;
+      color: #FF9800;
+      text-shadow:
+        0 0 20px rgba(255, 152, 0, 0.5),
+        0 4px 8px rgba(0, 0, 0, 0.5);
+      margin-bottom: 10px;
+      letter-spacing: 8px;
+    }
+
+    #splash .subtitle {
+      font-size: 18px;
+      color: #FFD54F;
+      margin-bottom: 40px;
+      opacity: 0.8;
+    }
+
+    #splash .emoji-bg {
+      font-size: 64px;
+      margin-bottom: 30px;
+      animation: bounce 1.5s ease-in-out infinite;
+    }
+
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-12px); }
+    }
+
+    #startBtn {
+      padding: 16px 48px;
+      font-size: 22px;
+      font-weight: bold;
+      color: #FFF;
+      background: linear-gradient(135deg, #FF9800, #F57C00);
+      border: none;
+      border-radius: 50px;
+      cursor: pointer;
+      box-shadow:
+        0 4px 15px rgba(255, 152, 0, 0.4),
+        0 2px 4px rgba(0, 0, 0, 0.3);
+      transition: transform 0.2s, box-shadow 0.2s;
+      letter-spacing: 4px;
+    }
+
+    #startBtn:hover {
+      transform: translateY(-2px);
+      box-shadow:
+        0 6px 20px rgba(255, 152, 0, 0.5),
+        0 4px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    #startBtn:active {
+      transform: translateY(1px);
+    }
+
+    .tip {
+      margin-top: 30px;
+      color: #666;
+      font-size: 13px;
+      text-align: center;
+      line-height: 1.8;
+    }
+
+    .tip span {
+      color: #FF9800;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <!-- 启动画面 -->
+  <div id="splash">
+    <div class="emoji-bg">&#x1F37D;&#xFE0F;</div>
+    <h1>MIMO 餐厅大亨</h1>
+    <p class="subtitle">经营你的梦想餐厅</p>
+    <button id="startBtn" onclick="startGame()">&#x1F525; 开始经营</button>
+    <div class="tip">
+      <span>[1]</span> 菜单 <span>[2]</span> 员工 <span>[3]</span> 装修 <span>[4]</span> 厨房 <span>[空格]</span> 加速
+    </div>
+  </div>
+
+  <!-- 游戏画布 -->
+  <div id="gameContainer">
+    <canvas id="gameCanvas"></canvas>
+  </div>
+
+  <script>
+    function startGame() {
+      var splash = document.getElementById('splash');
+      splash.classList.add('hidden');
+      setTimeout(function() { splash.style.display = 'none'; }, 600);
+
+      // 动态加载游戏模块
+      var script = document.createElement('script');
+      script.type = 'module';
+      script.src = 'js/main.js';
+      document.body.appendChild(script);
+    }
+  </script>
+<script>
+if(location.protocol==="file:"){document.body.innerHTML='<div style="position:fixed;inset:0;background:#0a0a0a;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px;font-family:sans-serif;color:#fff;z-index:9999"><div style="font-size:48px;margin-bottom:20px">⚠️</div><h2 style="color:#ff6b4a;font-size:20px;margin-bottom:12px">需要启动HTTP服务器</h2><p style="color:#888;font-size:13px;line-height:1.8;max-width:400px">此游戏使用ES Modules，无法通过file://打开。<br>请在游戏目录运行:</p><div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:12px 20px;margin:16px;font-family:monospace;color:#4aeaff;font-size:13px">python -m http.server 8000</div><p style="color:#666;font-size:12px">然后访问 http://localhost:8000</p><a href="../index.html" style="margin-top:16px;color:#ff6b4a;font-size:13px;text-decoration:none">← 返回游戏合集</a></div>'}
+</script>
+</body>
+</html>

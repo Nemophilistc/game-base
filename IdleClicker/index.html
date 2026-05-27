@@ -1,0 +1,1048 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>放置挂机大亨</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      color: #fff;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* 顶部信息栏 */
+    .top-bar {
+      background: rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(10px);
+      padding: 15px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid rgba(255, 215, 0, 0.3);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .game-title {
+      font-size: 24px;
+      font-weight: bold;
+      background: linear-gradient(45deg, #ffd700, #ffed4a);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+    }
+
+    .stats-container {
+      display: flex;
+      gap: 30px;
+    }
+
+    .stat-item {
+      text-align: center;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: #aaa;
+      margin-bottom: 5px;
+    }
+
+    .stat-value {
+      font-size: 20px;
+      font-weight: bold;
+      color: #ffd700;
+    }
+
+    /* 主容器 */
+    .main-container {
+      display: flex;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 20px;
+      gap: 20px;
+      min-height: calc(100vh - 80px);
+    }
+
+    /* 左侧面板 - 点击区域 */
+    .left-panel {
+      flex: 0 0 300px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .click-section {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 15px;
+      padding: 30px;
+      text-align: center;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 215, 0, 0.2);
+    }
+
+    .click-btn {
+      width: 150px;
+      height: 150px;
+      border-radius: 50%;
+      background: linear-gradient(145deg, #ffd700, #ff8c00);
+      border: none;
+      cursor: pointer;
+      font-size: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 20px;
+      transition: all 0.1s ease;
+      box-shadow: 0 10px 30px rgba(255, 215, 0, 0.4);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .click-btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 15px 40px rgba(255, 215, 0, 0.6);
+    }
+
+    .click-btn:active {
+      transform: scale(0.95);
+      box-shadow: 0 5px 15px rgba(255, 215, 0, 0.4);
+    }
+
+    .click-btn::after {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle, rgba(255,255,255,0.3) 0%, transparent 70%);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .click-btn:hover::after {
+      opacity: 1;
+    }
+
+    .click-value {
+      font-size: 14px;
+      color: #aaa;
+    }
+
+    .click-value span {
+      color: #ffd700;
+      font-weight: bold;
+    }
+
+    /* 点击动画 */
+    .click-animation {
+      position: absolute;
+      color: #ffd700;
+      font-size: 18px;
+      font-weight: bold;
+      pointer-events: none;
+      animation: floatUp 1s ease-out forwards;
+      text-shadow: 0 0 10px rgba(255, 215, 0, 0.8);
+    }
+
+    @keyframes floatUp {
+      0% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+      100% {
+        opacity: 0;
+        transform: translateY(-100px) scale(1.5);
+      }
+    }
+
+    /* 成就通知 */
+    .achievement-section {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 15px;
+      padding: 20px;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 215, 0, 0.2);
+    }
+
+    .achievement-summary {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .achievement-summary h3 {
+      font-size: 16px;
+      color: #ffd700;
+    }
+
+    .achievement-stats {
+      font-size: 14px;
+      color: #aaa;
+    }
+
+    .achievement-stats span {
+      color: #ffd700;
+      font-weight: bold;
+    }
+
+    /* 中间面板 - 主要内容 */
+    .center-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* 标签页导航 */
+    .tab-nav {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 12px 20px;
+      background: rgba(255, 255, 255, 0.1);
+      border: none;
+      border-radius: 10px 10px 0 0;
+      color: #aaa;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .tab-btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+      color: #fff;
+    }
+
+    .tab-btn.active {
+      background: rgba(255, 215, 0, 0.2);
+      color: #ffd700;
+      border-bottom: 2px solid #ffd700;
+    }
+
+    /* 标签页内容 */
+    .tab-content {
+      display: none;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 0 15px 15px 15px;
+      padding: 20px;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 215, 0, 0.2);
+      flex: 1;
+      overflow-y: auto;
+      max-height: calc(100vh - 200px);
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    /* 购买数量选择 */
+    .buy-amount-selector {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .buy-amount-btn {
+      flex: 1;
+      padding: 10px;
+      background: rgba(255, 255, 255, 0.1);
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .buy-amount-btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .buy-amount-btn.active {
+      background: rgba(255, 215, 0, 0.3);
+      color: #ffd700;
+      border: 1px solid rgba(255, 215, 0, 0.5);
+    }
+
+    /* 建筑列表 */
+    .building-item {
+      display: flex;
+      align-items: center;
+      padding: 15px;
+      margin-bottom: 10px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 10px;
+      transition: all 0.3s ease;
+      border: 1px solid transparent;
+    }
+
+    .building-item:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 215, 0, 0.3);
+    }
+
+    .building-item.affordable {
+      border-left: 3px solid #4ade80;
+    }
+
+    .building-item.expensive {
+      border-left: 3px solid #ef4444;
+    }
+
+    .building-icon {
+      font-size: 40px;
+      margin-right: 15px;
+      width: 60px;
+      text-align: center;
+    }
+
+    .building-info {
+      flex: 1;
+    }
+
+    .building-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 5px;
+    }
+
+    .building-name {
+      font-size: 16px;
+      font-weight: bold;
+      color: #fff;
+    }
+
+    .building-count {
+      font-size: 14px;
+      color: #ffd700;
+      background: rgba(255, 215, 0, 0.2);
+      padding: 2px 8px;
+      border-radius: 10px;
+    }
+
+    .building-description {
+      font-size: 12px;
+      color: #aaa;
+      margin-bottom: 5px;
+    }
+
+    .building-production {
+      font-size: 12px;
+      color: #4ade80;
+    }
+
+    .building-cost {
+      margin-left: 15px;
+    }
+
+    .buy-btn {
+      padding: 10px 20px;
+      background: linear-gradient(145deg, #ffd700, #ff8c00);
+      border: none;
+      border-radius: 8px;
+      color: #000;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      min-width: 100px;
+    }
+
+    .buy-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(255, 215, 0, 0.4);
+    }
+
+    .buy-btn:active {
+      transform: translateY(0);
+    }
+
+    .buy-btn.disabled {
+      background: #666;
+      cursor: not-allowed;
+      opacity: 0.7;
+    }
+
+    .buy-btn.disabled:hover {
+      transform: none;
+      box-shadow: none;
+    }
+
+    .cost-amount {
+      display: block;
+      font-size: 14px;
+    }
+
+    .cost-label {
+      display: block;
+      font-size: 10px;
+      opacity: 0.8;
+    }
+
+    /* 升级列表 */
+    .upgrade-item {
+      display: flex;
+      align-items: center;
+      padding: 15px;
+      margin-bottom: 10px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 10px;
+      transition: all 0.3s ease;
+      border: 1px solid transparent;
+    }
+
+    .upgrade-item:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .upgrade-item.purchased {
+      opacity: 0.6;
+      border-left: 3px solid #4ade80;
+    }
+
+    .upgrade-item.locked {
+      opacity: 0.4;
+      border-left: 3px solid #666;
+    }
+
+    .upgrade-item.affordable {
+      border-left: 3px solid #ffd700;
+      background: rgba(255, 215, 0, 0.1);
+    }
+
+    .upgrade-item.expensive {
+      border-left: 3px solid #ef4444;
+    }
+
+    .upgrade-icon {
+      font-size: 36px;
+      margin-right: 15px;
+      width: 50px;
+      text-align: center;
+    }
+
+    .upgrade-info {
+      flex: 1;
+    }
+
+    .upgrade-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 5px;
+    }
+
+    .upgrade-name {
+      font-size: 16px;
+      font-weight: bold;
+      color: #fff;
+    }
+
+    .upgrade-multiplier {
+      font-size: 14px;
+      color: #4ade80;
+      background: rgba(74, 222, 128, 0.2);
+      padding: 2px 8px;
+      border-radius: 10px;
+    }
+
+    .upgrade-description {
+      font-size: 12px;
+      color: #aaa;
+      margin-bottom: 5px;
+    }
+
+    .upgrade-status {
+      font-size: 12px;
+      color: #ffd700;
+    }
+
+    .upgrade-cost {
+      margin-left: 15px;
+    }
+
+    /* 成就列表 */
+    .achievement-item {
+      display: flex;
+      align-items: center;
+      padding: 15px;
+      margin-bottom: 10px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 10px;
+      transition: all 0.3s ease;
+    }
+
+    .achievement-item.unlocked {
+      background: rgba(255, 215, 0, 0.1);
+      border: 1px solid rgba(255, 215, 0, 0.3);
+    }
+
+    .achievement-item.locked {
+      opacity: 0.6;
+    }
+
+    .achievement-icon {
+      font-size: 36px;
+      margin-right: 15px;
+      width: 50px;
+      text-align: center;
+    }
+
+    .achievement-info {
+      flex: 1;
+    }
+
+    .achievement-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 5px;
+    }
+
+    .achievement-name {
+      font-size: 16px;
+      font-weight: bold;
+      color: #fff;
+    }
+
+    .achievement-reward {
+      font-size: 14px;
+      color: #4ade80;
+      background: rgba(74, 222, 128, 0.2);
+      padding: 2px 8px;
+      border-radius: 10px;
+    }
+
+    .achievement-description {
+      font-size: 12px;
+      color: #aaa;
+      margin-bottom: 10px;
+    }
+
+    .achievement-progress {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .progress-bar {
+      flex: 1;
+      height: 8px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #ffd700, #ff8c00);
+      border-radius: 4px;
+      transition: width 0.3s ease;
+    }
+
+    .progress-text {
+      font-size: 12px;
+      color: #aaa;
+      min-width: 80px;
+      text-align: right;
+    }
+
+    /* 统计面板 */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 15px;
+    }
+
+    .stat-card {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 10px;
+      padding: 20px;
+      text-align: center;
+    }
+
+    .stat-card-icon {
+      font-size: 30px;
+      margin-bottom: 10px;
+    }
+
+    .stat-card-value {
+      font-size: 24px;
+      font-weight: bold;
+      color: #ffd700;
+      margin-bottom: 5px;
+    }
+
+    .stat-card-label {
+      font-size: 12px;
+      color: #aaa;
+    }
+
+    /* 设置面板 */
+    .settings-section {
+      margin-bottom: 20px;
+    }
+
+    .settings-section h3 {
+      font-size: 16px;
+      color: #ffd700;
+      margin-bottom: 15px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid rgba(255, 215, 0, 0.2);
+    }
+
+    .settings-btn {
+      width: 100%;
+      padding: 12px;
+      margin-bottom: 10px;
+      background: rgba(255, 255, 255, 0.1);
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .settings-btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .settings-btn.danger {
+      background: rgba(239, 68, 68, 0.3);
+    }
+
+    .settings-btn.danger:hover {
+      background: rgba(239, 68, 68, 0.5);
+    }
+
+    /* 右侧面板 - 信息 */
+    .right-panel {
+      flex: 0 0 250px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .info-card {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 15px;
+      padding: 20px;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 215, 0, 0.2);
+    }
+
+    .info-card h3 {
+      font-size: 16px;
+      color: #ffd700;
+      margin-bottom: 15px;
+    }
+
+    .info-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      font-size: 14px;
+    }
+
+    .info-item:last-child {
+      border-bottom: none;
+    }
+
+    .info-label {
+      color: #aaa;
+    }
+
+    .info-value {
+      color: #fff;
+      font-weight: bold;
+    }
+
+    /* 通知 */
+    .notification {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(5px);
+      z-index: 1000;
+    }
+
+    .offline-content {
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      padding: 30px;
+      border-radius: 20px;
+      text-align: center;
+      border: 2px solid rgba(255, 215, 0, 0.5);
+      max-width: 400px;
+    }
+
+    .offline-content h3 {
+      font-size: 24px;
+      color: #ffd700;
+      margin-bottom: 15px;
+    }
+
+    .offline-content p {
+      font-size: 16px;
+      margin-bottom: 10px;
+    }
+
+    .gold-amount {
+      color: #ffd700;
+      font-weight: bold;
+      font-size: 20px;
+    }
+
+    .offline-content button {
+      margin-top: 20px;
+      padding: 12px 40px;
+      background: linear-gradient(145deg, #ffd700, #ff8c00);
+      border: none;
+      border-radius: 10px;
+      color: #000;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .offline-content button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(255, 215, 0, 0.4);
+    }
+
+    /* 成就弹窗 */
+    .achievement-popup {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      padding: 20px;
+      border-radius: 15px;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      border: 2px solid rgba(255, 215, 0, 0.5);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      animation: slideIn 0.5s ease;
+      z-index: 1001;
+    }
+
+    @keyframes slideIn {
+      from {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    .achievement-popup-icon {
+      font-size: 40px;
+    }
+
+    .achievement-popup-title {
+      font-size: 12px;
+      color: #aaa;
+      text-transform: uppercase;
+    }
+
+    .achievement-popup-name {
+      font-size: 18px;
+      font-weight: bold;
+      color: #ffd700;
+      margin: 5px 0;
+    }
+
+    .achievement-popup-desc {
+      font-size: 14px;
+      color: #fff;
+    }
+
+    .achievement-popup-reward {
+      font-size: 12px;
+      color: #4ade80;
+      margin-top: 5px;
+    }
+
+    /* 临时消息 */
+    .temp-message {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.8);
+      color: #fff;
+      padding: 10px 20px;
+      border-radius: 8px;
+      animation: fadeInOut 2s ease;
+      z-index: 1000;
+    }
+
+    @keyframes fadeInOut {
+      0% { opacity: 0; transform: translateX(-50%) translateY(20px); }
+      20% { opacity: 1; transform: translateX(-50%) translateY(0); }
+      80% { opacity: 1; transform: translateX(-50%) translateY(0); }
+      100% { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+    }
+
+    /* 空消息 */
+    .empty-message {
+      text-align: center;
+      color: #aaa;
+      padding: 40px;
+      font-size: 14px;
+    }
+
+    /* 滚动条样式 */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 215, 0, 0.5);
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 215, 0, 0.7);
+    }
+
+    /* 响应式设计 */
+    @media (max-width: 1200px) {
+      .right-panel {
+        display: none;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .main-container {
+        flex-direction: column;
+        padding: 10px;
+      }
+
+      .left-panel {
+        flex: none;
+        flex-direction: row;
+        overflow-x: auto;
+      }
+
+      .click-section,
+      .achievement-section {
+        min-width: 200px;
+      }
+
+      .tab-nav {
+        flex-wrap: wrap;
+      }
+
+      .tab-btn {
+        flex: none;
+        width: calc(50% - 5px);
+      }
+
+      .stats-container {
+        gap: 15px;
+      }
+
+      .stat-value {
+        font-size: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- 顶部信息栏 -->
+  <div class="top-bar">
+    <div class="game-title">放置挂机大亨</div>
+    <div class="stats-container">
+      <div class="stat-item">
+        <div class="stat-label">金币</div>
+        <div class="stat-value" id="gold">0</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">每秒产出</div>
+        <div class="stat-value" id="gold-per-second">0</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">点击价值</div>
+        <div class="stat-value" id="click-value">1</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 主容器 -->
+  <div class="main-container">
+    <!-- 左侧面板 -->
+    <div class="left-panel">
+      <!-- 点击区域 -->
+      <div class="click-section">
+        <button class="click-btn" id="click-btn">
+          💰
+        </button>
+        <div class="click-value">每次点击：<span id="click-value-display">1</span> 金币</div>
+      </div>
+
+      <!-- 成就摘要 -->
+      <div class="achievement-section">
+        <div class="achievement-summary">
+          <h3>成就进度</h3>
+          <div class="achievement-stats">
+            <span id="achievement-count">0/0</span>
+          </div>
+        </div>
+        <div class="achievement-stats">
+          加成：<span id="achievement-bonus">+0%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 中间面板 -->
+    <div class="center-panel">
+      <!-- 标签页导航 -->
+      <div class="tab-nav">
+        <button class="tab-btn active" data-tab="buildings">建筑</button>
+        <button class="tab-btn" data-tab="upgrades">升级</button>
+        <button class="tab-btn" data-tab="achievements">成就</button>
+        <button class="tab-btn" data-tab="stats">统计</button>
+        <button class="tab-btn" data-tab="settings">设置</button>
+      </div>
+
+      <!-- 建筑标签页 -->
+      <div class="tab-content active" id="buildings-tab">
+        <div class="buy-amount-selector">
+          <button class="buy-amount-btn active" data-amount="1">x1</button>
+          <button class="buy-amount-btn" data-amount="10">x10</button>
+          <button class="buy-amount-btn" data-amount="100">x100</button>
+        </div>
+        <div id="buildings-list"></div>
+      </div>
+
+      <!-- 升级标签页 -->
+      <div class="tab-content" id="upgrades-tab">
+        <div id="upgrades-list"></div>
+      </div>
+
+      <!-- 成就标签页 -->
+      <div class="tab-content" id="achievements-tab">
+        <div id="achievements-list"></div>
+      </div>
+
+      <!-- 统计标签页 -->
+      <div class="tab-content" id="stats-tab">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-card-icon">⏱️</div>
+            <div class="stat-card-value" id="play-time">0秒</div>
+            <div class="stat-card-label">游戏时长</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-icon">👆</div>
+            <div class="stat-card-value" id="total-clicks">0</div>
+            <div class="stat-card-label">总点击次数</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-icon">💰</div>
+            <div class="stat-card-value" id="total-gold">0</div>
+            <div class="stat-card-label">累计金币</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-icon">🏗️</div>
+            <div class="stat-card-value" id="total-buildings">0</div>
+            <div class="stat-card-label">建筑总数</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-icon">⬆️</div>
+            <div class="stat-card-value" id="total-upgrades">0</div>
+            <div class="stat-card-label">升级总数</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 设置标签页 -->
+      <div class="tab-content" id="settings-tab">
+        <div class="settings-section">
+          <h3>显示设置</h3>
+          <button class="settings-btn" id="number-format-toggle">切换中文数字</button>
+        </div>
+        <div class="settings-section">
+          <h3>存档管理</h3>
+          <button class="settings-btn" id="save-btn">手动保存</button>
+          <button class="settings-btn" id="export-btn">导出存档</button>
+          <button class="settings-btn" id="import-btn">导入存档</button>
+          <input type="file" id="import-file" accept=".json" style="display: none;">
+          <button class="settings-btn danger" id="reset-btn">重置游戏</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 右侧面板 -->
+    <div class="right-panel">
+      <!-- 产出信息 -->
+      <div class="info-card">
+        <h3>产出统计</h3>
+        <div class="info-item">
+          <span class="info-label">每秒产出</span>
+          <span class="info-value" id="info-pps">0</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">点击价值</span>
+          <span class="info-value" id="info-click">1</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">成就加成</span>
+          <span class="info-value" id="info-bonus">+0%</span>
+        </div>
+      </div>
+
+      <!-- 建筑统计 -->
+      <div class="info-card">
+        <h3>建筑统计</h3>
+        <div id="buildings-stats"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 离线收益通知 -->
+  <div class="notification" id="offline-notification"></div>
+
+  <!-- 成就通知 -->
+  <div class="notification" id="achievement-notification"></div>
+
+  <!-- 游戏脚本 -->
+  <script type="module" src="js/main.js"></script>
+<script>
+if(location.protocol==="file:"){document.body.innerHTML='<div style="position:fixed;inset:0;background:#0a0a0a;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px;font-family:sans-serif;color:#fff;z-index:9999"><div style="font-size:48px;margin-bottom:20px">⚠️</div><h2 style="color:#ff6b4a;font-size:20px;margin-bottom:12px">需要启动HTTP服务器</h2><p style="color:#888;font-size:13px;line-height:1.8;max-width:400px">此游戏使用ES Modules，无法通过file://打开。<br>请在游戏目录运行:</p><div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:12px 20px;margin:16px;font-family:monospace;color:#4aeaff;font-size:13px">python -m http.server 8000</div><p style="color:#666;font-size:12px">然后访问 http://localhost:8000</p><a href="../index.html" style="margin-top:16px;color:#ff6b4a;font-size:13px;text-decoration:none">← 返回游戏合集</a></div>'}
+</script>
+</body>
+</html>

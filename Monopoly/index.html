@@ -1,0 +1,554 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>大富翁 - Monopoly</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0f0f23;
+            color: #e2e8f0;
+            font-family: 'Microsoft YaHei', 'PingFang SC', Arial, sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #gameContainer {
+            display: flex;
+            gap: 16px;
+            max-width: 1200px;
+            width: 100%;
+            padding: 10px;
+            height: 100vh;
+            align-items: center;
+        }
+
+        /* 棋盘区域 */
+        #boardArea {
+            flex-shrink: 0;
+            position: relative;
+        }
+
+        #gameCanvas {
+            border-radius: 12px;
+            box-shadow: 0 0 40px rgba(99, 102, 241, 0.3);
+            cursor: pointer;
+        }
+
+        /* 右侧面板 */
+        #sidePanel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            min-width: 260px;
+            max-width: 320px;
+            height: calc(100vh - 20px);
+            overflow-y: auto;
+        }
+
+        .panel-card {
+            background: rgba(30, 41, 59, 0.9);
+            border: 1px solid rgba(100, 116, 139, 0.3);
+            border-radius: 12px;
+            padding: 16px;
+            backdrop-filter: blur(10px);
+        }
+
+        .panel-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #fbbf24;
+            margin-bottom: 12px;
+            border-bottom: 1px solid rgba(100, 116, 139, 0.3);
+            padding-bottom: 8px;
+        }
+
+        /* 回合信息 */
+        #turnInfo {
+            font-size: 20px;
+            font-weight: bold;
+            text-align: center;
+            padding: 8px;
+            background: rgba(15, 23, 42, 0.8);
+            border-radius: 8px;
+        }
+
+        /* 玩家信息 */
+        .player-item {
+            display: flex;
+            align-items: center;
+            padding: 6px 8px;
+            margin-bottom: 4px;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .player-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+            border: 2px solid rgba(255,255,255,0.5);
+        }
+
+        /* 操作按钮 */
+        .btn-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .game-btn {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: #fff;
+            flex: 1;
+            min-width: 80px;
+            text-align: center;
+        }
+
+        .game-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        .game-btn:active {
+            transform: translateY(0);
+        }
+
+        .game-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-roll { background: linear-gradient(135deg, #e74c3c, #c0392b); }
+        .btn-buy { background: linear-gradient(135deg, #27ae60, #1e8449); }
+        .btn-skip { background: linear-gradient(135deg, #7f8c8d, #566573); }
+        .btn-build { background: linear-gradient(135deg, #f39c12, #d68910); }
+        .btn-trade { background: linear-gradient(135deg, #3498db, #2980b9); }
+        .btn-end { background: linear-gradient(135deg, #9b59b6, #8e44ad); }
+        .btn-jail { background: linear-gradient(135deg, #e67e22, #d35400); }
+        .btn-card { background: linear-gradient(135deg, #1abc9c, #16a085); }
+        .btn-start { background: linear-gradient(135deg, #e74c3c, #c0392b); padding: 14px 32px; font-size: 18px; }
+
+        /* 行动面板 */
+        #actionPanel {
+            display: none;
+        }
+
+        #actionTitle {
+            font-size: 18px;
+            font-weight: bold;
+            color: #fbbf24;
+        }
+
+        #actionDesc {
+            font-size: 14px;
+            color: #94a3b8;
+            margin: 8px 0;
+        }
+
+        /* 监狱面板 */
+        #jailPanel {
+            display: none;
+        }
+
+        /* 建房面板 */
+        #buildPanel {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 100;
+            width: 360px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .build-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px;
+            margin-bottom: 6px;
+            background: rgba(15, 23, 42, 0.6);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .build-item:hover {
+            background: rgba(30, 41, 59, 0.8);
+        }
+
+        .build-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 3px;
+            display: inline-block;
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+
+        /* 交易面板 */
+        #tradePanel {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 100;
+            width: 420px;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .trade-section {
+            margin-bottom: 12px;
+        }
+
+        .trade-section label {
+            display: block;
+            font-size: 13px;
+            color: #94a3b8;
+            margin-bottom: 4px;
+        }
+
+        .trade-section input[type="number"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid rgba(100, 116, 139, 0.3);
+            border-radius: 6px;
+            background: rgba(15, 23, 42, 0.6);
+            color: #e2e8f0;
+            font-size: 14px;
+        }
+
+        .trade-section select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid rgba(100, 116, 139, 0.3);
+            border-radius: 6px;
+            background: rgba(15, 23, 42, 0.8);
+            color: #e2e8f0;
+            font-size: 14px;
+        }
+
+        .trade-prop {
+            display: block;
+            padding: 4px 0;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        .trade-prop input {
+            margin-right: 6px;
+        }
+
+        .trade-columns {
+            display: flex;
+            gap: 16px;
+        }
+
+        .trade-col {
+            flex: 1;
+        }
+
+        .trade-col-title {
+            font-size: 14px;
+            font-weight: bold;
+            color: #94a3b8;
+            margin-bottom: 8px;
+            text-align: center;
+        }
+
+        /* 菜单覆盖层 */
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+            background: rgba(15, 15, 35, 0.95);
+            backdrop-filter: blur(8px);
+        }
+
+        .menu-box {
+            background: rgba(30, 41, 59, 0.95);
+            border: 2px solid rgba(251, 191, 36, 0.5);
+            border-radius: 20px;
+            padding: 40px;
+            text-align: center;
+            max-width: 480px;
+            width: 90%;
+        }
+
+        .menu-box h1 {
+            font-size: 42px;
+            color: #fbbf24;
+            margin-bottom: 8px;
+            text-shadow: 0 0 20px rgba(251, 191, 36, 0.5);
+        }
+
+        .menu-box h2 {
+            font-size: 16px;
+            color: #94a3b8;
+            margin-bottom: 30px;
+        }
+
+        .menu-option {
+            margin-bottom: 20px;
+        }
+
+        .menu-option label {
+            display: block;
+            font-size: 14px;
+            color: #94a3b8;
+            margin-bottom: 6px;
+        }
+
+        .menu-option select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid rgba(100, 116, 139, 0.3);
+            border-radius: 8px;
+            background: rgba(15, 23, 42, 0.8);
+            color: #e2e8f0;
+            font-size: 16px;
+        }
+
+        /* 游戏结束 */
+        #gameOverOverlay {
+            display: none;
+        }
+
+        #winnerText {
+            font-size: 32px;
+            color: #fbbf24;
+            margin-bottom: 12px;
+        }
+
+        #winnerMoney {
+            font-size: 18px;
+            color: #94a3b8;
+            margin-bottom: 30px;
+        }
+
+        /* 地产信息 */
+        #squareInfo {
+            display: none;
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(15, 23, 42, 0.95);
+            border: 1px solid rgba(251, 191, 36, 0.5);
+            border-radius: 10px;
+            padding: 12px 20px;
+            font-size: 13px;
+            z-index: 50;
+            min-width: 200px;
+            text-align: center;
+        }
+
+        /* 骰子显示 */
+        .dice-display {
+            text-align: center;
+            font-size: 14px;
+            color: #94a3b8;
+            padding: 6px;
+        }
+
+        /* 响应式 */
+        @media (max-width: 900px) {
+            #gameContainer {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            #sidePanel {
+                flex-direction: row;
+                flex-wrap: wrap;
+                max-width: 100%;
+                height: auto;
+            }
+
+            .panel-card {
+                flex: 1;
+                min-width: 200px;
+            }
+
+            #gameCanvas {
+                max-width: 95vw;
+                max-height: 55vh;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div id="boardArea">
+            <canvas id="gameCanvas"></canvas>
+            <div id="squareInfo"></div>
+        </div>
+
+        <div id="sidePanel">
+            <!-- 回合信息 -->
+            <div class="panel-card">
+                <div id="turnInfo">大富翁</div>
+            </div>
+
+            <!-- 玩家信息 -->
+            <div class="panel-card">
+                <div class="panel-title">玩家</div>
+                <div id="playerInfo"></div>
+            </div>
+
+            <!-- 操作按钮 -->
+            <div class="panel-card">
+                <div class="panel-title">操作</div>
+                <div class="btn-row">
+                    <button id="btnRoll" class="game-btn btn-roll" style="display:none">掷骰子</button>
+                </div>
+                <div class="btn-row" style="margin-top:8px">
+                    <button id="btnBuild" class="game-btn btn-build" style="display:none">建房</button>
+                    <button id="btnTrade" class="game-btn btn-trade" style="display:none">交易</button>
+                </div>
+                <div class="btn-row" style="margin-top:8px">
+                    <button id="btnEndTurn" class="game-btn btn-end" style="display:none">结束回合</button>
+                </div>
+            </div>
+
+            <!-- 购买面板 -->
+            <div id="actionPanel" class="panel-card">
+                <div class="panel-title">地产</div>
+                <div id="actionTitle"></div>
+                <div id="actionDesc"></div>
+                <div class="btn-row">
+                    <button id="btnBuy" class="game-btn btn-buy">购买</button>
+                    <button id="btnSkip" class="game-btn btn-skip">跳过</button>
+                </div>
+            </div>
+
+            <!-- 监狱面板 -->
+            <div id="jailPanel" class="panel-card">
+                <div class="panel-title">监狱</div>
+                <p style="font-size:13px;color:#94a3b8;margin-bottom:8px">你在监狱中！选择一种方式出狱：</p>
+                <div class="btn-row">
+                    <button id="btnJailRoll" class="game-btn btn-jail">掷双数</button>
+                    <button id="btnJailPay" class="game-btn btn-jail">付$50</button>
+                    <button id="btnJailCard" class="game-btn btn-card">出狱卡</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 菜单覆盖层 -->
+    <div id="menuOverlay" class="overlay">
+        <div class="menu-box">
+            <h1>大富翁</h1>
+            <h2>MONOPOLY</h2>
+            <div class="menu-option">
+                <label>玩家人数</label>
+                <select id="playerCount">
+                    <option value="2">2人</option>
+                    <option value="3">3人</option>
+                    <option value="4">4人</option>
+                </select>
+            </div>
+            <div class="menu-option">
+                <label>AI对手数量</label>
+                <select id="aiCount">
+                    <option value="0">0 (纯热座)</option>
+                    <option value="1">1个AI</option>
+                    <option value="2">2个AI</option>
+                    <option value="3">3个AI</option>
+                </select>
+            </div>
+            <button id="btnStart" class="game-btn btn-start">开始游戏</button>
+        </div>
+    </div>
+
+    <!-- 游戏结束覆盖层 -->
+    <div id="gameOverOverlay" class="overlay">
+        <div class="menu-box">
+            <h1>游戏结束</h1>
+            <div id="winnerText"></div>
+            <div id="winnerMoney"></div>
+            <button id="btnRestart" class="game-btn btn-start">返回菜单</button>
+        </div>
+    </div>
+
+    <!-- 建房面板 -->
+    <div id="buildPanel" class="panel-card">
+        <div class="panel-title">建造房屋</div>
+        <div id="buildList"></div>
+        <div class="btn-row" style="margin-top:12px">
+            <button id="btnBuildCancel" class="game-btn btn-skip">关闭</button>
+        </div>
+    </div>
+
+    <!-- 交易面板 -->
+    <div id="tradePanel" class="panel-card">
+        <div class="panel-title">交易</div>
+        <div class="trade-section">
+            <label>交易对象</label>
+            <select id="tradeTarget"></select>
+        </div>
+        <div class="trade-columns">
+            <div class="trade-col">
+                <div class="trade-col-title">你出价</div>
+                <div class="trade-section">
+                    <label>现金</label>
+                    <input type="number" id="myCash" min="0" value="0">
+                </div>
+                <div class="trade-section">
+                    <label>地产</label>
+                    <div id="myProps"></div>
+                </div>
+            </div>
+            <div class="trade-col">
+                <div class="trade-col-title">你要求</div>
+                <div class="trade-section">
+                    <label>现金</label>
+                    <input type="number" id="theirCash" min="0" value="0">
+                </div>
+                <div class="trade-section">
+                    <label>地产</label>
+                    <div id="theirProps"></div>
+                </div>
+            </div>
+        </div>
+        <div class="btn-row" style="margin-top:12px">
+            <button id="btnTradeConfirm" class="game-btn btn-buy">确认交易</button>
+            <button id="btnTradeCancel" class="game-btn btn-skip">取消</button>
+        </div>
+    </div>
+
+    <script type="module" src="js/main.js"></script>
+<script>
+if(location.protocol==="file:"){document.body.innerHTML='<div style="position:fixed;inset:0;background:#0a0a0a;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px;font-family:sans-serif;color:#fff;z-index:9999"><div style="font-size:48px;margin-bottom:20px">⚠️</div><h2 style="color:#ff6b4a;font-size:20px;margin-bottom:12px">需要启动HTTP服务器</h2><p style="color:#888;font-size:13px;line-height:1.8;max-width:400px">此游戏使用ES Modules，无法通过file://打开。<br>请在游戏目录运行:</p><div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:12px 20px;margin:16px;font-family:monospace;color:#4aeaff;font-size:13px">python -m http.server 8000</div><p style="color:#666;font-size:12px">然后访问 http://localhost:8000</p><a href="../index.html" style="margin-top:16px;color:#ff6b4a;font-size:13px;text-decoration:none">← 返回游戏合集</a></div>'}
+</script>
+</body>
+</html>

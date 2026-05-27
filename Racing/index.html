@@ -1,0 +1,59 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>极速赛车</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{background:#0a0a0a;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'Segoe UI',Tahoma,sans-serif;overflow:hidden;color:#fff}
+        #gameCanvas{border:2px solid #333;border-radius:8px;box-shadow:0 0 30px rgba(244,67,54,0.3);background:#222}
+        .hud{position:fixed;top:15px;left:50%;transform:translateX(-50%);display:flex;gap:20px;z-index:10}
+        .hud-item{background:rgba(0,0,0,0.7);padding:8px 16px;border-radius:8px;font-size:14px;border:1px solid rgba(255,255,255,0.1);backdrop-filter:blur(10px)}
+        .hud-item span{color:#f44336;font-weight:bold}
+        .overlay{position:fixed;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100;background:rgba(0,0,0,0.85)}
+        .overlay.hidden{display:none}
+        .overlay-title{font-size:48px;margin-bottom:15px;text-shadow:0 0 20px rgba(244,67,54,0.5)}
+        .menu-btn{background:linear-gradient(135deg,#f44336 0%,#c62828 100%);border:none;padding:14px 40px;font-size:18px;color:#fff;border-radius:8px;cursor:pointer;transition:all 0.3s;margin:6px;font-weight:bold}
+        .menu-btn:hover{transform:scale(1.08);box-shadow:0 0 25px rgba(244,67,54,0.5)}
+        .stats{font-size:20px;color:#aaa;margin-bottom:20px;text-align:center;line-height:1.6}
+        .help-box{margin-top:15px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:14px 20px;max-width:350px;text-align:left;font-size:13px;color:#aaa;line-height:1.8;backdrop-filter:blur(5px)}
+        .help-box h3{color:#f44336;font-size:14px;margin-bottom:6px;text-align:center}
+    </style>
+</head>
+<body>
+    <div class="hud">
+        <div class="hud-item">分数: <span id="score">0</span></div>
+        <div class="hud-item">速度: <span id="speed">0</span></div>
+        <div class="hud-item">生命: <span id="lives" style="color:#4caf50">❤❤❤</span></div>
+        <div class="hud-item">最高: <span id="high">0</span></div>
+    </div>
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="startOverlay" class="overlay">
+        <div class="overlay-title" style="color:#f44336">极速赛车</div>
+        <button class="menu-btn" onclick="startGame()">开始游戏</button>
+        <div class="help-box">
+            <h3>操作说明</h3>
+            <div>← → 或 A/D：左右移动</div>
+            <div>R：重新开始</div>
+            <h3 style="margin-top:8px">游戏规则</h3>
+            <div>躲避来车，存活越久分数越高</div>
+            <div>速度会逐渐加快</div>
+            <div>收集黄色加速带短暂加速得分</div>
+            <div>收集绿色修复带恢复生命</div>
+        </div>
+    </div>
+
+    <div id="gameOverOverlay" class="overlay hidden">
+        <div class="overlay-title" style="color:#f44336;text-shadow:0 0 20px rgba(244,67,54,0.5)">车祸！</div>
+        <div id="goStats" class="stats"></div>
+        <button class="menu-btn" onclick="startGame()">再来一局</button>
+    </div>
+
+    <script type="module" src="js/main.js"></script>
+<script>
+if(location.protocol==="file:"){document.body.innerHTML='<div style="position:fixed;inset:0;background:#0a0a0a;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px;font-family:sans-serif;color:#fff;z-index:9999"><div style="font-size:48px;margin-bottom:20px">⚠️</div><h2 style="color:#ff6b4a;font-size:20px;margin-bottom:12px">需要启动HTTP服务器</h2><p style="color:#888;font-size:13px;line-height:1.8;max-width:400px">此游戏使用ES Modules，无法通过file://打开。<br>请在游戏目录运行:</p><div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:12px 20px;margin:16px;font-family:monospace;color:#4aeaff;font-size:13px">python -m http.server 8000</div><p style="color:#666;font-size:12px">然后访问 http://localhost:8000</p><a href="../index.html" style="margin-top:16px;color:#ff6b4a;font-size:13px;text-decoration:none">← 返回游戏合集</a></div>'}
+</script>
+</body>
+</html>

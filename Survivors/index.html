@@ -1,0 +1,333 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>末日幸存者 - MIMO Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0a0a0a;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            color: #fff;
+        }
+
+        #gameContainer {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #gameCanvas {
+            border: 2px solid #333;
+            border-radius: 8px;
+            box-shadow: 0 0 40px rgba(255, 0, 0, 0.3);
+            background: #111;
+            cursor: crosshair;
+        }
+
+        /* HUD */
+        #hud {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .hud-left, .hud-right {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .hud-item {
+            background: rgba(0, 0, 0, 0.7);
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .hud-item span {
+            color: #ff6b6b;
+            font-weight: bold;
+        }
+
+        #expBar {
+            width: 200px;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        #expFill {
+            height: 100%;
+            background: linear-gradient(90deg, #4ecdc4, #44bd32);
+            width: 0%;
+            transition: width 0.3s;
+        }
+
+        /* 升级选择界面 */
+        #levelUpScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+        }
+
+        #levelUpScreen.active {
+            display: flex;
+        }
+
+        #levelUpTitle {
+            font-size: 36px;
+            color: #ffd700;
+            margin-bottom: 30px;
+            text-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+        }
+
+        #upgradeOptions {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+            max-width: 800px;
+        }
+
+        .upgrade-card {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            border: 2px solid #333;
+            border-radius: 12px;
+            padding: 20px;
+            width: 220px;
+            cursor: pointer;
+            transition: all 0.3s;
+            pointer-events: auto;
+        }
+
+        .upgrade-card:hover {
+            transform: translateY(-5px);
+            border-color: #4ecdc4;
+            box-shadow: 0 10px 30px rgba(78, 205, 196, 0.3);
+        }
+
+        .upgrade-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+
+        .upgrade-name {
+            font-size: 18px;
+            font-weight: bold;
+            color: #4ecdc4;
+            margin-bottom: 8px;
+        }
+
+        .upgrade-desc {
+            font-size: 12px;
+            color: #aaa;
+            line-height: 1.4;
+        }
+
+        /* 游戏结束界面 */
+        #gameOverScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+        }
+
+        #gameOverScreen.active {
+            display: flex;
+        }
+
+        #gameOverTitle {
+            font-size: 48px;
+            color: #ff6b6b;
+            margin-bottom: 20px;
+            text-shadow: 0 0 30px rgba(255, 107, 107, 0.5);
+        }
+
+        #gameOverStats {
+            font-size: 20px;
+            color: #aaa;
+            margin-bottom: 30px;
+            text-align: center;
+            line-height: 1.6;
+        }
+
+        #restartBtn {
+            background: linear-gradient(135deg, #4ecdc4 0%, #44bd32 100%);
+            border: none;
+            padding: 15px 40px;
+            font-size: 18px;
+            color: #fff;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.3s;
+            pointer-events: auto;
+        }
+
+        #restartBtn:hover {
+            transform: scale(1.1);
+        }
+
+        /* 开始界面 */
+        #startScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a0000 50%, #0a0a0a 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 300;
+        }
+
+        #startScreen.hidden {
+            display: none;
+        }
+
+        #gameTitle {
+            font-size: 64px;
+            color: #ff6b6b;
+            margin-bottom: 10px;
+            text-shadow: 0 0 40px rgba(255, 107, 107, 0.6);
+            letter-spacing: 8px;
+        }
+
+        #gameSubtitle {
+            font-size: 18px;
+            color: #666;
+            margin-bottom: 40px;
+        }
+
+        #startBtn {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+            border: none;
+            padding: 18px 50px;
+            font-size: 20px;
+            color: #fff;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            pointer-events: auto;
+        }
+
+        #startBtn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 0 30px rgba(255, 107, 107, 0.5);
+        }
+
+        #startInstructions {
+            margin-top: 30px;
+            color: #666;
+            font-size: 14px;
+            text-align: center;
+            line-height: 1.8;
+        }
+
+        /* 控制提示 */
+        #controls {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255, 255, 255, 0.4);
+            font-size: 12px;
+            text-align: center;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- 开始界面 -->
+    <div id="startScreen">
+        <div id="gameTitle">末日幸存者</div>
+        <div id="gameSubtitle">在怪物潮中存活下去</div>
+        <button id="startBtn" onclick="startGame()">开始游戏</button>
+        <div id="startInstructions">
+            WASD / 方向键移动<br>
+            武器自动攻击，只需专注走位<br>
+            击杀怪物获取经验，升级选择技能
+        </div>
+    </div>
+
+    <!-- 游戏主界面 -->
+    <div id="gameContainer">
+        <div id="hud">
+            <div class="hud-left">
+                <div class="hud-item">❤️ HP: <span id="hp">100</span></div>
+                <div class="hud-item">🏆 击杀: <span id="kills">0</span></div>
+                <div class="hud-item">⏱️ 时间: <span id="time">0:00</span></div>
+            </div>
+            <div class="hud-right">
+                <div class="hud-item">📊 等级: <span id="level">1</span></div>
+                <div class="hud-item">
+                    <div id="expBar"><div id="expFill"></div></div>
+                </div>
+                <div class="hud-item">🗡️ 武器: <span id="weapons">基础剑气</span></div>
+            </div>
+        </div>
+        <canvas id="gameCanvas" width="1000" height="700"></canvas>
+    </div>
+
+    <!-- 升级选择界面 -->
+    <div id="levelUpScreen">
+        <div id="levelUpTitle">🎉 升级！选择技能</div>
+        <div id="upgradeOptions"></div>
+    </div>
+
+    <!-- 游戏结束界面 -->
+    <div id="gameOverScreen">
+        <div id="gameOverTitle">💀 游戏结束</div>
+        <div id="gameOverStats"></div>
+        <button id="restartBtn" onclick="restartGame()">再来一局</button>
+    </div>
+
+    <!-- 控制提示 -->
+    <div id="controls">WASD/方向键移动 | 武器自动攻击</div>
+
+    <script type="module" src="js/main.js"></script>
+<script>
+if(location.protocol==="file:"){document.body.innerHTML='<div style="position:fixed;inset:0;background:#0a0a0a;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px;font-family:sans-serif;color:#fff;z-index:9999"><div style="font-size:48px;margin-bottom:20px">⚠️</div><h2 style="color:#ff6b4a;font-size:20px;margin-bottom:12px">需要启动HTTP服务器</h2><p style="color:#888;font-size:13px;line-height:1.8;max-width:400px">此游戏使用ES Modules，无法通过file://打开。<br>请在游戏目录运行:</p><div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:12px 20px;margin:16px;font-family:monospace;color:#4aeaff;font-size:13px">python -m http.server 8000</div><p style="color:#666;font-size:12px">然后访问 http://localhost:8000</p><a href="../index.html" style="margin-top:16px;color:#ff6b4a;font-size:13px;text-decoration:none">← 返回游戏合集</a></div>'}
+</script>
+</body>
+</html>

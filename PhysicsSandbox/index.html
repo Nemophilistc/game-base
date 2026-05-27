@@ -1,0 +1,335 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>物理沙盒 — Physics Sandbox</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        @font-face { font-family: 'Icons'; src: local('Segoe UI Symbol'); }
+
+        body {
+            background: #0d0d1a;
+            color: #e0e0e0;
+            font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            user-select: none;
+        }
+
+        /* ======================== 布局 ======================== */
+        .app {
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            width: 200px;
+            min-width: 200px;
+            background: rgba(20, 20, 40, 0.92);
+            backdrop-filter: blur(12px);
+            border-right: 1px solid rgba(255,255,255,0.06);
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255,255,255,0.1) transparent;
+            z-index: 10;
+            padding-bottom: 12px;
+        }
+
+        .sidebar::-webkit-scrollbar { width: 4px; }
+        .sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+
+        .canvas-wrap {
+            flex: 1;
+            position: relative;
+        }
+
+        #game-canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+        }
+
+        /* ======================== 面板 ======================== */
+        .panel-title {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: rgba(255,255,255,0.4);
+            padding: 12px 14px 6px;
+        }
+
+        .sub-label {
+            font-size: 10px;
+            color: rgba(255,255,255,0.3);
+            padding: 4px 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .separator {
+            height: 1px;
+            background: rgba(255,255,255,0.06);
+            margin: 8px 14px;
+        }
+
+        .hint {
+            font-size: 12px;
+            color: rgba(255,255,255,0.3);
+            padding: 8px 14px;
+            font-style: italic;
+        }
+
+        /* ======================== 工具按钮 ======================== */
+        .tool-btn {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: calc(100% - 20px);
+            margin: 2px 10px;
+            padding: 8px 12px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 8px;
+            color: #ccc;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .tool-btn:hover {
+            background: rgba(255,255,255,0.08);
+            color: #fff;
+        }
+        .tool-btn.active {
+            background: rgba(78, 205, 196, 0.15);
+            border-color: rgba(78, 205, 196, 0.4);
+            color: #4ECDC4;
+        }
+        .tool-icon {
+            font-size: 18px;
+            width: 24px;
+            text-align: center;
+        }
+        .tool-label { font-size: 13px; }
+
+        /* ======================== 连接按钮 ======================== */
+        .conn-btn {
+            display: inline-block;
+            padding: 4px 10px;
+            margin: 2px 4px 2px 10px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 6px;
+            color: #aaa;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .conn-btn:hover { background: rgba(255,255,255,0.1); color: #fff; }
+        .conn-btn.active {
+            background: rgba(0, 255, 136, 0.12);
+            border-color: rgba(0, 255, 136, 0.3);
+            color: #00FF88;
+        }
+
+        /* ======================== 形状按钮 ======================== */
+        .shape-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            width: calc(100% - 20px);
+            margin: 2px 10px;
+            padding: 7px 12px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 8px;
+            color: #ccc;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .shape-btn:hover {
+            background: rgba(255,255,255,0.08);
+            color: #fff;
+        }
+        .shape-btn.active {
+            background: color-mix(in srgb, var(--shape-color) 15%, transparent);
+            border-color: color-mix(in srgb, var(--shape-color) 40%, transparent);
+            color: var(--shape-color);
+        }
+        .shape-icon {
+            font-size: 16px;
+            width: 20px;
+            text-align: center;
+        }
+
+        /* ======================== 场景按钮 ======================== */
+        .scene-btn {
+            display: block;
+            width: calc(100% - 20px);
+            margin: 2px 10px;
+            padding: 7px 12px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 8px;
+            color: #bbb;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.15s;
+            text-align: left;
+        }
+        .scene-btn:hover {
+            background: rgba(167, 139, 250, 0.15);
+            border-color: rgba(167, 139, 250, 0.3);
+            color: #A78BFA;
+        }
+
+        /* ======================== 操作按钮 ======================== */
+        .action-btn {
+            display: block;
+            width: calc(100% - 20px);
+            margin: 3px 10px;
+            padding: 7px 12px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            color: #ccc;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.15s;
+            text-align: center;
+        }
+        .action-btn:hover { background: rgba(255,255,255,0.12); color: #fff; }
+        .action-btn.danger { border-color: rgba(255,107,107,0.3); color: #FF6B6B; }
+        .action-btn.danger:hover { background: rgba(255,107,107,0.15); }
+
+        /* ======================== 滑块 ======================== */
+        .slider-group {
+            padding: 4px 14px 8px;
+        }
+        .slider-group label {
+            display: block;
+            font-size: 11px;
+            color: rgba(255,255,255,0.5);
+            margin-bottom: 4px;
+        }
+        .slider-group input[type="range"] {
+            width: 100%;
+            height: 4px;
+            -webkit-appearance: none;
+            appearance: none;
+            background: rgba(255,255,255,0.1);
+            border-radius: 2px;
+            outline: none;
+        }
+        .slider-group input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #4ECDC4;
+            cursor: pointer;
+        }
+        .slider-group span {
+            display: inline-block;
+            font-size: 11px;
+            color: #4ECDC4;
+            margin-top: 2px;
+            font-family: monospace;
+        }
+
+        /* ======================== 复选框 ======================== */
+        .toggle-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 5px 14px;
+            font-size: 12px;
+            color: #bbb;
+            cursor: pointer;
+            transition: color 0.15s;
+        }
+        .toggle-label:hover { color: #fff; }
+        .toggle-label input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            accent-color: #4ECDC4;
+            cursor: pointer;
+        }
+
+        /* ======================== 属性面板 ======================== */
+        .prop-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 14px;
+            font-size: 12px;
+        }
+        .prop-row span:first-child { color: rgba(255,255,255,0.5); }
+        .prop-row span:last-child { color: #4ECDC4; font-family: monospace; }
+
+        /* ======================== 快捷键提示 ======================== */
+        .shortcuts {
+            padding: 8px 14px;
+            font-size: 10px;
+            color: rgba(255,255,255,0.25);
+            line-height: 1.8;
+        }
+        .shortcuts kbd {
+            display: inline-block;
+            padding: 1px 5px;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 3px;
+            font-family: monospace;
+            font-size: 10px;
+            color: rgba(255,255,255,0.4);
+        }
+
+        /* ======================== 响应式 ======================== */
+        @media (max-width: 700px) {
+            .sidebar { width: 160px; min-width: 160px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <!-- 左侧面板 -->
+        <div class="sidebar">
+            <div id="toolbar"></div>
+            <div class="separator"></div>
+            <div id="shape-bar"></div>
+            <div class="separator"></div>
+            <div id="scene-bar"></div>
+            <div class="separator"></div>
+            <div id="physics-panel"></div>
+            <div class="separator"></div>
+            <div id="toggle-bar"></div>
+            <div class="separator"></div>
+            <div id="prop-panel"></div>
+            <div class="separator"></div>
+            <div class="shortcuts">
+                <kbd>1</kbd>~<kbd>5</kbd> 切换工具<br>
+                <kbd>Q</kbd><kbd>W</kbd><kbd>E</kbd><kbd>R</kbd> 切换形状<br>
+                <kbd>Z</kbd> 撤销 &nbsp; <kbd>Space</kbd> 暂停<br>
+                <kbd>Esc</kbd> 取消操作<br>
+                滚轮缩放 · 右键查看属性
+            </div>
+        </div>
+
+        <!-- 画布 -->
+        <div class="canvas-wrap">
+            <canvas id="game-canvas"></canvas>
+        </div>
+    </div>
+
+    <script type="module" src="js/main.js"></script>
+<script>
+if(location.protocol==="file:"){document.body.innerHTML='<div style="position:fixed;inset:0;background:#0a0a0a;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px;font-family:sans-serif;color:#fff;z-index:9999"><div style="font-size:48px;margin-bottom:20px">⚠️</div><h2 style="color:#ff6b4a;font-size:20px;margin-bottom:12px">需要启动HTTP服务器</h2><p style="color:#888;font-size:13px;line-height:1.8;max-width:400px">此游戏使用ES Modules，无法通过file://打开。<br>请在游戏目录运行:</p><div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:12px 20px;margin:16px;font-family:monospace;color:#4aeaff;font-size:13px">python -m http.server 8000</div><p style="color:#666;font-size:12px">然后访问 http://localhost:8000</p><a href="../index.html" style="margin-top:16px;color:#ff6b4a;font-size:13px;text-decoration:none">← 返回游戏合集</a></div>'}
+</script>
+</body>
+</html>

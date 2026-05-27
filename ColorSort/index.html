@@ -1,0 +1,76 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>颜色排序</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{background:#0a0a0a;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'Segoe UI',Tahoma,sans-serif;overflow:hidden;color:#fff}
+        #gameCanvas{border:2px solid #333;border-radius:8px;box-shadow:0 0 30px rgba(156,39,176,0.3);background:#111}
+        .hud{position:fixed;top:15px;left:50%;transform:translateX(-50%);display:flex;gap:15px;z-index:10}
+        .hud-item{background:rgba(0,0,0,0.7);padding:8px 14px;border-radius:8px;font-size:13px;border:1px solid rgba(255,255,255,0.1);backdrop-filter:blur(10px)}
+        .hud-item span{color:#9c27b0;font-weight:bold}
+        .overlay{position:fixed;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100;background:rgba(0,0,0,0.85)}
+        .overlay.hidden{display:none}
+        .overlay-title{font-size:48px;margin-bottom:15px;text-shadow:0 0 20px rgba(156,39,176,0.5);color:#9c27b0}
+        .menu-btn{background:linear-gradient(135deg,#9c27b0 0%,#7b1fa2 100%);border:none;padding:14px 40px;font-size:18px;color:#fff;border-radius:8px;cursor:pointer;transition:all 0.3s;margin:6px;font-weight:bold}
+        .menu-btn:hover{transform:scale(1.08);box-shadow:0 0 25px rgba(156,39,176,0.5)}
+        .help-box{margin-top:15px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:14px 20px;max-width:350px;text-align:left;font-size:13px;color:#aaa;line-height:1.8;backdrop-filter:blur(5px)}
+        .help-box h3{color:#9c27b0;font-size:14px;margin-bottom:6px;text-align:center}
+        #levelGrid{display:grid;grid-template-columns:repeat(10,40px);gap:6px;margin:15px 0;max-height:200px;overflow-y:auto}
+        .level-btn{width:40px;height:40px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.05);color:#fff;font-size:12px;cursor:pointer;transition:all 0.15s;text-align:center;line-height:1.2}
+        .level-btn:hover{background:rgba(156,39,176,0.3);border-color:#9c27b0}
+        .level-btn.locked{opacity:0.3;cursor:not-allowed}
+        .bottom-btns{display:flex;gap:8px;margin-top:10px}
+        .small-btn{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:8px 16px;font-size:13px;color:#888;cursor:pointer;transition:all 0.2s}
+        .small-btn:hover{background:rgba(156,39,176,0.2);color:#9c27b0;border-color:#9c27b0}
+        .stats{font-size:20px;color:#aaa;margin-bottom:20px;text-align:center;line-height:1.6}
+    </style>
+</head>
+<body>
+    <div class="hud">
+        <div class="hud-item">关卡: <span id="level">1</span></div>
+        <div class="hud-item">步数: <span id="moves">0</span></div>
+        <div class="hud-item">撤销: <span id="undos">3</span></div>
+        <div class="hud-item">时间: <span id="timer">0:00</span></div>
+    </div>
+    <canvas id="gameCanvas"></canvas>
+    <div class="bottom-btns">
+        <button class="small-btn" id="btnUndo">↩ 撤销</button>
+        <button class="small-btn" id="btnRestart">↺ 重新开始</button>
+    </div>
+
+    <div id="startOverlay" class="overlay">
+        <div class="overlay-title">颜色排序</div>
+        <div id="levelGrid"></div>
+        <div class="help-box">
+            <h3>操作说明</h3>
+            <div>点击试管选择顶部颜色</div>
+            <div>再点击另一试管倒入</div>
+            <div>Z：撤销 | R：重新开始</div>
+            <h3 style="margin-top:8px">游戏规则</h3>
+            <div>将彩色液体排序，使每管只有一种颜色</div>
+            <div>只能倒入同色或空管</div>
+            <div>步数越少，星级越高</div>
+        </div>
+    </div>
+
+    <div id="winOverlay" class="overlay hidden">
+        <div class="overlay-title" style="color:#4caf50;text-shadow:0 0 20px rgba(76,175,80,0.5)">完成！</div>
+        <div id="winStats" class="stats"></div>
+        <button class="menu-btn" id="btnNext">下一关</button>
+    </div>
+
+    <div id="gameOverOverlay" class="overlay hidden">
+        <div class="overlay-title" style="color:#f44336;text-shadow:0 0 20px rgba(244,67,54,0.5)">游戏结束</div>
+        <div id="goStats" class="stats"></div>
+        <button class="menu-btn" onclick="location.reload()">返回选关</button>
+    </div>
+
+    <script type="module" src="js/main.js"></script>
+<script>
+if(location.protocol==="file:"){document.body.innerHTML='<div style="position:fixed;inset:0;background:#0a0a0a;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px;font-family:sans-serif;color:#fff;z-index:9999"><div style="font-size:48px;margin-bottom:20px">⚠️</div><h2 style="color:#ff6b4a;font-size:20px;margin-bottom:12px">需要启动HTTP服务器</h2><p style="color:#888;font-size:13px;line-height:1.8;max-width:400px">此游戏使用ES Modules，无法通过file://打开。<br>请在游戏目录运行:</p><div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:12px 20px;margin:16px;font-family:monospace;color:#4aeaff;font-size:13px">python -m http.server 8000</div><p style="color:#666;font-size:12px">然后访问 http://localhost:8000</p><a href="../index.html" style="margin-top:16px;color:#ff6b4a;font-size:13px;text-decoration:none">← 返回游戏合集</a></div>'}
+</script>
+</body>
+</html>
