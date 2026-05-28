@@ -506,6 +506,7 @@ let paused = false;
 let gameTimer = 0;
 let lastTimestamp = 0;
 let moveAccum = 0;
+let gameOverTimeout = null;
 
 // ── 模式选择 ──
 window.setMode = function (m, el) {
@@ -514,7 +515,14 @@ window.setMode = function (m, el) {
 
 // ── 开始游戏 ──
 window.startGame = function () {
-    Sound.init();
+    try { Sound.init(); } catch (e) { /* AudioContext 不可用时静默跳过 */ }
+
+    // 清除上一局的 game-over 定时器，防止它覆盖新游戏
+    if (gameOverTimeout) { clearTimeout(gameOverTimeout); gameOverTimeout = null; }
+
+    // 停止旧的游戏循环，重新启动
+    if (gameTimer) { cancelAnimationFrame(gameTimer); gameTimer = 0; }
+
     UI.hideAllScreens();
 
     snake.init();
@@ -528,7 +536,7 @@ window.startGame = function () {
     moveAccum = 0;
     UI.updateHUD(score, snake.length, highScore);
 
-    if (!gameTimer) gameTimer = requestAnimationFrame(gameLoop);
+    gameTimer = requestAnimationFrame(gameLoop);
 };
 
 // ── 返回菜单 ──
@@ -586,7 +594,7 @@ function gameLoop(timestamp) {
             Sound.play('die');
             highScore = Math.max(highScore, score);
             localStorage.setItem('snake_high', highScore);
-            setTimeout(() => UI.showGameOver(score, snake.length, highScore), 500);
+            gameOverTimeout = setTimeout(() => UI.showGameOver(score, snake.length, highScore), 500);
             moveAccum = 0;
             return;
         }

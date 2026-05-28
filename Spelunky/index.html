@@ -570,14 +570,21 @@ class Level {
             this.items.push({ type: 'chest', x: ix, y: iy });
         }
 
+        // Player spawn tile coords (for spike safety check)
+        const spawnCol = Math.floor(this.playerStart.x / TILE);
+        const spawnRow = Math.floor(this.playerStart.y / TILE);
+
         // Place traps
         for (const room of rooms) {
-            // Spike pits
+            // Spike pits (skip starting room and area near player spawn)
+            if (room === topRoom) continue;
             if (room.w >= 5 && rng.chance(0.25)) {
                 const sy = room.y + room.h - 1;
                 const sx = room.x + rng.int(1, room.w - 3);
                 const sw = rng.int(2, 3);
                 for (let x = sx; x < sx + sw && x < this.cols; x++) {
+                    // Don't place spikes within 2 tiles of player spawn
+                    if (Math.abs(x - spawnCol) <= 2 && Math.abs(sy - spawnRow) <= 2) continue;
                     if (grid[sy][x] === T.AIR) {
                         grid[sy][x] = T.SPIKE;
                     }
@@ -1061,6 +1068,8 @@ class Player {
                     if (action === 'bomb') this.input.bombPressed = true;
                     if (action === 'rope') this.input.ropePressed = true;
                     if (action === 'whip') this.input.whipPressed = true;
+                    // ArrowUp/KeyW also trigger jump
+                    if (action === 'up') this.input.jumpPressed = true;
                 }
                 this.input[action] = true;
             }
@@ -1119,6 +1128,7 @@ class Player {
 
         // Ladder climbing
         if (this.onLadder && (this.input.up || this.input.down)) {
+            if (!this.climbing) this.jumpBuffer = 0; // Prevent jump-off when first grabbing ladder
             this.climbing = true;
         }
         if (this.climbing && !this.onLadder) {
@@ -3418,7 +3428,7 @@ class UI {
         ctx.strokeRect(viewW / 2 - btnW / 2, btnY, btnW, btnH);
         ctx.fillStyle = COLORS.gold;
         ctx.font = 'bold 18px monospace';
-        ctx.fillText('按 SPACE 开始', viewW / 2, btnY + 26);
+        ctx.fillText('点击或按 SPACE 开始', viewW / 2, btnY + 26);
 
         // Help box
         const helpY = btnY + 60;
@@ -3493,7 +3503,7 @@ class UI {
         ctx.strokeRect(viewW / 2 - 120, btnY, 240, 36);
         ctx.fillStyle = COLORS.gold;
         ctx.font = 'bold 14px monospace';
-        ctx.fillText('按 SPACE 重新开始', viewW / 2, btnY + 24);
+        ctx.fillText('点击或按 SPACE 重新开始', viewW / 2, btnY + 24);
 
         ctx.textAlign = 'left';
     }
@@ -3646,31 +3656,57 @@ class Game {
     }
 
     _setupStartInput() {
-        const handler = (e) => {
+        const keyHandler = (e) => {
             if (e.code === 'Space' && this.state === 'start') {
                 e.preventDefault();
-                window.removeEventListener('keydown', handler);
+                window.removeEventListener('keydown', keyHandler);
+                this.canvas.removeEventListener('click', clickHandler);
                 Sound.jump();
                 this.ui.transition(() => {
                     this.startGame();
                 });
             }
         };
-        window.addEventListener('keydown', handler);
+        const clickHandler = (e) => {
+            if (this.state === 'start') {
+                e.preventDefault();
+                window.removeEventListener('keydown', keyHandler);
+                this.canvas.removeEventListener('click', clickHandler);
+                Sound.jump();
+                this.ui.transition(() => {
+                    this.startGame();
+                });
+            }
+        };
+        window.addEventListener('keydown', keyHandler);
+        this.canvas.addEventListener('click', clickHandler);
     }
 
     _setupGameOverInput() {
-        const handler = (e) => {
+        const keyHandler = (e) => {
             if (e.code === 'Space' && this.state === 'gameover') {
                 e.preventDefault();
-                window.removeEventListener('keydown', handler);
+                window.removeEventListener('keydown', keyHandler);
+                this.canvas.removeEventListener('click', clickHandler);
                 Sound.jump();
                 this.ui.transition(() => {
                     this.startGame();
                 });
             }
         };
-        window.addEventListener('keydown', handler);
+        const clickHandler = (e) => {
+            if (this.state === 'gameover') {
+                e.preventDefault();
+                window.removeEventListener('keydown', keyHandler);
+                this.canvas.removeEventListener('click', clickHandler);
+                Sound.jump();
+                this.ui.transition(() => {
+                    this.startGame();
+                });
+            }
+        };
+        window.addEventListener('keydown', keyHandler);
+        this.canvas.addEventListener('click', clickHandler);
     }
 
     _setupShopInput() {
@@ -4275,7 +4311,7 @@ window.startGame = initGame;
 
 // Auto-init if DOM is ready
 if (document.readyState === 'loading') {
-    if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",initGame)}else{initGame()};
+    initGame();;
 } else {
     initGame();
 }

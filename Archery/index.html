@@ -1394,13 +1394,26 @@ class EffectsManager {
     }
     this.particles = this.particles.filter(p => p.alive);
 
+    // Hard cap to prevent runaway particle accumulation
+    if (this.particles.length > 100) {
+      this.particles = this.particles.slice(-100);
+    }
+    if (this.celebrationParticles.length > 50) {
+      this.celebrationParticles = this.celebrationParticles.slice(-50);
+    }
+
     // Update floating texts
     for (const ft of this.floatingTexts) {
-      ft.y -= 1.2;
+      ft.y -= 1.5;
       ft.life--;
       ft.alpha = ft.life / ft.maxLife;
     }
     this.floatingTexts = this.floatingTexts.filter(ft => ft.life > 0);
+
+    // Cap floating texts
+    if (this.floatingTexts.length > 8) {
+      this.floatingTexts = this.floatingTexts.slice(-8);
+    }
 
     // Update screen shake
     if (this.screenShake > 0) {
@@ -1416,7 +1429,7 @@ class EffectsManager {
 
     // Update bullseye flash
     if (this.bullseyeFlash > 0) {
-      this.bullseyeFlash -= 0.02;
+      this.bullseyeFlash -= 0.05;
     }
 
     // Update wind particles
@@ -1436,111 +1449,111 @@ class EffectsManager {
       ? ['#FFD700', '#FFA500', '#FFFF00', '#fff']
       : ['#FF4444', '#FF8844', '#FFAA44', '#fff'];
 
-    const count = zone === 0 ? 25 : 12;
+    const count = zone === 0 ? 10 : 6;
     for (let i = 0; i < count; i++) {
       const angle = Math.random() * Math.PI * 2;
-      const speed = 1 + Math.random() * 4;
+      const speed = 1 + Math.random() * 3;
       const color = colors[Math.floor(Math.random() * colors.length)];
       this.particles.push(new Particle(
         x, y,
         Math.cos(angle) * speed,
         Math.sin(angle) * speed,
         color,
-        2 + Math.random() * 3,
-        30 + Math.random() * 30
+        2 + Math.random() * 2,
+        20 + Math.random() * 20
       ));
     }
 
     if (zone === 0) {
-      this.bullseyeFlash = 1;
-      this.screenShake = 8;
+      this.bullseyeFlash = 0.5;
+      this.screenShake = 4;
     } else {
-      this.screenShake = 3;
+      this.screenShake = 2;
     }
   }
 
   // Balloon pop effect
   spawnBalloonPop(x, y, color) {
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 10; i++) {
       const angle = Math.random() * Math.PI * 2;
-      const speed = 2 + Math.random() * 5;
+      const speed = 2 + Math.random() * 3;
       this.particles.push(new Particle(
         x, y,
         Math.cos(angle) * speed,
         Math.sin(angle) * speed,
         color,
-        3 + Math.random() * 4,
-        20 + Math.random() * 20
+        2 + Math.random() * 3,
+        15 + Math.random() * 15
       ));
     }
     // Confetti
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 5; i++) {
       const angle = Math.random() * Math.PI * 2;
-      const speed = 1 + Math.random() * 3;
+      const speed = 1 + Math.random() * 2;
       this.particles.push(new Particle(
         x, y,
         Math.cos(angle) * speed,
         Math.sin(angle) * speed - 2,
         ['#FF4488', '#FFDD44', '#44DDFF', '#DD44FF', '#44FF44'][Math.floor(Math.random() * 5)],
         2 + Math.random() * 2,
-        40 + Math.random() * 30
+        30 + Math.random() * 20
       ));
     }
-    this.screenShake = 4;
+    this.screenShake = 3;
   }
 
   // Apple hit effect
   spawnAppleHit(x, y) {
     // Red juice particles
-    for (let i = 0; i < 15; i++) {
+    for (let i = 0; i < 8; i++) {
       const angle = Math.random() * Math.PI * 2;
-      const speed = 1 + Math.random() * 3;
+      const speed = 1 + Math.random() * 2;
       this.particles.push(new Particle(
         x, y,
         Math.cos(angle) * speed,
         Math.sin(angle) * speed,
         '#CC0000',
-        2 + Math.random() * 3,
-        25 + Math.random() * 20
+        2 + Math.random() * 2,
+        20 + Math.random() * 15
       ));
     }
-    this.screenShake = 5;
+    this.screenShake = 3;
   }
 
   // Bullseye celebration (big)
   spawnBullseyeCelebration(x, y) {
     // Ring of golden particles
-    for (let i = 0; i < 40; i++) {
-      const angle = (Math.PI * 2 / 40) * i;
-      const speed = 3 + Math.random() * 2;
+    for (let i = 0; i < 16; i++) {
+      const angle = (Math.PI * 2 / 16) * i;
+      const speed = 2 + Math.random() * 2;
       this.celebrationParticles.push(new Particle(
         x, y,
         Math.cos(angle) * speed,
         Math.sin(angle) * speed,
         ['#FFD700', '#FFA500', '#FFFF00', '#FFFFFF'][Math.floor(Math.random() * 4)],
-        3 + Math.random() * 3,
-        50 + Math.random() * 30
+        2 + Math.random() * 3,
+        35 + Math.random() * 20
       ));
     }
 
     // Star burst
-    for (let i = 0; i < 12; i++) {
-      const angle = (Math.PI * 2 / 12) * i;
-      for (let j = 1; j <= 3; j++) {
+    for (let i = 0; i < 8; i++) {
+      const angle = (Math.PI * 2 / 8) * i;
+      for (let j = 1; j <= 2; j++) {
         const speed = j * 3;
         this.celebrationParticles.push(new Particle(
           x, y,
           Math.cos(angle) * speed,
           Math.sin(angle) * speed,
           '#FFD700',
-          4,
-          30 + j * 10
+          3,
+          25 + j * 10
         ));
       }
     }
 
-    this.bullseyeFlash = 1;
-    this.screenShake = 10;
+    this.bullseyeFlash = 0.5;
+    this.screenShake = 5;
   }
 
   // Floating score text
@@ -1550,8 +1563,8 @@ class EffectsManager {
       text,
       color,
       size,
-      life: 60,
-      maxLife: 60,
+      life: 45,
+      maxLife: 45,
       alpha: 1
     });
   }
@@ -1564,9 +1577,9 @@ class EffectsManager {
       x, y: y - 30,
       text: `${combo}连击! x${CONFIG.COMBO_MULTIPLIERS[Math.min(combo - 1, CONFIG.COMBO_MULTIPLIERS.length - 1)]}`,
       color,
-      size: 28 + combo * 2,
-      life: 70,
-      maxLife: 70,
+      size: 28 + Math.min(combo, 5) * 2,
+      life: 50,
+      maxLife: 50,
       alpha: 1
     });
   }
@@ -1574,13 +1587,13 @@ class EffectsManager {
   // Wind particles (ambient)
   _updateWindParticles() {
     // Spawn new wind particles occasionally
-    if (Math.random() < 0.1) {
+    if (Math.random() < 0.03) {
       this.windParticles.push({
         x: Math.random() > 0.5 ? -10 : CONFIG.CANVAS_WIDTH + 10,
         y: Math.random() * CONFIG.CANVAS_HEIGHT * 0.8,
         size: 1 + Math.random() * 2,
-        life: 100 + Math.random() * 100,
-        maxLife: 200,
+        life: 60 + Math.random() * 60,
+        maxLife: 120,
         alpha: 0.2 + Math.random() * 0.3
       });
     }
@@ -1591,6 +1604,11 @@ class EffectsManager {
       p.life--;
     }
     this.windParticles = this.windParticles.filter(p => p.life > 0);
+
+    // Cap wind particles
+    if (this.windParticles.length > 30) {
+      this.windParticles = this.windParticles.slice(-30);
+    }
   }
 
   updateWindParticlesWithWind(wind) {
@@ -2638,6 +2656,9 @@ class ArcheryGame {
   render() {
     const ctx = this.ctx;
 
+    // Clear entire canvas each frame to prevent visual accumulation
+    ctx.clearRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
+
     ctx.save();
 
     // Screen shake
@@ -2834,9 +2855,7 @@ window.startGame = function () {
 
         
         // Initialize when page loads
-        window.addEventListener('DOMContentLoaded', () => {
-            if (window.startGame) window.startGame();
-        });
+        if (window.startGame) window.startGame();;;
 
         // Also init on first user interaction for audio
         let initialized = false;

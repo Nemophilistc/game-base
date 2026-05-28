@@ -2271,6 +2271,17 @@ function init() {
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
 
+    // Click to start/restart
+    canvas.addEventListener('click', () => {
+        if (gameState === STATE.MENU) {
+            sound.init();
+            sound.resume();
+            startGame();
+        } else if (gameState === STATE.GAMEOVER) {
+            startGame();
+        }
+    });
+
     // Touch controls for mobile
     setupTouchControls();
 
@@ -2384,6 +2395,13 @@ function setupTouchControls() {
 }
 
 function startGame() {
+    // Resume AudioContext before any sound calls (browser may have suspended it)
+    sound.init();
+    sound.resume();
+
+    // Clear stale input state from previous game
+    keys = {};
+
     plane.reset();
     effects.reset();
     score = 0;
@@ -2393,6 +2411,11 @@ function startGame() {
     terrain = new Terrain(canvas.width, canvas.height);
     obstacles = new ObstacleManager(canvas.width, canvas.height, terrain.getGroundY());
     collectibles = new CollectibleManager(canvas.width, canvas.height, terrain.getGroundY());
+
+    // Clear UI state from previous game
+    ui.screenShake = 0;
+    ui.messages = [];
+
     gameState = STATE.PLAYING;
     ui.showMessage('起飞!', 90, '#44ff44');
 }
@@ -2619,19 +2642,17 @@ function draw() {
 }
 
 // Start
-window.addEventListener('DOMContentLoaded', init);
+init();;
 
         
         // Hide loading screen once module is loaded
-        window.addEventListener('DOMContentLoaded', () => {
-            setTimeout(() => {
+        setTimeout(() => {
                 const loading = document.getElementById('loading');
                 if (loading) {
                     loading.classList.add('hidden');
                     setTimeout(() => loading.remove(), 500);
                 }
-            }, 300);
-        });
+            }, 300);;;
     
 </script>
 

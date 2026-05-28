@@ -80,7 +80,7 @@ const CANVAS_WIDTH = GRID_COLS * CELL_SIZE;
 const CANVAS_HEIGHT = GRID_ROWS * CELL_SIZE;
 
 // 游戏初始资源
-const INITIAL_GOLD = 300;
+const INITIAL_GOLD = 500;
 const INITIAL_LIVES = 20;
 
 // 多地图路径定义
@@ -208,62 +208,106 @@ const TOWER_TYPES = {
 // 敌人类型定义
 const ENEMY_TYPES = {
   normal: {
-    name: '普通',
+    name: '步兵',
     hp: 80,
     speed: 1.0,
-    reward: 25,
+    reward: 30,
     color: '#e74c3c',
-    size: 0.6,
+    size: 0.7,
     armor: 0
   },
   fast: {
-    name: '快速',
+    name: '刺客',
     hp: 50,
     speed: 2.0,
-    reward: 30,
+    reward: 35,
     color: '#f39c12',
-    size: 0.5,
+    size: 0.6,
     armor: 0
   },
   flying: {
-    name: '飞行',
+    name: '飞龙',
     hp: 60,
     speed: 1.2,
-    reward: 35,
+    reward: 40,
     color: '#9b59b6',
-    size: 0.55,
+    size: 0.65,
     armor: 0,
     flying: true
   },
   armored: {
-    name: '装甲',
+    name: '重甲',
     hp: 200,
     speed: 0.7,
-    reward: 40,
+    reward: 50,
     color: '#7f8c8d',
-    size: 0.75,
+    size: 0.85,
     armor: 15
   },
   healer: {
-    name: '治疗',
+    name: '萨满',
     hp: 100,
     speed: 0.9,
-    reward: 50,
+    reward: 60,
     color: '#2ecc71',
-    size: 0.6,
+    size: 0.7,
     armor: 0,
     healAmount: 5,
     healRange: 2,
     healInterval: 1.5
   },
   boss: {
-    name: 'Boss',
+    name: '魔王',
     hp: 800,
     speed: 0.5,
-    reward: 200,
+    reward: 300,
     color: '#c0392b',
-    size: 1.0,
+    size: 1.2,
     armor: 10
+  },
+  assassin: {
+    name: '暗影刺客',
+    hp: 40,
+    speed: 2.5,
+    reward: 45,
+    color: '#2c3e50',
+    size: 0.55,
+    armor: 0,
+    stealth: true
+  },
+  summoner: {
+    name: '召唤师',
+    hp: 120,
+    speed: 0.6,
+    reward: 80,
+    color: '#8E44AD',
+    size: 0.75,
+    armor: 0,
+    summonType: 'normal',
+    summonInterval: 4,
+    maxSummons: 3
+  },
+  shield: {
+    name: '盾卫',
+    hp: 150,
+    speed: 0.8,
+    reward: 55,
+    color: '#2980b9',
+    size: 0.8,
+    armor: 5,
+    shieldHp: 80,
+    shieldRegen: 2
+  },
+  bomber: {
+    name: '爆破兵',
+    hp: 70,
+    speed: 1.3,
+    reward: 40,
+    color: '#d35400',
+    size: 0.65,
+    armor: 0,
+    explosionDamage: 1,
+    explosionRadius: 2
   }
 };
 
@@ -584,49 +628,286 @@ function removeTower(col, row) {
   grid[row][col] = CELL_EMPTY;
 }
 
+// ---- 地图环境主题 ----
+const MAP_THEMES = [
+  { // 蜿蜒峡谷 - 沙漠峡谷风格
+    name: 'canyon',
+    pathColor: '#d4a574',
+    pathTexture: '#c9976a',
+    groundColor: '#c2955a',
+    groundTexture: '#b5884f',
+    groundAccent: '#a07840',
+    decorations: drawCanyonDecor,
+    arrowColor: 'rgba(80,40,0,0.2)',
+    gridColor: 'rgba(0,0,0,0.06)'
+  },
+  { // 迷宫回廊 - 地下城风格
+    name: 'dungeon',
+    pathColor: '#6b6b7b',
+    pathTexture: '#5a5a6a',
+    groundColor: '#3a3a4a',
+    groundTexture: '#2e2e3e',
+    groundAccent: '#44445a',
+    decorations: drawDungeonDecor,
+    arrowColor: 'rgba(200,180,100,0.2)',
+    gridColor: 'rgba(100,100,150,0.08)'
+  },
+  { // 蛇形长廊 - 暗黑森林风格
+    name: 'forest',
+    pathColor: '#6b5b3a',
+    pathTexture: '#5a4e30',
+    groundColor: '#2d5a1e',
+    groundTexture: '#245018',
+    groundAccent: '#1e4512',
+    decorations: drawForestDecor,
+    arrowColor: 'rgba(0,60,0,0.2)',
+    gridColor: 'rgba(0,50,0,0.06)'
+  }
+];
+
+function drawCanyonDecor(ctx, x, y, c, r, seed) {
+  // 仙人掌
+  if (seed === 0) {
+    ctx.fillStyle = '#2d8a4e';
+    ctx.fillRect(x + 22, y + 12, 6, 28);
+    ctx.fillRect(x + 16, y + 18, 6, 4);
+    ctx.fillRect(x + 16, y + 12, 4, 10);
+    ctx.fillRect(x + 28, y + 22, 6, 4);
+    ctx.fillRect(x + 28, y + 16, 4, 10);
+    // 仙人掌花
+    ctx.fillStyle = '#ff6b9d';
+    ctx.beginPath();
+    ctx.arc(x + 25, y + 10, 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // 岩石
+  if (seed === 1) {
+    ctx.fillStyle = '#8B7355';
+    ctx.beginPath();
+    ctx.moveTo(x + 10, y + 42);
+    ctx.lineTo(x + 18, y + 20);
+    ctx.lineTo(x + 35, y + 18);
+    ctx.lineTo(x + 45, y + 25);
+    ctx.lineTo(x + 48, y + 42);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#9B8365';
+    ctx.beginPath();
+    ctx.moveTo(x + 15, y + 42);
+    ctx.lineTo(x + 22, y + 25);
+    ctx.lineTo(x + 32, y + 23);
+    ctx.lineTo(x + 28, y + 42);
+    ctx.closePath();
+    ctx.fill();
+  }
+  // 沙丘凸起
+  if (seed === 2) {
+    ctx.fillStyle = '#b8884f';
+    ctx.beginPath();
+    ctx.ellipse(x + 28, y + 40, 18, 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#c99860';
+    ctx.beginPath();
+    ctx.ellipse(x + 28, y + 38, 14, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // 裂缝纹理
+  if (seed === 3) {
+    ctx.strokeStyle = '#a07040';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x + 8, y + 20);
+    ctx.lineTo(x + 20, y + 28);
+    ctx.lineTo(x + 35, y + 25);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x + 20, y + 28);
+    ctx.lineTo(x + 18, y + 40);
+    ctx.stroke();
+  }
+}
+
+function drawDungeonDecor(ctx, x, y, c, r, seed) {
+  // 火把
+  if (seed === 0) {
+    // 火把柄
+    ctx.fillStyle = '#8B6914';
+    ctx.fillRect(x + 25, y + 15, 5, 25);
+    // 火焰
+    ctx.fillStyle = '#FF6600';
+    ctx.beginPath();
+    ctx.moveTo(x + 22, y + 15);
+    ctx.quadraticCurveTo(x + 27, y + 2, x + 32, y + 15);
+    ctx.fill();
+    ctx.fillStyle = '#FFCC00';
+    ctx.beginPath();
+    ctx.moveTo(x + 24, y + 15);
+    ctx.quadraticCurveTo(x + 27, y + 6, x + 30, y + 15);
+    ctx.fill();
+    // 光晕
+    ctx.fillStyle = 'rgba(255,150,0,0.08)';
+    ctx.beginPath();
+    ctx.arc(x + 28, y + 12, 20, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // 石柱
+  if (seed === 1) {
+    ctx.fillStyle = '#555566';
+    ctx.fillRect(x + 18, y + 5, 18, 46);
+    ctx.fillStyle = '#666677';
+    ctx.fillRect(x + 15, y + 3, 24, 6);
+    ctx.fillRect(x + 15, y + 44, 24, 6);
+    // 石柱纹理
+    ctx.fillStyle = '#4a4a5a';
+    ctx.fillRect(x + 22, y + 12, 2, 30);
+  }
+  // 地面裂缝
+  if (seed === 2) {
+    ctx.strokeStyle = '#2a2a3a';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(x + 5, y + 30);
+    ctx.lineTo(x + 20, y + 25);
+    ctx.lineTo(x + 35, y + 32);
+    ctx.lineTo(x + 50, y + 28);
+    ctx.stroke();
+  }
+  // 蜘蛛网
+  if (seed === 3) {
+    ctx.strokeStyle = 'rgba(200,200,200,0.2)';
+    ctx.lineWidth = 0.5;
+    for (let i = 0; i < 4; i++) {
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + 15 + i * 10, y + 20 + i * 8);
+      ctx.stroke();
+    }
+  }
+}
+
+function drawForestDecor(ctx, x, y, c, r, seed) {
+  // 树木
+  if (seed === 0) {
+    // 树干
+    ctx.fillStyle = '#4a3520';
+    ctx.fillRect(x + 23, y + 22, 8, 25);
+    // 树冠
+    ctx.fillStyle = '#1a5c10';
+    ctx.beginPath();
+    ctx.arc(x + 27, y + 18, 14, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#228B22';
+    ctx.beginPath();
+    ctx.arc(x + 27, y + 15, 11, 0, Math.PI * 2);
+    ctx.fill();
+    // 高光
+    ctx.fillStyle = '#2a9a2a';
+    ctx.beginPath();
+    ctx.arc(x + 23, y + 12, 5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // 蘑菇
+  if (seed === 1) {
+    // 蘑菇柄
+    ctx.fillStyle = '#d4c4a0';
+    ctx.fillRect(x + 24, y + 32, 6, 12);
+    // 蘑菇帽
+    ctx.fillStyle = '#cc3333';
+    ctx.beginPath();
+    ctx.ellipse(x + 27, y + 32, 10, 7, 0, Math.PI, 0);
+    ctx.fill();
+    // 白点
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(x + 23, y + 28, 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(x + 30, y + 30, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // 灌木丛
+  if (seed === 2) {
+    ctx.fillStyle = '#1a6010';
+    ctx.beginPath();
+    ctx.arc(x + 15, y + 38, 10, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(x + 30, y + 35, 12, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#228018';
+    ctx.beginPath();
+    ctx.arc(x + 22, y + 33, 9, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // 草丛和花朵
+  if (seed === 3) {
+    ctx.fillStyle = '#2a7a20';
+    for (let i = 0; i < 5; i++) {
+      const gx = x + 8 + i * 9;
+      const gy = y + 35 + (i % 3) * 4;
+      ctx.fillRect(gx, gy, 2, 8);
+      ctx.fillRect(gx + 3, gy + 2, 2, 6);
+    }
+    // 小花
+    ctx.fillStyle = '#ffaa00';
+    ctx.beginPath();
+    ctx.arc(x + 20, y + 30, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#ff5577';
+    ctx.beginPath();
+    ctx.arc(x + 38, y + 34, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
 /** 绘制地图 */
 function drawMap(ctx, path) {
   const enemyPath = currentPath;
+  const theme = MAP_THEMES[currentMapIndex] || MAP_THEMES[0];
 
   for (let r = 0; r < GRID_ROWS; r++) {
     for (let c = 0; c < GRID_COLS; c++) {
       const x = c * CELL_SIZE;
       const y = r * CELL_SIZE;
+      const seed = (r * 31 + c * 17) % 8;
 
       if (grid[r][c] === CELL_PATH) {
-        // 路径 - 沙地风格
-        ctx.fillStyle = '#d4a574';
+        // 路径
+        ctx.fillStyle = theme.pathColor;
         ctx.fillRect(x, y, CELL_SIZE, CELL_SIZE);
         // 路径纹理
-        ctx.fillStyle = '#c9976a';
+        ctx.fillStyle = theme.pathTexture;
         ctx.fillRect(x + 2, y + 2, CELL_SIZE - 4, 2);
         ctx.fillRect(x + CELL_SIZE / 3, y + CELL_SIZE / 2, CELL_SIZE / 3, 2);
       } else {
-        // 空地 - 草地
-        ctx.fillStyle = '#4a8c3f';
+        // 空地
+        ctx.fillStyle = theme.groundColor;
         ctx.fillRect(x, y, CELL_SIZE, CELL_SIZE);
-        // 草地纹理
-        ctx.fillStyle = '#3d7a34';
+        // 地面纹理
+        ctx.fillStyle = theme.groundTexture;
         ctx.fillRect(x, y, CELL_SIZE, 1);
         ctx.fillRect(x, y, 1, CELL_SIZE);
-        // 随机草点
-        const seed = (r * 31 + c * 17) % 7;
-        if (seed < 3) {
-          ctx.fillStyle = '#5a9c4f';
-          ctx.fillRect(x + 15 + seed * 8, y + 20 + seed * 5, 3, 5);
-          ctx.fillRect(x + 30 + seed * 4, y + 35 + seed * 3, 2, 4);
+        // 地面装饰纹理
+        if (seed < 2) {
+          ctx.fillStyle = theme.groundAccent;
+          ctx.fillRect(x + 10 + seed * 12, y + 15 + seed * 10, 4, 2);
+          ctx.fillRect(x + 30 + seed * 6, y + 35 + seed * 5, 3, 2);
+        }
+        // 地图特有装饰物
+        if (seed < 4) {
+          theme.decorations(ctx, x, y, c, r, seed);
         }
       }
 
       // 网格线
-      ctx.strokeStyle = 'rgba(0,0,0,0.08)';
+      ctx.strokeStyle = theme.gridColor;
       ctx.lineWidth = 1;
       ctx.strokeRect(x, y, CELL_SIZE, CELL_SIZE);
     }
   }
 
   // 绘制路径方向箭头（每隔几格）
-  ctx.fillStyle = 'rgba(0,0,0,0.12)';
+  ctx.fillStyle = theme.arrowColor;
   for (let i = 0; i < enemyPath.length - 1; i += 3) {
     const [c1, r1] = enemyPath[i];
     const [c2, r2] = enemyPath[Math.min(i + 1, enemyPath.length - 1)];
@@ -1462,6 +1743,24 @@ class Projectile {
 // ==================== 敌人系统 ====================
 
 
+// roundRect polyfill
+if (typeof CanvasRenderingContext2D !== 'undefined' && !CanvasRenderingContext2D.prototype.roundRect) {
+  CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, radii) {
+    const r = typeof radii === 'number' ? radii : (Array.isArray(radii) ? radii[0] : 0);
+    this.moveTo(x + r, y);
+    this.lineTo(x + w - r, y);
+    this.quadraticCurveTo(x + w, y, x + w, y + r);
+    this.lineTo(x + w, y + h - r);
+    this.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    this.lineTo(x + r, y + h);
+    this.quadraticCurveTo(x, y + h, x, y + h - r);
+    this.lineTo(x, y + r);
+    this.quadraticCurveTo(x, y, x + r, y);
+    this.closePath();
+    return this;
+  };
+}
+
 let enemyIdCounter = 0;
 
 class Enemy {
@@ -1484,6 +1783,21 @@ class Enemy {
     this.healInterval = def.healInterval || 0;
     this.healCooldown = 0;
 
+    // 新敌人类型属性
+    this.stealth = def.stealth || false;
+    this.stealthAlpha = this.stealth ? 0.15 : 1;
+    this.summonType = def.summonType || null;
+    this.summonInterval = def.summonInterval || 0;
+    this.summonCooldown = def.summonInterval || 0;
+    this.maxSummons = def.maxSummons || 0;
+    this.summonCount = 0;
+    this.shieldHp = def.shieldHp || 0;
+    this.maxShieldHp = def.shieldHp || 0;
+    this.shieldRegen = def.shieldRegen || 0;
+    this.explosionDamage = def.explosionDamage || 0;
+    this.explosionRadius = (def.explosionRadius || 0) * CELL_SIZE;
+    this.exploded = false;
+
     this.alive = true;
     this.reachedEnd = false;
 
@@ -1492,6 +1806,8 @@ class Enemy {
     this.pathProgress = 0;
     this.x = pathPixels[0].x;
     this.y = pathPixels[0].y;
+    this.facingX = 1;
+    this.facingY = 0;
 
     // 状态效果
     this.slowTimer = 0;
@@ -1503,6 +1819,9 @@ class Enemy {
     // 可视化
     this.hitFlash = 0;
     this.deathTimer = 0;
+    this.walkCycle = Math.random() * Math.PI * 2;
+    this.spawnTime = Date.now();
+    this.trail = [];
   }
 
   update(dt, enemies) {
@@ -1526,7 +1845,7 @@ class Enemy {
       this.burnTickTimer -= dt;
       if (this.burnTickTimer <= 0) {
         this.takeDamage(this.burnDamage, true);
-        this.burnTickTimer = 0.5; // 每0.5秒一次DOT
+        this.burnTickTimer = 0.5;
       }
     }
 
@@ -1536,6 +1855,26 @@ class Enemy {
       if (this.healCooldown <= 0) {
         this.healNearby(enemies);
         this.healCooldown = this.healInterval;
+      }
+    }
+
+    // 隐身闪烁
+    if (this.stealth) {
+      this.stealthAlpha = 0.1 + Math.sin(Date.now() * 0.005) * 0.05;
+    }
+
+    // 盾卫护盾回复
+    if (this.maxShieldHp > 0 && this.shieldHp < this.maxShieldHp) {
+      this.shieldHp = Math.min(this.maxShieldHp, this.shieldHp + this.shieldRegen * dt);
+    }
+
+    // 召唤师召唤
+    if (this.summonType && this.summonCount < this.maxSummons) {
+      this.summonCooldown -= dt;
+      if (this.summonCooldown <= 0) {
+        this.summonCooldown = this.summonInterval;
+        this.summonCount++;
+        this._shouldSummon = true;
       }
     }
 
@@ -1556,8 +1895,26 @@ class Enemy {
         this.x += (dx / dist) * moveSpeed;
         this.y += (dy / dist) * moveSpeed;
         this.pathProgress = (this.pathIndex + (1 - dist / CELL_SIZE)) / (pathPixels.length - 1);
+        // 更新朝向
+        this.facingX = dx / dist;
+        this.facingY = dy / dist;
+      }
+
+      // 走路动画
+      this.walkCycle += dt * this.speed * 8;
+
+      // 快速敌人拖尾
+      if (this.speed >= 1.5) {
+        this.trail.push({ x: this.x, y: this.y, alpha: 0.4, time: Date.now() });
+        if (this.trail.length > 8) this.trail.shift();
       }
     }
+
+    // 拖尾衰减
+    for (const t of this.trail) {
+      t.alpha -= dt * 2;
+    }
+    this.trail = this.trail.filter(t => t.alpha > 0);
 
     // 到达终点
     if (this.pathIndex >= pathPixels.length - 1) {
@@ -1570,9 +1927,27 @@ class Enemy {
   }
 
   takeDamage(amount, ignoreArmor = false) {
+    // 隐身被攻击时短暂现身
+    if (this.stealth) {
+      this.stealthAlpha = 0.8;
+      this._revealTimer = 1.5;
+    }
+
+    // 护盾先承受伤害
     let dmg = amount;
+    if (this.shieldHp > 0) {
+      if (dmg <= this.shieldHp) {
+        this.shieldHp -= dmg;
+        this.hitFlash = 1;
+        return;
+      } else {
+        dmg -= this.shieldHp;
+        this.shieldHp = 0;
+      }
+    }
+
     if (!ignoreArmor && this.armor > 0) {
-      dmg = Math.max(1, amount - this.armor);
+      dmg = Math.max(1, dmg - this.armor);
     }
     this.hp -= dmg;
     this.hitFlash = 1;
@@ -1583,7 +1958,6 @@ class Enemy {
   }
 
   applySlow(factor, duration) {
-    // 取更强的减速
     if (factor < this.slowFactor || this.slowTimer <= 0) {
       this.slowFactor = factor;
     }
@@ -1608,7 +1982,6 @@ class Enemy {
         healed = true;
       }
     }
-    // 治疗自身
     if (healed) {
       this.hp = Math.min(this.maxHp, this.hp + this.healAmount);
     }
@@ -1622,325 +1995,993 @@ class Enemy {
     ctx.translate(this.x, this.y);
 
     // 死亡动画
-    if (!this.alive && this.deathTimer < 0.3) {
-      const alpha = 1 - this.deathTimer / 0.3;
-      ctx.globalAlpha = alpha;
-      const scale = 1 + this.deathTimer * 3;
+    if (!this.alive && this.deathTimer < 0.4) {
+      const t = this.deathTimer / 0.4;
+      ctx.globalAlpha = 1 - t;
+      const scale = 1 + t * 2;
       ctx.scale(scale, scale);
+      // 死亡爆炸粒子
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2 + t * 3;
+        const r = t * s;
+        ctx.fillStyle = `rgba(255,150,50,${1 - t})`;
+        ctx.beginPath();
+        ctx.arc(Math.cos(a) * r, Math.sin(a) * r, 3 * (1 - t), 0, Math.PI * 2);
+        ctx.fill();
+      }
     } else if (!this.alive) {
       ctx.restore();
       return;
     }
 
-    // 阴影
-    ctx.fillStyle = 'rgba(0,0,0,0.2)';
+    // 拖尾效果
+    ctx.restore();
+    for (const t of this.trail) {
+      ctx.fillStyle = `rgba(243,156,18,${t.alpha * 0.3})`;
+      ctx.beginPath();
+      ctx.arc(t.x - this.x, t.y - this.y, s * 0.3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.save();
+    ctx.translate(this.x, this.y);
+
+    // 地面阴影
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
     ctx.beginPath();
-    ctx.ellipse(2, s / 2 + 2, s / 2, s / 4, 0, 0, Math.PI * 2);
+    ctx.ellipse(2, s / 2 + 4, s * 0.6, s * 0.2, 0, 0, Math.PI * 2);
     ctx.fill();
 
     const flash = this.hitFlash > 0;
+    const bob = Math.sin(this.walkCycle) * 2;
 
-    // 按类型绘制不同外观
+    // 隐身透明度
+    if (this.stealth) {
+      if (this._revealTimer > 0) {
+        this._revealTimer -= 1 / 60;
+        ctx.globalAlpha = 0.8;
+      } else {
+        ctx.globalAlpha = this.stealthAlpha;
+      }
+    }
+
+    // 按类型绘制
     switch (this.type) {
-      case 'normal': this._drawSoldier(ctx, s, flash, now); break;
-      case 'fast': this._drawRunner(ctx, s, flash, now); break;
+      case 'normal': this._drawSoldier(ctx, s, flash, now, bob); break;
+      case 'fast': this._drawRunner(ctx, s, flash, now, bob); break;
       case 'flying': this._drawFairy(ctx, s, flash, now); break;
-      case 'armored': this._drawTank(ctx, s, flash, now); break;
-      case 'healer': this._drawPriest(ctx, s, flash, now); break;
+      case 'armored': this._drawTank(ctx, s, flash, now, bob); break;
+      case 'healer': this._drawPriest(ctx, s, flash, now, bob); break;
       case 'boss': this._drawDemon(ctx, s, flash, now); break;
+      case 'assassin': this._drawAssassin(ctx, s, flash, now, bob); break;
+      case 'summoner': this._drawSummoner(ctx, s, flash, now, bob); break;
+      case 'shield': this._drawShieldGuard(ctx, s, flash, now, bob); break;
+      case 'bomber': this._drawBomber(ctx, s, flash, now, bob); break;
       default:
         ctx.fillStyle = flash ? '#fff' : this.color;
         ctx.beginPath(); ctx.arc(0, 0, s / 2, 0, Math.PI * 2); ctx.fill();
     }
 
-    // 减速效果
+    ctx.globalAlpha = 1;
+
+    // 减速视觉效果
     if (this.slowTimer > 0) {
       ctx.strokeStyle = 'rgba(0,191,255,0.6)';
       ctx.lineWidth = 2;
-      for (let i = 0; i < 3; i++) {
-        const a = (now * 0.003 + i * 2.1) % (Math.PI * 2);
-        const r = s / 2 + 3;
+      for (let i = 0; i < 4; i++) {
+        const a = (now * 0.003 + i * 1.57) % (Math.PI * 2);
+        const r = s / 2 + 4;
         ctx.beginPath();
-        ctx.arc(Math.cos(a) * r, Math.sin(a) * r, 2, 0, Math.PI * 2);
+        ctx.arc(Math.cos(a) * r, Math.sin(a) * r, 2.5, 0, Math.PI * 2);
         ctx.stroke();
+      }
+      // 冰霜粒子
+      for (let i = 0; i < 2; i++) {
+        const fx = (Math.random() - 0.5) * s;
+        const fy = -s / 2 + Math.random() * s;
+        ctx.fillStyle = 'rgba(100,200,255,0.5)';
+        ctx.fillRect(fx, fy, 2, 2);
       }
     }
 
-    // 灼烧效果
+    // 灼烧视觉效果
     if (this.burnTimer > 0) {
-      for (let i = 0; i < 3; i++) {
+      for (let i = 0; i < 5; i++) {
         const fx = (Math.random() - 0.5) * s * 0.8;
-        const fy = -s / 3 + (Math.random() - 0.5) * s * 0.5;
-        ctx.fillStyle = `rgba(255,${80 + Math.random() * 120},0,${0.4 + Math.random() * 0.3})`;
+        const fy = -s / 3 - Math.random() * s * 0.5;
+        const r = Math.random();
+        ctx.fillStyle = `rgba(255,${50 + r * 150},0,${0.5 + r * 0.3})`;
         ctx.beginPath();
-        ctx.arc(fx, fy, 2 + Math.random() * 2, 0, Math.PI * 2);
+        ctx.arc(fx, fy, 2 + Math.random() * 3, 0, Math.PI * 2);
         ctx.fill();
       }
     }
 
     ctx.restore();
 
+    // 护盾条
+    if (this.alive && this.maxShieldHp > 0 && this.shieldHp > 0) {
+      const sBarW = s * 1.4;
+      const sBarH = 3;
+      const sBarX = this.x - sBarW / 2;
+      const sBarY = this.y - s / 2 - 17;
+      const shieldRatio = this.shieldHp / this.maxShieldHp;
+      ctx.fillStyle = 'rgba(0,0,0,0.7)';
+      ctx.fillRect(sBarX - 1, sBarY - 1, sBarW + 2, sBarH + 2);
+      ctx.fillStyle = '#3498db';
+      ctx.fillRect(sBarX, sBarY, sBarW * shieldRatio, sBarH);
+    }
+
     // 血条
     if (this.alive && this.hp < this.maxHp) {
-      const barW = s * 1.2;
-      const barH = 4;
+      const barW = s * 1.4;
+      const barH = 5;
       const barX = this.x - barW / 2;
-      const barY = this.y - s / 2 - 10;
+      const barY = this.y - s / 2 - 12;
       const hpRatio = this.hp / this.maxHp;
 
-      ctx.fillStyle = 'rgba(0,0,0,0.6)';
-      ctx.fillRect(barX - 1, barY - 1, barW + 2, barH + 2);
-      ctx.fillStyle = hpRatio > 0.5 ? '#2ecc71' : hpRatio > 0.25 ? '#f39c12' : '#e74c3c';
-      ctx.fillRect(barX, barY, barW * hpRatio, barH);
+      // 血条背景
+      ctx.fillStyle = 'rgba(0,0,0,0.7)';
+      ctx.beginPath();
+      ctx.roundRect(barX - 1, barY - 1, barW + 2, barH + 2, 2);
+      ctx.fill();
+
+      // 血条颜色
+      const barColor = hpRatio > 0.6 ? '#2ecc71' : hpRatio > 0.3 ? '#f39c12' : '#e74c3c';
+      ctx.fillStyle = barColor;
+      ctx.beginPath();
+      ctx.roundRect(barX, barY, barW * hpRatio, barH, 1);
+      ctx.fill();
+
+      // 血条高光
+      ctx.fillStyle = 'rgba(255,255,255,0.2)';
+      ctx.fillRect(barX, barY, barW * hpRatio, barH / 2);
+    }
+
+    // 名称标签（Boss和精英）
+    if (this.alive && (this.type === 'boss' || this.type === 'healer')) {
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      ctx.font = 'bold 10px sans-serif';
+      ctx.textAlign = 'center';
+      const tw = ctx.measureText(this.name).width;
+      ctx.beginPath();
+      ctx.roundRect(this.x - tw / 2 - 3, this.y - s / 2 - 26, tw + 6, 14, 3);
+      ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.fillText(this.name, this.x, this.y - s / 2 - 15);
     }
   }
 
-  // --- 普通：小兵（盾牌+头盔） ---
-  _drawSoldier(ctx, s, flash, now) {
+  // --- 步兵：全身人形 + 盾牌 + 头盔 + 走路动画 ---
+  _drawSoldier(ctx, s, flash, now, bob) {
     const c = flash ? '#fff' : this.color;
-    // 身体
+    const legSwing = Math.sin(this.walkCycle) * 4;
+
+    // 腿
+    ctx.fillStyle = flash ? '#ddd' : '#8B0000';
+    ctx.fillRect(-4, s / 4 + bob, 3, 6 + legSwing);
+    ctx.fillRect(2, s / 4 + bob, 3, 6 - legSwing);
+
+    // 身体（躯干）
     ctx.fillStyle = c;
     ctx.beginPath();
-    ctx.arc(0, 2, s / 2, 0, Math.PI * 2);
+    ctx.roundRect(-s / 3, -s / 6 + bob, s * 0.65, s * 0.55, 3);
     ctx.fill();
+
+    // 腰带
+    ctx.fillStyle = flash ? '#ccc' : '#5D4037';
+    ctx.fillRect(-s / 3, s / 6 + bob, s * 0.65, 3);
+
+    // 盾牌（左手）
+    ctx.fillStyle = flash ? '#ddd' : '#78909C';
+    ctx.beginPath();
+    ctx.ellipse(-s / 2 - 3, 2 + bob, 5, 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // 盾牌纹章
+    ctx.fillStyle = flash ? '#eee' : '#B0BEC5';
+    ctx.beginPath();
+    ctx.ellipse(-s / 2 - 3, 2 + bob, 2, 4, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 头
+    ctx.fillStyle = flash ? '#eee' : '#FFCCBC';
+    ctx.beginPath();
+    ctx.arc(0, -s / 3 + bob, s / 4, 0, Math.PI * 2);
+    ctx.fill();
+
     // 头盔
-    ctx.fillStyle = flash ? '#eee' : '#c0392b';
+    ctx.fillStyle = flash ? '#ddd' : '#B71C1C';
     ctx.beginPath();
-    ctx.arc(0, -3, s / 2.5, Math.PI, 0);
+    ctx.arc(0, -s / 3 - 2 + bob, s / 3.5, Math.PI, 0);
     ctx.fill();
-    // 盾牌
-    ctx.fillStyle = flash ? '#ddd' : '#7f8c8d';
-    ctx.beginPath();
-    ctx.ellipse(-s / 2 - 2, 2, 4, 6, 0, 0, Math.PI * 2);
-    ctx.fill();
+    // 头盔檐
+    ctx.fillStyle = flash ? '#ccc' : '#880E0E';
+    ctx.fillRect(-s / 3, -s / 3 - 1 + bob, s * 0.65, 3);
+
     // 眼睛
     ctx.fillStyle = '#fff';
-    ctx.beginPath(); ctx.arc(-3, -1, 2.5, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(3, -1, 2.5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(-3, -s / 3 + bob, 2.5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(3, -s / 3 + bob, 2.5, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#000';
-    ctx.beginPath(); ctx.arc(-2, -1, 1.2, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(4, -1, 1.2, 0, Math.PI * 2); ctx.fill();
-  }
+    ctx.beginPath(); ctx.arc(-2.5, -s / 3 + bob, 1.2, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(3.5, -s / 3 + bob, 1.2, 0, Math.PI * 2); ctx.fill();
 
-  // --- 快速：冲刺者（流线型+速度线） ---
-  _drawRunner(ctx, s, flash, now) {
-    const c = flash ? '#fff' : this.color;
-    // 身体（椭圆流线型）
-    ctx.fillStyle = c;
+    // 武器（右手长矛）
+    ctx.strokeStyle = flash ? '#ccc' : '#5D4037';
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.ellipse(0, 0, s / 2.5, s / 2, 0, 0, Math.PI * 2);
-    ctx.fill();
-    // 尖角头饰
-    ctx.fillStyle = flash ? '#eee' : '#e67e22';
+    ctx.moveTo(s / 3, -s / 4 + bob);
+    ctx.lineTo(s / 2 + 6, -s / 2 - 4 + bob);
+    ctx.stroke();
+    // 矛头
+    ctx.fillStyle = flash ? '#eee' : '#CFD8DC';
     ctx.beginPath();
-    ctx.moveTo(s / 2, 0);
-    ctx.lineTo(s / 2 + 5, -3);
-    ctx.lineTo(s / 2 + 5, 3);
+    ctx.moveTo(s / 2 + 6, -s / 2 - 4 + bob);
+    ctx.lineTo(s / 2 + 3, -s / 2 - 8 + bob);
+    ctx.lineTo(s / 2 + 9, -s / 2 - 8 + bob);
     ctx.closePath();
     ctx.fill();
-    // 速度线
-    ctx.strokeStyle = flash ? 'rgba(255,255,255,0.4)' : 'rgba(243,156,18,0.4)';
-    ctx.lineWidth = 1;
-    for (let i = 0; i < 3; i++) {
-      const lx = -s / 2 - 4 - i * 4;
-      const ly = -3 + i * 3;
-      ctx.beginPath(); ctx.moveTo(lx, ly); ctx.lineTo(lx - 6, ly); ctx.stroke();
-    }
-    // 眼睛
-    ctx.fillStyle = '#fff';
-    ctx.beginPath(); ctx.arc(2, -2, 2, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(2, 2, 2, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#000';
-    ctx.beginPath(); ctx.arc(3, -2, 1, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(3, 2, 1, 0, Math.PI * 2); ctx.fill();
   }
 
-  // --- 飞行：精灵（翅膀+光环） ---
-  _drawFairy(ctx, s, flash, now) {
+  // --- 刺客：流线型 + 匕首 + 残影 ---
+  _drawRunner(ctx, s, flash, now, bob) {
     const c = flash ? '#fff' : this.color;
-    const wingFlap = Math.sin(now * 0.008) * 8;
-    // 翅膀
-    ctx.fillStyle = flash ? 'rgba(255,255,255,0.4)' : 'rgba(155,89,182,0.5)';
-    ctx.beginPath();
-    ctx.ellipse(-s / 2 - 2, -2 + wingFlap, 5, 9, -0.3, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.ellipse(s / 2 + 2, -2 - wingFlap, 5, 9, 0.3, 0, Math.PI * 2);
-    ctx.fill();
-    // 光环
-    ctx.strokeStyle = flash ? 'rgba(255,255,255,0.5)' : 'rgba(155,89,182,0.4)';
-    ctx.lineWidth = 1.5;
-    const haloPulse = Math.sin(now * 0.005) * 2;
-    ctx.beginPath();
-    ctx.arc(0, -s / 2 - 4 + haloPulse, 4, 0, Math.PI * 2);
-    ctx.stroke();
-    // 身体
+    const lean = 0.2; // 前倾
+
+    ctx.save();
+    ctx.rotate(lean);
+
+    // 腿（奔跑动画）
+    const legSwing = Math.sin(this.walkCycle) * 6;
+    ctx.fillStyle = flash ? '#ddd' : '#222';
+    ctx.fillRect(-3, s / 4 + bob, 2, 5 + legSwing);
+    ctx.fillRect(2, s / 4 + bob, 2, 5 - legSwing);
+
+    // 身体（紧身衣）
     ctx.fillStyle = c;
     ctx.beginPath();
-    ctx.arc(0, 0, s / 2.5, 0, Math.PI * 2);
+    ctx.ellipse(0, bob, s / 3, s / 2.2, 0, 0, Math.PI * 2);
     ctx.fill();
-    // 魔法光点
+
+    // 斗篷
+    ctx.fillStyle = flash ? 'rgba(255,255,255,0.3)' : 'rgba(230,126,34,0.4)';
+    ctx.beginPath();
+    ctx.moveTo(-s / 3, -s / 4 + bob);
+    ctx.quadraticCurveTo(-s / 2 - 4, 0 + bob, -s / 3, s / 3 + bob);
+    ctx.lineTo(-s / 5, 0 + bob);
+    ctx.closePath();
+    ctx.fill();
+
+    // 头（兜帽）
+    ctx.fillStyle = flash ? '#eee' : '#333';
+    ctx.beginPath();
+    ctx.arc(0, -s / 3 + bob, s / 4, 0, Math.PI * 2);
+    ctx.fill();
+    // 兜帽尖角
+    ctx.fillStyle = flash ? '#ddd' : '#222';
+    ctx.beginPath();
+    ctx.moveTo(0, -s / 2 + bob);
+    ctx.lineTo(-3, -s / 3 - 2 + bob);
+    ctx.lineTo(3, -s / 3 - 2 + bob);
+    ctx.closePath();
+    ctx.fill();
+
+    // 发光眼睛
+    ctx.fillStyle = flash ? '#fff' : '#FF5722';
+    ctx.beginPath(); ctx.arc(-2, -s / 3 + bob, 2, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(2, -s / 3 + bob, 2, 0, Math.PI * 2); ctx.fill();
+    // 眼睛发光
+    ctx.shadowColor = '#FF5722';
+    ctx.shadowBlur = 4;
+    ctx.fillStyle = '#FF5722';
+    ctx.beginPath(); ctx.arc(-2, -s / 3 + bob, 1, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(2, -s / 3 + bob, 1, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // 匕首
+    ctx.fillStyle = flash ? '#eee' : '#CFD8DC';
+    ctx.beginPath();
+    ctx.moveTo(s / 3, -s / 6 + bob);
+    ctx.lineTo(s / 2 + 5, -s / 3 + bob);
+    ctx.lineTo(s / 3 + 1, 0 + bob);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  // --- 飞龙：翅膀扇动 + 龙形 + 火焰尾迹 ---
+  _drawFairy(ctx, s, flash, now) {
+    const c = flash ? '#fff' : this.color;
+    const wingFlap = Math.sin(now * 0.01) * 12;
+    const hover = Math.sin(now * 0.004) * 3;
+
+    ctx.save();
+    ctx.translate(0, hover);
+
+    // 翅膀（龙翼）
+    ctx.fillStyle = flash ? 'rgba(255,255,255,0.4)' : 'rgba(155,89,182,0.6)';
+    // 左翼
+    ctx.beginPath();
+    ctx.moveTo(-s / 4, -2);
+    ctx.quadraticCurveTo(-s / 2 - 8, -s / 2 - 6 + wingFlap, -s / 2 - 2, -s / 4 + wingFlap);
+    ctx.quadraticCurveTo(-s / 2 - 6, s / 6 + wingFlap * 0.5, -s / 4, s / 4);
+    ctx.closePath();
+    ctx.fill();
+    // 右翼
+    ctx.beginPath();
+    ctx.moveTo(s / 4, -2);
+    ctx.quadraticCurveTo(s / 2 + 8, -s / 2 - 6 - wingFlap, s / 2 + 2, -s / 4 - wingFlap);
+    ctx.quadraticCurveTo(s / 2 + 6, s / 6 - wingFlap * 0.5, s / 4, s / 4);
+    ctx.closePath();
+    ctx.fill();
+
+    // 翅膀骨架
+    ctx.strokeStyle = flash ? 'rgba(255,255,255,0.3)' : 'rgba(155,89,182,0.4)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(-s / 4, 0);
+    ctx.lineTo(-s / 2 - 4, -s / 3 + wingFlap * 0.7);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(s / 4, 0);
+    ctx.lineTo(s / 2 + 4, -s / 3 - wingFlap * 0.7);
+    ctx.stroke();
+
+    // 身体（龙身）
+    ctx.fillStyle = c;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, s / 3, s / 2.2, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 鳞片纹理
+    ctx.fillStyle = flash ? 'rgba(255,255,255,0.2)' : 'rgba(120,60,150,0.3)';
     for (let i = 0; i < 3; i++) {
-      const a = now * 0.004 + i * 2.1;
-      const r = s / 2 + 5;
+      ctx.beginPath();
+      ctx.ellipse(-2 + i * 3, -4 + i * 4, 3, 2, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // 头
+    ctx.fillStyle = flash ? '#eee' : '#7B1FA2';
+    ctx.beginPath();
+    ctx.ellipse(0, -s / 3, s / 4, s / 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 龙角
+    ctx.fillStyle = flash ? '#ccc' : '#4A148C';
+    ctx.beginPath();
+    ctx.moveTo(-3, -s / 2.5);
+    ctx.lineTo(-6, -s / 2 - 6);
+    ctx.lineTo(0, -s / 2.5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(3, -s / 2.5);
+    ctx.lineTo(6, -s / 2 - 6);
+    ctx.lineTo(0, -s / 2.5);
+    ctx.closePath();
+    ctx.fill();
+
+    // 眼睛（龙眼）
+    ctx.fillStyle = flash ? '#fff' : '#FFD700';
+    ctx.beginPath(); ctx.arc(-3, -s / 3, 2.5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(3, -s / 3, 2.5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#000';
+    // 竖瞳
+    ctx.fillRect(-3.5, -s / 3 - 2, 1.5, 4);
+    ctx.fillRect(2.5, -s / 3 - 2, 1.5, 4);
+
+    // 魔法光环
+    ctx.strokeStyle = `rgba(155,89,182,${0.3 + Math.sin(now * 0.005) * 0.2})`;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(0, 0, s / 2 + 6, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // 飞行魔法粒子
+    for (let i = 0; i < 4; i++) {
+      const a = now * 0.004 + i * 1.57;
+      const r = s / 2 + 4 + Math.sin(now * 0.006 + i) * 3;
       ctx.fillStyle = `rgba(155,89,182,${0.3 + Math.sin(now * 0.005 + i) * 0.2})`;
       ctx.beginPath();
       ctx.arc(Math.cos(a) * r, Math.sin(a) * r, 2, 0, Math.PI * 2);
       ctx.fill();
     }
-    // 眼睛
-    ctx.fillStyle = '#fff';
-    ctx.beginPath(); ctx.arc(-2, -1, 2, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(2, -1, 2, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#000';
-    ctx.beginPath(); ctx.arc(-1.5, -1, 1, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(2.5, -1, 1, 0, Math.PI * 2); ctx.fill();
+
+    ctx.restore();
   }
 
-  // --- 装甲：坦克（履带+炮塔+铆钉） ---
-  _drawTank(ctx, s, flash, now) {
+  // --- 重甲：全覆式装甲 + 履带 + 炮管 + 铆钉 ---
+  _drawTank(ctx, s, flash, now, bob) {
     const c = flash ? '#fff' : this.color;
-    // 履带
-    ctx.fillStyle = flash ? '#bbb' : '#555';
+    const treadOffset = (now * 0.02) % 6;
+
+    // 履带（两侧）
+    ctx.fillStyle = flash ? '#999' : '#37474F';
+    // 左履带
     ctx.beginPath();
-    if (ctx.roundRect) ctx.roundRect(-s / 2 - 2, -s / 3, s + 4, s * 0.7, 4);
-    else ctx.rect(-s / 2 - 2, -s / 3, s + 4, s * 0.7);
+    ctx.roundRect(-s / 2 - 3, -s / 2.5, s * 0.25, s * 0.85, 3);
     ctx.fill();
+    // 右履带
+    ctx.beginPath();
+    ctx.roundRect(s / 2 - s * 0.25 + 3, -s / 2.5, s * 0.25, s * 0.85, 3);
+    ctx.fill();
+
     // 履带纹理
-    ctx.strokeStyle = flash ? '#999' : '#444';
+    ctx.strokeStyle = flash ? '#777' : '#263238';
     ctx.lineWidth = 1;
-    for (let i = 0; i < 4; i++) {
-      const ty = -s / 3 + 3 + i * (s * 0.7 / 4);
-      ctx.beginPath(); ctx.moveTo(-s / 2, ty); ctx.lineTo(-s / 2 + 6, ty); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(s / 2 - 6, ty); ctx.lineTo(s / 2, ty); ctx.stroke();
+    for (let i = 0; i < 5; i++) {
+      const ty = -s / 2.5 + 3 + i * (s * 0.85 / 5) + treadOffset % (s * 0.85 / 5);
+      if (ty > -s / 2.5 && ty < s / 3) {
+        ctx.beginPath(); ctx.moveTo(-s / 2 - 1, ty); ctx.lineTo(-s / 2 + 6, ty); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(s / 2 - 1, ty); ctx.lineTo(s / 2 - 6, ty); ctx.stroke();
+      }
     }
-    // 车身
+
+    // 车身（主体装甲）
     ctx.fillStyle = c;
     ctx.beginPath();
-    if (ctx.roundRect) ctx.roundRect(-s / 3, -s / 4, s * 0.65, s * 0.5, 3);
-    else ctx.rect(-s / 3, -s / 4, s * 0.65, s * 0.5);
+    ctx.roundRect(-s / 3, -s / 3, s * 0.65, s * 0.7, 4);
     ctx.fill();
-    // 炮塔
-    ctx.fillStyle = flash ? '#ddd' : '#666';
+
+    // 装甲高光
+    ctx.fillStyle = flash ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.08)';
     ctx.beginPath();
-    ctx.arc(0, 0, s / 4, 0, Math.PI * 2);
+    ctx.roundRect(-s / 3, -s / 3, s * 0.65, s * 0.35, 4);
     ctx.fill();
+
+    // 炮塔
+    ctx.fillStyle = flash ? '#ccc' : '#546E7A';
+    ctx.beginPath();
+    ctx.arc(0, 0, s / 3.5, 0, Math.PI * 2);
+    ctx.fill();
+
     // 炮管
-    ctx.strokeStyle = flash ? '#aaa' : '#444';
-    ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(s / 2 + 4, 0); ctx.stroke();
+    ctx.strokeStyle = flash ? '#aaa' : '#37474F';
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(s / 4, 0);
+    ctx.lineTo(s / 2 + 8, 0);
+    ctx.stroke();
+
+    // 炮口
+    ctx.fillStyle = flash ? '#ddd' : '#263238';
+    ctx.beginPath();
+    ctx.arc(s / 2 + 8, 0, 3, 0, Math.PI * 2);
+    ctx.fill();
+
     // 铆钉
-    ctx.fillStyle = flash ? '#ccc' : '#888';
-    const rivets = [[-s/4, -s/5], [-s/4, s/5], [s/6, -s/5], [s/6, s/5]];
+    ctx.fillStyle = flash ? '#bbb' : '#78909C';
+    const rivets = [[-s/4, -s/5], [-s/4, s/5], [s/6, -s/5], [s/6, s/5], [0, -s/4], [0, s/4]];
     for (const [rx, ry] of rivets) {
-      ctx.beginPath(); ctx.arc(rx, ry, 1.5, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(rx, ry, 2, 0, Math.PI * 2); ctx.fill();
     }
+
+    // 前灯
+    ctx.fillStyle = flash ? '#fff' : '#FFEB3B';
+    ctx.shadowColor = '#FFEB3B';
+    ctx.shadowBlur = 4;
+    ctx.beginPath();
+    ctx.arc(s / 3, -s / 5, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(s / 3, s / 5, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
   }
 
-  // --- 治疗：牧师（法杖+治愈光环） ---
-  _drawPriest(ctx, s, flash, now) {
+  // --- 萨满：法袍 + 法杖 + 治愈光环 + 漂浮 ---
+  _drawPriest(ctx, s, flash, now, bob) {
     const c = flash ? '#fff' : this.color;
-    // 治愈光环
+    const hover = Math.sin(now * 0.003) * 2;
     const pulse = Math.sin(now * 0.005) * 4;
-    ctx.strokeStyle = flash ? 'rgba(255,255,255,0.4)' : 'rgba(46,204,113,0.35)';
+
+    ctx.save();
+    ctx.translate(0, hover);
+
+    // 治愈光环（双层）
+    ctx.strokeStyle = flash ? 'rgba(255,255,255,0.4)' : 'rgba(46,204,113,0.3)';
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.arc(0, 0, this.healRange / CELL_SIZE * s + pulse, 0, Math.PI * 2);
     ctx.stroke();
-    ctx.strokeStyle = flash ? 'rgba(255,255,255,0.2)' : 'rgba(46,204,113,0.15)';
+    ctx.strokeStyle = flash ? 'rgba(255,255,255,0.15)' : 'rgba(46,204,113,0.12)';
     ctx.beginPath();
-    ctx.arc(0, 0, this.healRange / CELL_SIZE * s + pulse + 4, 0, Math.PI * 2);
+    ctx.arc(0, 0, this.healRange / CELL_SIZE * s + pulse + 6, 0, Math.PI * 2);
     ctx.stroke();
-    // 长袍身体
+
+    // 法袍（梯形）
     ctx.fillStyle = c;
     ctx.beginPath();
-    ctx.moveTo(-s / 3, s / 3);
-    ctx.lineTo(-s / 4, -s / 3);
-    ctx.lineTo(s / 4, -s / 3);
-    ctx.lineTo(s / 3, s / 3);
+    ctx.moveTo(-s / 2.5, s / 3);
+    ctx.lineTo(-s / 4, -s / 4);
+    ctx.quadraticCurveTo(0, -s / 3, s / 4, -s / 4);
+    ctx.lineTo(s / 2.5, s / 3);
     ctx.closePath();
     ctx.fill();
+
+    // 法袍纹饰
+    ctx.strokeStyle = flash ? 'rgba(255,255,255,0.3)' : 'rgba(39,174,96,0.4)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(-s / 5, 0);
+    ctx.lineTo(0, s / 4);
+    ctx.lineTo(s / 5, 0);
+    ctx.stroke();
+
     // 头
     ctx.fillStyle = flash ? '#eee' : '#27ae60';
-    ctx.beginPath(); ctx.arc(0, -s / 3 - 2, s / 5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(0, -s / 3 - 2, s / 4.5, 0, Math.PI * 2); ctx.fill();
+
+    // 兜帽
+    ctx.fillStyle = flash ? '#ddd' : '#1B5E20';
+    ctx.beginPath();
+    ctx.arc(0, -s / 3 - 4, s / 4, Math.PI + 0.3, -0.3);
+    ctx.closePath();
+    ctx.fill();
+
     // 法杖
-    ctx.strokeStyle = flash ? '#ccc' : '#8B4513';
-    ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(s / 4, -s / 4); ctx.lineTo(s / 4 + 2, s / 3 + 3); ctx.stroke();
-    // 法杖宝石
-    ctx.fillStyle = flash ? '#fff' : '#2ecc71';
-    ctx.beginPath(); ctx.arc(s / 4, -s / 4 - 3, 3, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = flash ? '#ccc' : '#5D4037';
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(s / 3, -s / 4);
+    ctx.lineTo(s / 3 + 2, s / 3 + 4);
+    ctx.stroke();
+
+    // 法杖宝石（发光）
+    const gemGlow = 0.5 + Math.sin(now * 0.006) * 0.3;
+    ctx.fillStyle = flash ? '#fff' : `rgba(46,204,113,${gemGlow})`;
+    ctx.shadowColor = '#2ecc71';
+    ctx.shadowBlur = 6;
+    ctx.beginPath();
+    ctx.arc(s / 3, -s / 4 - 4, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
     // 十字标记
-    ctx.fillStyle = flash ? 'rgba(255,255,255,0.6)' : 'rgba(46,204,113,0.6)';
-    ctx.fillRect(-1, -s / 3 - 6, 2, 6);
-    ctx.fillRect(-3, -s / 3 - 4, 6, 2);
+    ctx.fillStyle = flash ? 'rgba(255,255,255,0.6)' : 'rgba(46,204,113,0.7)';
+    ctx.fillRect(-1, -s / 3 - 8, 2, 7);
+    ctx.fillRect(-3, -s / 3 - 5, 6, 2);
+
     // 眼睛
     ctx.fillStyle = '#fff';
-    ctx.beginPath(); ctx.arc(-2, -s / 3 - 2, 1.5, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(2, -s / 3 - 2, 1.5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(-2, -s / 3 - 2, 2, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(2, -s / 3 - 2, 2, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.arc(-1.5, -s / 3 - 2, 1, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(2.5, -s / 3 - 2, 1, 0, Math.PI * 2); ctx.fill();
+
+    // 治愈光点
+    for (let i = 0; i < 3; i++) {
+      const a = now * 0.003 + i * 2.1;
+      const r = this.healRange / CELL_SIZE * s * 0.7;
+      ctx.fillStyle = `rgba(46,204,113,${0.2 + Math.sin(now * 0.004 + i) * 0.15})`;
+      ctx.beginPath();
+      ctx.arc(Math.cos(a) * r, Math.sin(a) * r, 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
   }
 
-  // --- Boss：恶魔（双角+翅膀+核心+威压光环） ---
+  // --- 魔王：双角 + 恶魔翅膀 + 装甲 + 核心 + 威压 ---
   _drawDemon(ctx, s, flash, now) {
     const c = flash ? '#fff' : this.color;
-    // 威压光环
-    const auraPulse = Math.sin(now * 0.003) * 6;
-    ctx.fillStyle = 'rgba(192,57,43,0.15)';
+    const auraPulse = Math.sin(now * 0.003) * 8;
+    const breathe = Math.sin(now * 0.004) * 2;
+
+    // 威压光环（多层）
+    for (let i = 3; i > 0; i--) {
+      ctx.fillStyle = `rgba(192,57,43,${0.06 * i})`;
+      ctx.beginPath();
+      ctx.arc(0, 0, s / 2 + 12 + auraPulse + i * 6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // 地面裂纹效果
+    ctx.strokeStyle = `rgba(255,50,0,${0.15 + Math.sin(now * 0.005) * 0.1})`;
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      const r1 = s / 2 + 5;
+      const r2 = s / 2 + 15 + Math.sin(now * 0.003 + i) * 3;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a) * r1, Math.sin(a) * r1);
+      ctx.lineTo(Math.cos(a) * r2, Math.sin(a) * r2);
+      ctx.stroke();
+    }
+
+    // 恶魔翅膀
+    ctx.fillStyle = flash ? 'rgba(255,255,255,0.3)' : 'rgba(100,0,0,0.7)';
+    // 左翼
     ctx.beginPath();
-    ctx.arc(0, 0, s / 2 + 10 + auraPulse, 0, Math.PI * 2);
-    ctx.fill();
-    // 翅膀
-    ctx.fillStyle = flash ? 'rgba(255,255,255,0.3)' : 'rgba(139,0,0,0.6)';
-    ctx.beginPath();
-    ctx.moveTo(-s / 3, 0);
-    ctx.quadraticCurveTo(-s / 2 - 8, -s / 2 - 5, -s / 2 - 4, s / 4);
+    ctx.moveTo(-s / 4, -s / 6);
+    ctx.quadraticCurveTo(-s / 2 - 10, -s / 2 - 8, -s / 2 - 6, -s / 4);
+    ctx.quadraticCurveTo(-s / 2 - 14, 0, -s / 2 - 4, s / 3);
+    ctx.lineTo(-s / 4, s / 6);
     ctx.closePath();
     ctx.fill();
+    // 右翼
     ctx.beginPath();
-    ctx.moveTo(s / 3, 0);
-    ctx.quadraticCurveTo(s / 2 + 8, -s / 2 - 5, s / 2 + 4, s / 4);
+    ctx.moveTo(s / 4, -s / 6);
+    ctx.quadraticCurveTo(s / 2 + 10, -s / 2 - 8, s / 2 + 6, -s / 4);
+    ctx.quadraticCurveTo(s / 2 + 14, 0, s / 2 + 4, s / 3);
+    ctx.lineTo(s / 4, s / 6);
     ctx.closePath();
     ctx.fill();
+
+    // 翅膀骨骼
+    ctx.strokeStyle = flash ? '#ddd' : '#880E0E';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(-s / 4, -s / 6);
+    ctx.lineTo(-s / 2 - 8, -s / 3);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(s / 4, -s / 6);
+    ctx.lineTo(s / 2 + 8, -s / 3);
+    ctx.stroke();
+
     // 身体
     ctx.fillStyle = c;
     ctx.beginPath();
-    ctx.arc(0, 0, s / 2, 0, Math.PI * 2);
+    ctx.arc(0, breathe, s / 2, 0, Math.PI * 2);
     ctx.fill();
-    // 装甲层
-    ctx.fillStyle = flash ? '#ddd' : '#922';
+
+    // 装甲层（前后）
+    ctx.fillStyle = flash ? '#ddd' : '#7F0000';
     ctx.beginPath();
-    ctx.arc(0, 0, s / 2, -0.8, 0.8);
+    ctx.arc(0, breathe, s / 2, -0.7, 0.7);
     ctx.fill();
     ctx.beginPath();
-    ctx.arc(0, 0, s / 2, Math.PI - 0.8, Math.PI + 0.8);
+    ctx.arc(0, breathe, s / 2, Math.PI - 0.7, Math.PI + 0.7);
     ctx.fill();
-    // 双角
-    ctx.fillStyle = flash ? '#ccc' : '#8B0000';
+
+    // 装甲铆钉
+    ctx.fillStyle = flash ? '#ccc' : '#B71C1C';
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      const r = s / 2 - 2;
+      ctx.beginPath();
+      ctx.arc(Math.cos(a) * r, Math.sin(a) * r + breathe, 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // 双角（更大更弯曲）
+    ctx.fillStyle = flash ? '#ccc' : '#4A0000';
+    // 左角
     ctx.beginPath();
-    ctx.moveTo(-5, -s / 2 + 2);
-    ctx.lineTo(-10, -s / 2 - 12);
-    ctx.lineTo(-1, -s / 2 - 3);
+    ctx.moveTo(-6, -s / 2 + 4);
+    ctx.quadraticCurveTo(-14, -s / 2 - 10, -10, -s / 2 - 16);
+    ctx.lineTo(-2, -s / 2 + 2);
     ctx.closePath();
     ctx.fill();
+    // 右角
     ctx.beginPath();
-    ctx.moveTo(5, -s / 2 + 2);
-    ctx.lineTo(10, -s / 2 - 12);
-    ctx.lineTo(1, -s / 2 - 3);
+    ctx.moveTo(6, -s / 2 + 4);
+    ctx.quadraticCurveTo(14, -s / 2 - 10, 10, -s / 2 - 16);
+    ctx.lineTo(2, -s / 2 + 2);
     ctx.closePath();
     ctx.fill();
-    // 核心（发光）
-    const coreGlow = Math.sin(now * 0.006) * 0.3 + 0.7;
-    ctx.fillStyle = flash ? '#fff' : `rgba(255,50,50,${coreGlow})`;
+
+    // 核心（脉动发光）
+    const coreGlow = 0.5 + Math.sin(now * 0.006) * 0.4;
+    ctx.fillStyle = flash ? '#fff' : `rgba(255,30,30,${coreGlow})`;
+    ctx.shadowColor = '#ff0000';
+    ctx.shadowBlur = 10;
     ctx.beginPath();
-    ctx.arc(0, 0, s / 5, 0, Math.PI * 2);
+    ctx.arc(0, breathe, s / 5, 0, Math.PI * 2);
     ctx.fill();
-    // 眼睛（恶魔红眼）
-    ctx.fillStyle = flash ? '#fff' : '#ff0';
-    ctx.beginPath(); ctx.arc(-4, -3, 3, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(4, -3, 3, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // 核心内环
+    ctx.strokeStyle = `rgba(255,200,0,${coreGlow * 0.5})`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(0, breathe, s / 7, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // 恶魔眼（发光红眼）
+    ctx.fillStyle = flash ? '#fff' : '#FF0';
+    ctx.shadowColor = '#FF0';
+    ctx.shadowBlur = 5;
+    ctx.beginPath(); ctx.arc(-5, -4 + breathe, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(5, -4 + breathe, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // 竖瞳
     ctx.fillStyle = '#000';
-    ctx.beginPath(); ctx.arc(-3, -3, 1.5, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(5, -3, 1.5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillRect(-6, -6 + breathe, 2.5, 5);
+    ctx.fillRect(4, -6 + breathe, 2.5, 5);
+
+    // 嘴（怒吼）
+    ctx.strokeStyle = flash ? '#fff' : '#FF0';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(-4, 4 + breathe);
+    ctx.quadraticCurveTo(0, 7 + breathe, 4, 4 + breathe);
+    ctx.stroke();
+
+    // 火焰粒子环绕
+    for (let i = 0; i < 5; i++) {
+      const a = now * 0.003 + i * 1.26;
+      const r = s / 2 + 8 + Math.sin(now * 0.005 + i * 2) * 4;
+      const px = Math.cos(a) * r;
+      const py = Math.sin(a) * r + breathe;
+      const fireAlpha = 0.3 + Math.sin(now * 0.008 + i) * 0.2;
+      ctx.fillStyle = `rgba(255,${80 + i * 30},0,${fireAlpha})`;
+      ctx.beginPath();
+      ctx.arc(px, py, 2 + Math.sin(now * 0.01 + i) * 1, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // --- 暗影刺客：半隐身 + 双匕 + 暗影拖尾 ---
+  _drawAssassin(ctx, s, flash, now, bob) {
+    const c = flash ? '#fff' : this.color;
+    const legSwing = Math.sin(this.walkCycle) * 5;
+
+    // 暗影拖尾
+    ctx.fillStyle = 'rgba(44,62,80,0.15)';
+    for (let i = 1; i <= 3; i++) {
+      ctx.beginPath();
+      ctx.arc(-this.facingX * i * 4, -this.facingY * i * 4, s / 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // 腿
+    ctx.fillStyle = flash ? '#ddd' : '#1a1a2e';
+    ctx.fillRect(-3, s / 4 + bob, 2, 5 + legSwing);
+    ctx.fillRect(2, s / 4 + bob, 2, 5 - legSwing);
+
+    // 身体（紧身忍者服）
+    ctx.fillStyle = c;
+    ctx.beginPath();
+    ctx.ellipse(0, bob, s / 3.2, s / 2.2, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 头（面罩）
+    ctx.fillStyle = flash ? '#eee' : '#1a1a2e';
+    ctx.beginPath(); ctx.arc(0, -s / 3 + bob, s / 4, 0, Math.PI * 2); ctx.fill();
+
+    // 护额
+    ctx.fillStyle = flash ? '#ccc' : '#7f8c8d';
+    ctx.fillRect(-s / 3.5, -s / 3 - 2 + bob, s / 1.8, 3);
+
+    // 发光红眼
+    ctx.fillStyle = '#ff1744';
+    ctx.shadowColor = '#ff1744';
+    ctx.shadowBlur = 6;
+    ctx.beginPath(); ctx.arc(-2.5, -s / 3 + bob, 1.8, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(2.5, -s / 3 + bob, 1.8, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // 双匕首
+    ctx.fillStyle = flash ? '#eee' : '#90A4AE';
+    // 左匕
+    ctx.beginPath();
+    ctx.moveTo(-s / 3, -s / 6 + bob);
+    ctx.lineTo(-s / 2 - 6, -s / 3 + bob);
+    ctx.lineTo(-s / 3 + 1, 0 + bob);
+    ctx.closePath();
+    ctx.fill();
+    // 右匕
+    ctx.beginPath();
+    ctx.moveTo(s / 3, -s / 6 + bob);
+    ctx.lineTo(s / 2 + 6, -s / 3 + bob);
+    ctx.lineTo(s / 3 - 1, 0 + bob);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // --- 召唤师：法阵 + 暗能量 + 召唤光环 ---
+  _drawSummoner(ctx, s, flash, now, bob) {
+    const c = flash ? '#fff' : this.color;
+    const pulse = Math.sin(now * 0.004) * 3;
+
+    // 召唤法阵
+    ctx.strokeStyle = `rgba(142,68,173,${0.3 + Math.sin(now * 0.005) * 0.15})`;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(0, s / 3, s / 2 + 4 + pulse, 0, Math.PI * 2);
+    ctx.stroke();
+    // 法阵内圈
+    ctx.beginPath();
+    ctx.arc(0, s / 3, s / 3, 0, Math.PI * 2);
+    ctx.stroke();
+    // 法阵符号
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2 + now * 0.002;
+      const r = s / 2 + 4 + pulse;
+      ctx.fillStyle = `rgba(142,68,173,0.4)`;
+      ctx.beginPath();
+      ctx.arc(Math.cos(a) * r, s / 3 + Math.sin(a) * r, 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // 身体（长袍）
+    ctx.fillStyle = c;
+    ctx.beginPath();
+    ctx.moveTo(-s / 2.5, s / 3 + bob);
+    ctx.lineTo(-s / 4, -s / 4 + bob);
+    ctx.quadraticCurveTo(0, -s / 3 + bob, s / 4, -s / 4 + bob);
+    ctx.lineTo(s / 2.5, s / 3 + bob);
+    ctx.closePath();
+    ctx.fill();
+
+    // 暗能量纹路
+    ctx.strokeStyle = flash ? 'rgba(255,255,255,0.3)' : 'rgba(142,68,173,0.5)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(-s / 5, 0 + bob);
+    ctx.lineTo(0, s / 5 + bob);
+    ctx.lineTo(s / 5, 0 + bob);
+    ctx.stroke();
+
+    // 头
+    ctx.fillStyle = flash ? '#eee' : '#9B59B6';
+    ctx.beginPath(); ctx.arc(0, -s / 3 - 2 + bob, s / 4.5, 0, Math.PI * 2); ctx.fill();
+
+    // 兜帽
+    ctx.fillStyle = flash ? '#ddd' : '#6C3483';
+    ctx.beginPath();
+    ctx.arc(0, -s / 3 - 4 + bob, s / 3.5, Math.PI + 0.3, -0.3);
+    ctx.closePath();
+    ctx.fill();
+
+    // 发光紫眼
+    ctx.fillStyle = '#E040FB';
+    ctx.shadowColor = '#E040FB';
+    ctx.shadowBlur = 5;
+    ctx.beginPath(); ctx.arc(-2, -s / 3 - 2 + bob, 2, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(2, -s / 3 - 2 + bob, 2, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // 召唤计数指示
+    if (this.summonCount > 0) {
+      ctx.fillStyle = 'rgba(142,68,173,0.6)';
+      ctx.font = 'bold 8px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(`×${this.summonCount}`, 0, s / 2 + 6);
+    }
+  }
+
+  // --- 盾卫：大盾 + 全身甲 + 护盾光环 ---
+  _drawShieldGuard(ctx, s, flash, now, bob) {
+    const c = flash ? '#fff' : this.color;
+    const legSwing = Math.sin(this.walkCycle) * 3;
+
+    // 腿
+    ctx.fillStyle = flash ? '#ddd' : '#1565C0';
+    ctx.fillRect(-4, s / 4 + bob, 3, 6 + legSwing);
+    ctx.fillRect(2, s / 4 + bob, 3, 6 - legSwing);
+
+    // 身体（重甲）
+    ctx.fillStyle = c;
+    ctx.beginPath();
+    ctx.roundRect(-s / 2.8, -s / 5 + bob, s * 0.7, s * 0.6, 3);
+    ctx.fill();
+
+    // 装甲板高光
+    ctx.fillStyle = flash ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.1)';
+    ctx.beginPath();
+    ctx.roundRect(-s / 2.8, -s / 5 + bob, s * 0.7, s * 0.3, 3);
+    ctx.fill();
+
+    // 大盾牌（左手）
+    const shieldPulse = this.shieldHp > 0 ? Math.sin(now * 0.006) * 2 : 0;
+    ctx.fillStyle = flash ? '#ddd' : '#1E88E5';
+    ctx.beginPath();
+    ctx.ellipse(-s / 2 - 4, 2 + bob, 8, 12 + shieldPulse, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // 盾牌十字
+    ctx.strokeStyle = flash ? '#eee' : '#90CAF9';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-s / 2 - 4, -6 + bob);
+    ctx.lineTo(-s / 2 - 4, 10 + bob);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-s / 2 - 10, 2 + bob);
+    ctx.lineTo(-s / 2 + 2, 2 + bob);
+    ctx.stroke();
+
+    // 护盾能量光环
+    if (this.shieldHp > 0) {
+      const shieldAlpha = 0.2 + (this.shieldHp / this.maxShieldHp) * 0.3;
+      ctx.strokeStyle = `rgba(52,152,219,${shieldAlpha})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, bob, s / 2 + 3, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // 头盔（全封闭式）
+    ctx.fillStyle = flash ? '#eee' : '#0D47A1';
+    ctx.beginPath(); ctx.arc(0, -s / 3 + bob, s / 3.8, 0, Math.PI * 2); ctx.fill();
+    // 面罩缝
+    ctx.strokeStyle = flash ? '#ccc' : '#0a3d91';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(-s / 5, -s / 3 + bob);
+    ctx.lineTo(s / 5, -s / 3 + bob);
+    ctx.stroke();
+
+    // 眼缝
+    ctx.fillStyle = flash ? '#fff' : '#64B5F6';
+    ctx.fillRect(-4, -s / 3 - 1 + bob, 3, 2);
+    ctx.fillRect(2, -s / 3 - 1 + bob, 3, 2);
+  }
+
+  // --- 爆破兵：炸药包 + 火信 + 危险标记 ---
+  _drawBomber(ctx, s, flash, now, bob) {
+    const c = flash ? '#fff' : this.color;
+    const legSwing = Math.sin(this.walkCycle) * 4;
+    const fuseGlow = 0.5 + Math.sin(now * 0.01) * 0.4;
+
+    // 腿
+    ctx.fillStyle = flash ? '#ddd' : '#BF360C';
+    ctx.fillRect(-3, s / 4 + bob, 2, 5 + legSwing);
+    ctx.fillRect(2, s / 4 + bob, 2, 5 - legSwing);
+
+    // 身体
+    ctx.fillStyle = c;
+    ctx.beginPath();
+    ctx.ellipse(0, bob, s / 3, s / 2.3, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 炸药包（背后）
+    ctx.fillStyle = flash ? '#ddd' : '#4E342E';
+    ctx.beginPath();
+    ctx.roundRect(-s / 5, -s / 6 + bob, s * 0.4, s * 0.45, 3);
+    ctx.fill();
+    // TNT标记
+    ctx.fillStyle = flash ? '#fff' : '#FF5722';
+    ctx.font = 'bold 7px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('TNT', 0.5, s / 8 + bob);
+
+    // 头
+    ctx.fillStyle = flash ? '#eee' : '#FFCCBC';
+    ctx.beginPath(); ctx.arc(0, -s / 3 + bob, s / 4.5, 0, Math.PI * 2); ctx.fill();
+
+    // 头巾
+    ctx.fillStyle = flash ? '#ddd' : '#D84315';
+    ctx.beginPath();
+    ctx.arc(0, -s / 3 - 1 + bob, s / 4, Math.PI, 0);
+    ctx.fill();
+
+    // 火信（头顶，闪烁）
+    ctx.strokeStyle = flash ? '#ccc' : '#5D4037';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(0, -s / 2 + bob);
+    ctx.lineTo(2, -s / 2 - 6 + bob);
+    ctx.stroke();
+    // 火花
+    ctx.fillStyle = `rgba(255,${150 + Math.random() * 100},0,${fuseGlow})`;
+    ctx.shadowColor = '#FF6F00';
+    ctx.shadowBlur = 4;
+    ctx.beginPath();
+    ctx.arc(2, -s / 2 - 6 + bob, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // 危险标记
+    ctx.fillStyle = `rgba(255,87,34,${0.4 + Math.sin(now * 0.008) * 0.3})`;
+    ctx.font = 'bold 10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('⚠', 0, s / 2 + 8 + bob);
+
+    // 眼睛（疯狂）
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(-2.5, -s / 3 + bob, 2, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(2.5, -s / 3 + bob, 2, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.arc(-2, -s / 3 + bob, 1, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(3, -s / 3 + bob, 1, 0, Math.PI * 2); ctx.fill();
   }
 }
 
@@ -1956,18 +2997,29 @@ function generateWaveConfigs() {
     const enemies = [];
     const hpMult = 1 + (w - 1) * 0.15; // 每波血量增加15%
 
-    // 基础数量随波次增加
-    const baseCount = Math.min(5 + Math.floor(w * 1.2), 30);
+    // 基础数量随波次增加（后期大量敌人）
+    const baseCount = Math.min(8 + Math.floor(w * 2.2), 70);
 
     // 每5波Boss
     if (w % 5 === 0) {
-      // Boss波
-      for (let i = 0; i < Math.floor(w / 10) + 1; i++) {
+      // Boss波 - Boss数量随波次增加
+      const bossCount = Math.floor(w / 10) + 1;
+      for (let i = 0; i < bossCount; i++) {
         enemies.push({ type: 'boss', delay: i * 2 });
       }
-      // 配一些小兵
-      for (let i = 0; i < baseCount / 2; i++) {
-        enemies.push({ type: 'normal', delay: i * 0.8 });
+      // 配大量小兵护卫Boss
+      const guardCount = Math.floor(baseCount * 0.8);
+      for (let i = 0; i < guardCount; i++) {
+        let type = 'normal';
+        const roll = Math.random();
+        if (w >= 15 && roll < 0.15) type = 'shield';
+        else if (w >= 12 && roll < 0.2) type = 'bomber';
+        else if (w >= 9 && roll < 0.25) type = 'assassin';
+        else if (w >= 7 && roll < 0.3) type = 'healer';
+        else if (w >= 5 && roll < 0.35) type = 'armored';
+        else if (w >= 3 && roll < 0.4) type = 'flying';
+        else if (w >= 2 && roll < 0.5) type = 'fast';
+        enemies.push({ type, delay: i * 0.5 });
       }
     } else {
       // 根据波次解锁不同敌人
@@ -1975,17 +3027,22 @@ function generateWaveConfigs() {
         let type = 'normal';
         const roll = Math.random();
 
-        if (w >= 3 && roll < 0.3) {
-          type = 'fast';
-        }
-        if (w >= 6 && roll < 0.2) {
-          type = 'flying';
-        }
-        if (w >= 10 && roll < 0.15) {
-          type = 'armored';
-        }
-        if (w >= 14 && roll < 0.1) {
+        if (w >= 18 && roll < 0.06) {
+          type = 'summoner';
+        } else if (w >= 15 && roll < 0.1) {
+          type = 'shield';
+        } else if (w >= 12 && roll < 0.12) {
+          type = 'bomber';
+        } else if (w >= 9 && roll < 0.15) {
+          type = 'assassin';
+        } else if (w >= 7 && roll < 0.2) {
           type = 'healer';
+        } else if (w >= 5 && roll < 0.25) {
+          type = 'armored';
+        } else if (w >= 3 && roll < 0.3) {
+          type = 'flying';
+        } else if (w >= 2 && roll < 0.35) {
+          type = 'fast';
         }
 
         enemies.push({ type, delay: i * 0.6 });
@@ -1996,7 +3053,7 @@ function generateWaveConfigs() {
       number: w,
       enemies,
       hpMultiplier: hpMult,
-      bonusGold: w * 15
+      bonusGold: w * 40
     });
   }
 
@@ -2092,6 +3149,13 @@ class WaveManager {
       this.betweenWaveTimer = 0;
     }
   }
+
+  forceNextWave() {
+    if (this.betweenWaves && !this.allWavesComplete) {
+      return this.startNextWave();
+    }
+    return null;
+  }
 }
 
 // === ./ui.js ===
@@ -2117,7 +3181,8 @@ const uiState = {
   enemyCount: 0,
   killCount: 0,
   towerCount: 0,
-  selectedMapIndex: 0        // 选中的地图
+  selectedMapIndex: 0,       // 选中的地图
+  betweenWaves: false        // 是否在波次间隔中
 };
 
 // ---- 事件回调 ----
@@ -2293,17 +3358,29 @@ function drawHUD(ctx) {
   // 存储
   uiState._pauseRect = { x: pauseX, y: pauseY, w: pauseW, h: pauseH };
 
-  // 下一波按钮
-  const nextX = CANVAS_WIDTH - 170;
-  const nextW = 80;
-  ctx.fillStyle = 'rgba(46,204,113,0.8)';
-  ctx.fillRect(nextX, pauseY, nextW, pauseH);
+  // 下一波按钮（更大更醒目）
+  const nextX = CANVAS_WIDTH - 180;
+  const nextW = 95;
+  const nextH = 28;
+  // 脉动效果
+  const pulse = 0.8 + Math.sin(Date.now() * 0.005) * 0.2;
+  ctx.fillStyle = `rgba(46,204,113,${pulse})`;
+  ctx.beginPath();
+  if (ctx.roundRect) {
+    ctx.roundRect(nextX, pauseY, nextW, nextH, 4);
+  } else {
+    ctx.rect(nextX, pauseY, nextW, nextH);
+  }
+  ctx.fill();
   ctx.strokeStyle = '#2ecc71';
-  ctx.strokeRect(nextX, pauseY, nextW, pauseH);
+  ctx.lineWidth = 2;
+  ctx.strokeRect(nextX, pauseY, nextW, nextH);
   ctx.fillStyle = '#fff';
-  ctx.font = '11px Arial';
-  ctx.fillText('下一波', nextX + nextW / 2, y);
-  uiState._nextWaveRect = { x: nextX, y: pauseY, w: nextW, h: pauseH };
+  ctx.font = 'bold 13px Arial';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('▶ 下一波', nextX + nextW / 2, pauseY + nextH / 2);
+  uiState._nextWaveRect = { x: nextX, y: pauseY, w: nextW, h: nextH };
 }
 
 // ---- 塔信息面板（选中已建造的塔时） ----
@@ -2615,8 +3692,14 @@ function handleClick(mx, my) {
     return;
   }
 
-  // 下一波按钮
+  // 下一波按钮（顶部小按钮）
   if (uiState._nextWaveRect && hitTest(mx, my, uiState._nextWaveRect)) {
+    onSkipWait?.();
+    return;
+  }
+
+  // 下一波按钮（中央大按钮）
+  if (uiState._nextWaveBigRect && hitTest(mx, my, uiState._nextWaveBigRect)) {
     onSkipWait?.();
     return;
   }
@@ -2706,12 +3789,53 @@ function drawHoverInfo(ctx) {
   }
 }
 
+// ---- 波次间隔大按钮 ----
+function drawNextWaveOverlay(ctx) {
+  if (!uiState.betweenWaves) return;
+
+  const btnW = 200;
+  const btnH = 50;
+  const btnX = CANVAS_WIDTH / 2 - btnW / 2;
+  const btnY = CANVAS_HEIGHT / 2 - btnH / 2;
+  const pulse = 0.7 + Math.sin(Date.now() * 0.006) * 0.3;
+
+  // 半透明背景
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.fillRect(0, CANVAS_HEIGHT / 2 - 40, CANVAS_WIDTH, 80);
+
+  // 按钮
+  ctx.fillStyle = `rgba(46,204,113,${pulse})`;
+  ctx.beginPath();
+  if (ctx.roundRect) {
+    ctx.roundRect(btnX, btnY, btnW, btnH, 10);
+  } else {
+    ctx.rect(btnX, btnY, btnW, btnH);
+  }
+  ctx.fill();
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(btnX, btnY, btnW, btnH);
+
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 20px Arial';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('▶ 下一波', btnX + btnW / 2, btnY + btnH / 2);
+
+  uiState._nextWaveBigRect = { x: btnX, y: btnY, w: btnW, h: btnH };
+}
+
 // ---- 主绘制 ----
 function drawUI(ctx) {
   drawHUD(ctx);
   drawTowerPanel(ctx);
   drawTowerInfo(ctx);
   drawHoverInfo(ctx);
+
+  // 波次间隔期间显示大按钮
+  if (!uiState.showStartMenu && !uiState.showGameOver && !uiState.showVictory && uiState.isRunning && !uiState.isPaused) {
+    drawNextWaveOverlay(ctx);
+  }
 
   if (uiState.showStartMenu) {
     drawStartMenu(ctx);
@@ -2740,6 +3864,7 @@ let towers = [];
 let enemies = [];
 let projectiles = [];
 let particles = [];
+let goldPopups = [];
 let waveManager;
 let lastTime = 0;
 let gameStarted = false;
@@ -2775,6 +3900,32 @@ class Particle {
   }
 }
 
+// ---- 金币飘字 ----
+class GoldPopup {
+  constructor(x, y, amount) {
+    this.x = x;
+    this.y = y;
+    this.amount = amount;
+    this.life = 1.0;
+    this.alive = true;
+  }
+
+  update(dt) {
+    this.y -= 40 * dt;
+    this.life -= dt;
+    if (this.life <= 0) this.alive = false;
+  }
+
+  draw(ctx) {
+    const alpha = Math.max(0, this.life);
+    ctx.fillStyle = `rgba(241,196,15,${alpha})`;
+    ctx.font = 'bold 14px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`+${this.amount}G`, this.x, this.y);
+  }
+}
+
 function spawnParticles(x, y, color, count = 8) {
   for (let i = 0; i < count; i++) {
     particles.push(new Particle(x, y, color));
@@ -2797,7 +3948,7 @@ function init() {
     onStartGame: startGame,
     onPauseToggle: () => {},
     onSpeedChange: (spd) => { uiState.gameSpeed = spd; },
-    onSkipWait: () => { waveManager.skipWait(); },
+    onSkipWait: () => { waveManager.forceNextWave(); },
     onTowerSelect: handleTowerSelect,
     onTowerPlace: handleTowerPlace,
     onTowerUpgrade: handleTowerUpgrade,
@@ -2955,18 +4106,49 @@ function update(dt) {
     uiState.score += enemy.reward;
     uiState.killCount++;
     spawnParticles(enemy.x, enemy.y, 'rgb(255,100,50)', 12);
+    goldPopups.push(new GoldPopup(enemy.x, enemy.y - 20, enemy.reward));
     playEnemyDeath();
+
+    // 爆破兵死亡爆炸
+    if (enemy.explosionDamage > 0 && !enemy.exploded) {
+      enemy.exploded = true;
+      // 对周围塔造成伤害（减少塔的血量或直接移除低级塔）
+      // 这里改为对周围敌人也造成溅射伤害
+      for (const other of enemies) {
+        if (other === enemy || !other.alive) continue;
+        const dx = other.x - enemy.x;
+        const dy = other.y - enemy.y;
+        if (Math.sqrt(dx * dx + dy * dy) <= enemy.explosionRadius) {
+          other.takeDamage(30, true);
+        }
+      }
+      // 爆炸特效
+      spawnParticles(enemy.x, enemy.y, 'rgb(255,150,0)', 20);
+      spawnParticles(enemy.x, enemy.y, 'rgb(255,50,0)', 15);
+    }
   }
 
-  // 更新粒子
-  for (const p of particles) {
-    p.update(dt);
+  // 召唤师召唤
+  for (const enemy of enemies) {
+    if (enemy.alive && enemy._shouldSummon) {
+      enemy._shouldSummon = false;
+      const summon = new Enemy(enemy.summonType, 1);
+      summon.pathIndex = Math.max(0, enemy.pathIndex - 1);
+      summon.x = enemy.x + (Math.random() - 0.5) * 20;
+      summon.y = enemy.y + (Math.random() - 0.5) * 20;
+      enemies.push(summon);
+    }
   }
+
+  // 更新粒子和飘字
+  for (const p of particles) p.update(dt);
+  for (const g of goldPopups) g.update(dt);
 
   // 清理
   enemies = enemies.filter(e => e.alive || e.deathTimer < 0.3);
   projectiles = projectiles.filter(p => p.alive);
   particles = particles.filter(p => p.alive);
+  goldPopups = goldPopups.filter(g => g.alive);
 
   // 波次生成完毕，检查是否全部消灭
   if (waveResult === 'spawning_done') {
@@ -2988,6 +4170,7 @@ function update(dt) {
 
   // 更新UI状态
   uiState.enemyCount = enemies.filter(e => e.alive).length;
+  uiState.betweenWaves = waveManager.betweenWaves;
 }
 
 // ---- 渲染 ----
@@ -3018,16 +4201,17 @@ function render() {
   }
 
   // 绘制粒子
-  for (const p of particles) {
-    p.draw(ctx);
-  }
+  for (const p of particles) p.draw(ctx);
+
+  // 绘制金币飘字
+  for (const g of goldPopups) g.draw(ctx);
 
   // 绘制UI（覆盖层）
   drawUI(ctx);
 }
 
 // ---- 启动 ----
-if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",init)}else{init()};
+init();;
 
 
 </script>

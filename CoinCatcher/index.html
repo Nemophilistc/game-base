@@ -463,18 +463,24 @@ class Player {
         if (keys.has('ArrowLeft') || keys.has('a') || keys.has('A')) moveDir -= 1;
         if (keys.has('ArrowRight') || keys.has('d') || keys.has('D')) moveDir += 1;
 
-        // Mouse/touch override
+        // Mouse/touch override - direct lerp for fast tracking
         if (mouseX !== null) {
             const targetX = mouseX - this.width / 2;
             const diff = targetX - this.x;
-            if (Math.abs(diff) > 2) {
-                moveDir = Math.sign(diff) * Math.min(1, Math.abs(diff) / 50);
+            if (Math.abs(diff) > 1) {
+                // Lerp directly toward mouse with high factor for responsive feel
+                const lerpFactor = 1 - Math.pow(0.05, dt); // ~0.85 effective per frame at 60fps
+                this.x += diff * lerpFactor;
+                this.vx = diff * lerpFactor / dt;
+            } else {
+                this.x = targetX;
+                this.vx = 0;
             }
+        } else {
+            // Apply keyboard velocity
+            this.vx = moveDir * this.speed;
+            this.x += this.vx * dt;
         }
-
-        // Apply velocity
-        this.vx = moveDir * this.speed;
-        this.x += this.vx * dt;
 
         // Clamp to bounds
         this.x = Math.max(0, Math.min(GAME_WIDTH - this.width, this.x));

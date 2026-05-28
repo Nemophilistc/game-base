@@ -454,10 +454,14 @@ class Board {
       }
     }
 
-    // 清除宝石
+    // 标记宝石为matched（不立即移除，等动画播放完再清除）
     for (const key of toClear) {
       const [r, c] = key.split(',').map(Number);
-      this.grid[r][c] = null;
+      const gem = this.grid[r][c];
+      if (gem) {
+        gem.matched = true;
+        gem.matchTime = Date.now();
+      }
     }
 
     const multiplier = CHAIN_MULTIPLIERS[Math.min(this.chainLevel, CHAIN_MULTIPLIERS.length - 1)];
@@ -538,7 +542,7 @@ class Board {
         }
       }
     }
-    // 清除
+    // 标记为matched（不立即移除，等动画播放完再清除）
     const cleared = [];
     for (const key of toClear) {
       const [cr, cc] = key.split(',').map(Number);
@@ -546,10 +550,11 @@ class Board {
       if (gem) {
         this.clearStats[gem.type] = (this.clearStats[gem.type] || 0) + 1;
         cleared.push({ r: cr, c: cc, color: gem.color, type: gem.type });
+        gem.matched = true;
+        gem.matchTime = Date.now();
       } else {
         cleared.push({ r: cr, c: cc, color: '#fff', type: 0 });
       }
-      this.grid[cr][cc] = null;
     }
     const multiplier = CHAIN_MULTIPLIERS[Math.min(this.chainLevel, CHAIN_MULTIPLIERS.length - 1)];
     const totalScore = cleared.length * BASE_SCORE_PER_GEM * multiplier;
@@ -640,6 +645,18 @@ class Board {
       }
     }
     return false;
+  }
+
+  // 最终清除已标记matched的宝石（动画播放完后调用）
+  finalizeClear() {
+    for (let r = 0; r < GRID_ROWS; r++) {
+      for (let c = 0; c < GRID_COLS; c++) {
+        const gem = this.grid[r][c];
+        if (gem && gem.matched) {
+          this.grid[r][c] = null;
+        }
+      }
+    }
   }
 
   // 重置连锁等级
@@ -1109,10 +1126,25 @@ class UI {
           scale = 0.3 + Math.sin(time * 0.01) * 0.1;
         }
 
+        // matched宝石：闪烁+缩小动画
+        let matchAlpha = 1;
+        let matchScale = 1;
+        let matchGlowBoost = 0;
+        if (gem.matched) {
+          const elapsed = time - (gem.matchTime || time);
+          const t = Math.min(elapsed / 400, 1); // 400ms动画
+          // 快速闪烁
+          matchGlowBoost = (0.5 + Math.sin(elapsed * 0.03) * 0.5) * 20;
+          // 逐渐缩小并淡出
+          matchScale = 1 - t * 0.5;
+          matchAlpha = 1 - t * 0.6;
+          scale = matchScale;
+        }
+
         ctx.save();
         ctx.translate(cx, cy);
         ctx.scale(scale, scale);
-        ctx.globalAlpha = gem.alpha;
+        ctx.globalAlpha = gem.alpha * matchAlpha;
 
         // 发光背景
         const glowGrad = ctx.createRadialGradient(0, 0, radius * 0.3, 0, 0, radius * 1.2);
@@ -1124,9 +1156,9 @@ class UI {
         ctx.fill();
 
         // 宝石主体 - 圆角矩形
-        ctx.fillStyle = gem.color;
-        ctx.shadowColor = gem.glow;
-        ctx.shadowBlur = gem.selected ? 15 : 8;
+        ctx.fillStyle = gem.matched ? '#fff' : gem.color;
+        ctx.shadowColor = gem.matched ? '#fff' : gem.glow;
+        ctx.shadowBlur = (gem.selected ? 15 : 8) + matchGlowBoost;
         ctx.beginPath();
         ctx.roundRect(-radius, -radius, radius * 2, radius * 2, radius * 0.4);
         ctx.fill();
@@ -1753,7 +1785,9 @@ class Game {
 
     // 消除动画后下落
     this.state = STATE.DESTROYING;
-    this._startAnim(300, () => {
+    this._startAnim(400, () => {
+      // 动画播放完毕，现在真正移除matched宝石
+      this.board.finalizeClear();
       this._doGravity();
     });
   }
@@ -1881,16 +1915,12 @@ class Game {
 }
 
 // --- 启动 ---
-window.addEventListener('DOMContentLoaded', () => {
-  new Game();
-});
+new Game();;;
 
         // 隐藏加载画面
-    window.addEventListener('DOMContentLoaded', () => {
-      setTimeout(() => {
+    setTimeout(() => {
         document.getElementById('loading').classList.add('hidden');
-      }, 300);
-    });
+      }, 300);;;
   
 </script>
 
