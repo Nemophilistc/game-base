@@ -25,8 +25,17 @@ export function addRandom(grid) {
     return pos;
 }
 
-/** 顺时针旋转 90 度 */
+/** 逆时针旋转 90 度 */
 function rotate(g) {
+    const res = Array.from({ length: N }, () => Array(N).fill(0));
+    for (let r = 0; r < N; r++)
+        for (let c = 0; c < N; c++)
+            res[N - 1 - c][r] = g[r][c];
+    return res;
+}
+
+/** 顺时针旋转 90 度 */
+function rotateCW(g) {
     const res = Array.from({ length: N }, () => Array(N).fill(0));
     for (let r = 0; r < N; r++)
         for (let c = 0; c < N; c++)
@@ -41,14 +50,14 @@ function rotate(g) {
  * @returns {{ grid, moved, scoreGain, mergedPositions, randomPos }}
  */
 export function move(grid, dir) {
-    const rotated = dir === 'up' || dir === 'down';
-    const reversed = dir === 'right' || dir === 'down';
-
     let g = cloneGrid(grid);
-    if (rotated) g = rotate(g);
-    if (reversed) g = g.map(r => r.reverse());
-
     let scoreGain = 0;
+
+    // 统一旋转到"向左合并"的方向，处理完再旋转回来
+    // 'left': 不旋转  'right': 旋转180°  'up': 逆时针90°  'down': 顺时针90°
+    if (dir === 'up') g = rotate(g);          // 逆时针90°
+    else if (dir === 'down') g = rotateCW(g); // 顺时针90°
+    else if (dir === 'right') { g = rotate(g); g = rotate(g); } // 180°
 
     for (let r = 0; r < N; r++) {
         let row = g[r].filter(v => v !== 0);
@@ -63,8 +72,10 @@ export function move(grid, dir) {
         g[r] = row;
     }
 
-    if (reversed) g = g.map(r => r.reverse());
-    if (rotated) g = rotate(rotate(rotate(g)));   // 逆时针 90 度 x3
+    // 旋转回来
+    if (dir === 'up') g = rotateCW(g);        // 顺时针90°（逆时针的逆）
+    else if (dir === 'down') g = rotate(g);   // 逆时针90°（顺时针的逆）
+    else if (dir === 'right') { g = rotate(g); g = rotate(g); } // 180°
 
     // 检测是否真的移动了
     let moved = false;

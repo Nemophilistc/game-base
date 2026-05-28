@@ -3,7 +3,7 @@ import { H, GRAVITY, FLAP, BIRD_SIZE } from './config.js';
 import Sound from './sound.js';
 
 const bird = {
-    x: 80,
+    x: 100,
     y: H / 2,
     vy: 0,
     angle: 0,
@@ -11,7 +11,7 @@ const bird = {
 };
 
 export function resetBird() {
-    bird.x = 80;
+    bird.x = 100;
     bird.y = H / 2;
     bird.vy = 0;
     bird.angle = 0;
@@ -51,30 +51,30 @@ export function drawBird(ctx, frameCount, state) {
     ctx.fill();
 
     // 翅膀
-    const wingY = bird.flapFrame > 0 ? -5 : 3;
+    const wingY = bird.flapFrame > 0 ? -7 : 4;
     ctx.fillStyle = '#ff9800';
     ctx.beginPath();
-    ctx.ellipse(-3, wingY, 10, 5, -0.3, 0, Math.PI * 2);
+    ctx.ellipse(-4, wingY, 13, 7, -0.3, 0, Math.PI * 2);
     ctx.fill();
 
     // 眼白
     ctx.fillStyle = '#fff';
     ctx.beginPath();
-    ctx.arc(8, -4, 5, 0, Math.PI * 2);
+    ctx.arc(10, -5, 6, 0, Math.PI * 2);
     ctx.fill();
 
     // 瞳孔
     ctx.fillStyle = '#000';
     ctx.beginPath();
-    ctx.arc(9, -4, 2.5, 0, Math.PI * 2);
+    ctx.arc(11, -5, 3, 0, Math.PI * 2);
     ctx.fill();
 
     // 嘴巴
     ctx.fillStyle = '#f44336';
     ctx.beginPath();
-    ctx.moveTo(12, 0);
-    ctx.lineTo(20, 2);
-    ctx.lineTo(12, 5);
+    ctx.moveTo(15, 0);
+    ctx.lineTo(25, 3);
+    ctx.lineTo(15, 6);
     ctx.closePath();
     ctx.fill();
 

@@ -56,26 +56,86 @@ export class Player {
             ctx.globalAlpha = 0.4;
         }
 
-        ctx.fillStyle = '#00ff96';
+        const cx = this.x;
+        const baseY = H - 50;
+        const hw = this.w / 2;
+
+        // 引擎火焰
+        const flicker = Math.random() * 6;
+        ctx.fillStyle = '#ff6b35';
         ctx.beginPath();
-        ctx.moveTo(this.x, H - 40);
-        ctx.lineTo(this.x - this.w / 2, H - 50);
-        ctx.lineTo(this.x - this.w / 4, H - 50);
-        ctx.lineTo(this.x - this.w / 4, H - 55);
-        ctx.lineTo(this.x + this.w / 4, H - 55);
-        ctx.lineTo(this.x + this.w / 4, H - 50);
-        ctx.lineTo(this.x + this.w / 2, H - 50);
+        ctx.moveTo(cx - 8, baseY + 6);
+        ctx.lineTo(cx, baseY + 18 + flicker);
+        ctx.lineTo(cx + 8, baseY + 6);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = '#ffff00';
+        ctx.beginPath();
+        ctx.moveTo(cx - 4, baseY + 6);
+        ctx.lineTo(cx, baseY + 12 + flicker * 0.6);
+        ctx.lineTo(cx + 4, baseY + 6);
         ctx.closePath();
         ctx.fill();
 
+        // 主机身（深蓝渐变）
+        const bodyGrad = ctx.createLinearGradient(cx - hw, baseY, cx + hw, baseY);
+        bodyGrad.addColorStop(0, '#1565c0');
+        bodyGrad.addColorStop(0.5, '#42a5f5');
+        bodyGrad.addColorStop(1, '#1565c0');
+        ctx.fillStyle = bodyGrad;
+        ctx.beginPath();
+        ctx.moveTo(cx, baseY - 18);
+        ctx.lineTo(cx - hw, baseY + 6);
+        ctx.lineTo(cx - hw * 0.6, baseY + 6);
+        ctx.lineTo(cx - hw * 0.3, baseY + 2);
+        ctx.lineTo(cx + hw * 0.3, baseY + 2);
+        ctx.lineTo(cx + hw * 0.6, baseY + 6);
+        ctx.lineTo(cx + hw, baseY + 6);
+        ctx.closePath();
+        ctx.fill();
+
+        // 左翼
+        ctx.fillStyle = '#0d47a1';
+        ctx.beginPath();
+        ctx.moveTo(cx - hw * 0.5, baseY - 2);
+        ctx.lineTo(cx - hw - 6, baseY + 8);
+        ctx.lineTo(cx - hw * 0.6, baseY + 6);
+        ctx.closePath();
+        ctx.fill();
+        // 右翼
+        ctx.beginPath();
+        ctx.moveTo(cx + hw * 0.5, baseY - 2);
+        ctx.lineTo(cx + hw + 6, baseY + 8);
+        ctx.lineTo(cx + hw * 0.6, baseY + 6);
+        ctx.closePath();
+        ctx.fill();
+
+        // 驾驶舱
+        ctx.fillStyle = '#90caf9';
+        ctx.beginPath();
+        ctx.ellipse(cx, baseY - 6, 5, 7, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#e3f2fd';
+        ctx.beginPath();
+        ctx.ellipse(cx - 1, baseY - 8, 2, 3, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 翼尖灯
+        ctx.fillStyle = '#00e5ff';
+        ctx.beginPath(); ctx.arc(cx - hw - 4, baseY + 7, 2, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(cx + hw + 4, baseY + 7, 2, 0, Math.PI * 2); ctx.fill();
+
         ctx.globalAlpha = 1;
 
+        // 护盾
         if (shield > 0) {
             ctx.strokeStyle = 'rgba(0,200,255,0.4)';
             ctx.lineWidth = 2;
             ctx.beginPath();
-            ctx.arc(this.x, H - 48, 28, 0, Math.PI * 2);
+            ctx.arc(cx, baseY - 4, 30, 0, Math.PI * 2);
             ctx.stroke();
+            ctx.fillStyle = 'rgba(0,200,255,0.08)';
+            ctx.fill();
         }
     }
 }

@@ -137,32 +137,176 @@ export class EnemyManager {
         // 绘制敌人
         this.enemies.forEach(e => {
             if (!e.alive) return;
-            ctx.fillStyle = e.color;
-            ctx.fillRect(e.x, e.y, e.w, e.h);
-            ctx.fillStyle = 'rgba(255,255,255,0.15)';
-            ctx.fillRect(e.x, e.y, e.w, e.h / 2);
-            // 眼睛
-            ctx.fillStyle = '#000';
-            ctx.fillRect(e.x + 8, e.y + 8, 6, 6);
-            ctx.fillRect(e.x + e.w - 14, e.y + 8, 6, 6);
+            const cx = e.x + e.w / 2;
+            const cy = e.y + e.h / 2;
+            const hw = e.w / 2;
+            const hh = e.h / 2;
+
+            // 根据颜色类型绘制不同形状的敌人
+            if (e.color === '#f44336' || e.color === '#e53935') {
+                // 顶层：恶魔型（尖角+翅膀）
+                ctx.fillStyle = e.color;
+                // 身体
+                ctx.beginPath();
+                ctx.moveTo(cx, cy + hh);
+                ctx.lineTo(cx - hw, cy - hh * 0.3);
+                ctx.lineTo(cx - hw * 0.7, cy - hh);
+                ctx.lineTo(cx - hw * 0.2, cy - hh * 0.6);
+                ctx.lineTo(cx, cy - hh);
+                ctx.lineTo(cx + hw * 0.2, cy - hh * 0.6);
+                ctx.lineTo(cx + hw * 0.7, cy - hh);
+                ctx.lineTo(cx + hw, cy - hh * 0.3);
+                ctx.closePath();
+                ctx.fill();
+                // 眼睛
+                ctx.fillStyle = '#fff';
+                ctx.beginPath(); ctx.arc(cx - 6, cy - 2, 4, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(cx + 6, cy - 2, 4, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = '#000';
+                ctx.beginPath(); ctx.arc(cx - 5, cy - 2, 2, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(cx + 7, cy - 2, 2, 0, Math.PI * 2); ctx.fill();
+            } else if (e.color === '#ff9800' || e.color === '#fb8c00') {
+                // 第二层：甲虫型（圆壳+触角）
+                ctx.fillStyle = e.color;
+                ctx.beginPath();
+                ctx.ellipse(cx, cy, hw, hh, 0, 0, Math.PI * 2);
+                ctx.fill();
+                // 壳纹
+                ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+                ctx.lineWidth = 1;
+                ctx.beginPath(); ctx.moveTo(cx, cy - hh); ctx.lineTo(cx, cy + hh); ctx.stroke();
+                // 触角
+                ctx.strokeStyle = e.color;
+                ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.moveTo(cx - 8, cy - hh); ctx.lineTo(cx - 14, cy - hh - 8); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(cx + 8, cy - hh); ctx.lineTo(cx + 14, cy - hh - 8); ctx.stroke();
+                ctx.fillStyle = '#fff';
+                ctx.beginPath(); ctx.arc(cx - 14, cy - hh - 8, 2, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(cx + 14, cy - hh - 8, 2, 0, Math.PI * 2); ctx.fill();
+                // 眼睛
+                ctx.fillStyle = '#fff';
+                ctx.beginPath(); ctx.arc(cx - 7, cy - 3, 4, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(cx + 7, cy - 3, 4, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = '#000';
+                ctx.beginPath(); ctx.arc(cx - 6, cy - 3, 2, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(cx + 8, cy - 3, 2, 0, Math.PI * 2); ctx.fill();
+            } else if (e.color === '#ffeb3b' || e.color === '#fdd835') {
+                // 第三层：水母型（波浪边+触手）
+                ctx.fillStyle = e.color;
+                ctx.beginPath();
+                ctx.arc(cx, cy - hh * 0.3, hw, Math.PI, 0);
+                ctx.lineTo(cx + hw, cy + hh * 0.3);
+                // 波浪底边
+                for (let i = 0; i < 5; i++) {
+                    const wx = cx + hw - (i + 1) * (e.w / 5);
+                    const wy = cy + hh * 0.3 + (i % 2 === 0 ? 5 : 0);
+                    ctx.lineTo(wx, wy);
+                }
+                ctx.closePath();
+                ctx.fill();
+                // 眼睛
+                ctx.fillStyle = '#000';
+                ctx.beginPath(); ctx.arc(cx - 6, cy - hh * 0.2, 3, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(cx + 6, cy - hh * 0.2, 3, 0, Math.PI * 2); ctx.fill();
+                // 发光
+                ctx.fillStyle = 'rgba(255,235,59,0.3)';
+                ctx.beginPath(); ctx.arc(cx, cy, hw * 0.5, 0, Math.PI * 2); ctx.fill();
+            } else if (e.color === '#4caf50' || e.color == '#43a047') {
+                // 第四层：水晶型（菱形+光芒）
+                ctx.fillStyle = e.color;
+                ctx.beginPath();
+                ctx.moveTo(cx, cy - hh);
+                ctx.lineTo(cx + hw, cy);
+                ctx.lineTo(cx, cy + hh);
+                ctx.lineTo(cx - hw, cy);
+                ctx.closePath();
+                ctx.fill();
+                // 内部菱形
+                ctx.fillStyle = '#81c784';
+                ctx.beginPath();
+                ctx.moveTo(cx, cy - hh * 0.5);
+                ctx.lineTo(cx + hw * 0.5, cy);
+                ctx.lineTo(cx, cy + hh * 0.5);
+                ctx.lineTo(cx - hw * 0.5, cy);
+                ctx.closePath();
+                ctx.fill();
+                // 核心
+                ctx.fillStyle = '#c8e6c9';
+                ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI * 2); ctx.fill();
+                // 眼睛
+                ctx.fillStyle = '#000';
+                ctx.beginPath(); ctx.arc(cx - 5, cy - 2, 2, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(cx + 5, cy - 2, 2, 0, Math.PI * 2); ctx.fill();
+            } else {
+                // 底层：机械型（方形+铆钉+装甲）
+                ctx.fillStyle = e.color;
+                ctx.fillRect(e.x + 2, e.y, e.w - 4, e.h);
+                ctx.fillRect(e.x, e.y + 3, e.w, e.h - 6);
+                // 装甲板
+                ctx.fillStyle = 'rgba(0,0,0,0.2)';
+                ctx.fillRect(e.x + 4, e.y + 2, e.w - 8, e.h / 2 - 2);
+                // 铆钉
+                ctx.fillStyle = 'rgba(255,255,255,0.3)';
+                ctx.beginPath(); ctx.arc(e.x + 6, e.y + 5, 1.5, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(e.x + e.w - 6, e.y + 5, 1.5, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(e.x + 6, e.y + e.h - 5, 1.5, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(e.x + e.w - 6, e.y + e.h - 5, 1.5, 0, Math.PI * 2); ctx.fill();
+                // 眼睛（发光）
+                ctx.fillStyle = '#ff1744';
+                ctx.beginPath(); ctx.arc(cx - 7, cy - 2, 3, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(cx + 7, cy - 2, 3, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = 'rgba(255,23,68,0.3)';
+                ctx.beginPath(); ctx.arc(cx - 7, cy - 2, 5, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(cx + 7, cy - 2, 5, 0, Math.PI * 2); ctx.fill();
+            }
+
             if (e.hp > 1) {
                 ctx.fillStyle = '#fff';
-                ctx.font = '10px Arial';
+                ctx.font = 'bold 10px Arial';
                 ctx.textAlign = 'center';
-                ctx.fillText(e.hp, e.x + e.w / 2, e.y + e.h - 4);
+                ctx.fillText(e.hp, cx, e.y + e.h + 10);
             }
         });
 
         // 绘制UFO
         if (this.ufo) {
-            ctx.fillStyle = '#ffd700';
+            const ux = this.ufo.x + 20;
+            const uy = this.ufo.y + 10;
+            const t = Date.now() * 0.003;
+
+            // 光环
+            ctx.strokeStyle = 'rgba(255,215,0,0.3)';
+            ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.arc(ux, uy, 25 + Math.sin(t) * 3, 0, Math.PI * 2); ctx.stroke();
+
+            // 主体
+            const ufoGrad = ctx.createLinearGradient(ux - 20, uy, ux + 20, uy);
+            ufoGrad.addColorStop(0, '#ffd700');
+            ufoGrad.addColorStop(0.5, '#fff176');
+            ufoGrad.addColorStop(1, '#ffd700');
+            ctx.fillStyle = ufoGrad;
             ctx.beginPath();
-            ctx.ellipse(this.ufo.x + 20, this.ufo.y + 10, 20, 10, 0, 0, Math.PI * 2);
+            ctx.ellipse(ux, uy, 22, 10, 0, 0, Math.PI * 2);
             ctx.fill();
+
+            // 顶盖
+            ctx.fillStyle = '#ffb300';
+            ctx.beginPath();
+            ctx.ellipse(ux, uy - 4, 12, 8, 0, Math.PI, 0);
+            ctx.fill();
+
+            // 顶灯
             ctx.fillStyle = '#ff0';
-            ctx.beginPath();
-            ctx.arc(this.ufo.x + 20, this.ufo.y + 5, 6, 0, Math.PI * 2);
-            ctx.fill();
+            ctx.beginPath(); ctx.arc(ux, uy - 8, 5, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = 'rgba(255,255,0,0.4)';
+            ctx.beginPath(); ctx.arc(ux, uy - 8, 8, 0, Math.PI * 2); ctx.fill();
+
+            // 底部灯
+            const lights = [-12, -4, 4, 12];
+            for (const lx of lights) {
+                ctx.fillStyle = `hsl(${(t * 50 + lx * 10) % 360},100%,60%)`;
+                ctx.beginPath(); ctx.arc(ux + lx, uy + 5, 2, 0, Math.PI * 2); ctx.fill();
+            }
         }
     }
 }

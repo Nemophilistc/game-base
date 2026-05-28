@@ -99,25 +99,103 @@ export function checkLevelClear(bricks) {
 export function drawBricks(ctx, bricks) {
     bricks.forEach(br => {
         if (!br.alive) return;
-        ctx.fillStyle = br.type === 'steel' ? '#78909c' : br.type === 'tough' ? br.color + 'cc' : br.color;
-        ctx.fillRect(br.x, br.y, br.w, br.h);
-        ctx.fillStyle = 'rgba(255,255,255,0.15)';
-        ctx.fillRect(br.x, br.y, br.w, br.h / 2);
-        if (br.type === 'tough' && br.hp > 1) {
-            ctx.fillStyle = '#fff'; ctx.font = '10px Arial'; ctx.textAlign = 'center';
-            ctx.fillText(br.hp, br.x + br.w / 2, br.y + br.h / 2 + 3);
-        }
-        if (br.type === 'bomb') {
-            ctx.fillStyle = '#fff'; ctx.font = '11px Arial'; ctx.textAlign = 'center';
-            ctx.fillText('💥', br.x + br.w / 2, br.y + br.h / 2 + 4);
-        }
-        if (br.type === 'power') {
-            ctx.fillStyle = '#fff'; ctx.font = '11px Arial'; ctx.textAlign = 'center';
-            ctx.fillText('🎁', br.x + br.w / 2, br.y + br.h / 2 + 4);
-        }
+        const x = br.x, y = br.y, w = br.w, h = br.h;
+
         if (br.type === 'steel') {
+            // 钢铁砖：金属质感+铆钉+磨砂
+            const g = ctx.createLinearGradient(x, y, x, y + h);
+            g.addColorStop(0, '#90a4ae');
+            g.addColorStop(0.4, '#78909c');
+            g.addColorStop(1, '#546e7a');
+            ctx.fillStyle = g;
+            ctx.fillRect(x, y, w, h);
+            // 金属高光
+            ctx.fillStyle = 'rgba(255,255,255,0.2)';
+            ctx.fillRect(x + 2, y + 1, w - 4, h * 0.35);
+            // 铆钉
+            ctx.fillStyle = '#455a64';
+            const rx = [x + 5, x + w - 5], ry = [y + 4, y + h - 4];
+            for (const px of rx) for (const py of ry) {
+                ctx.beginPath(); ctx.arc(px, py, 2, 0, Math.PI * 2); ctx.fill();
+            }
+            // 边框
             ctx.strokeStyle = '#90a4ae'; ctx.lineWidth = 1;
-            ctx.strokeRect(br.x + 2, br.y + 2, br.w - 4, br.h - 4);
+            ctx.strokeRect(x + 1, y + 1, w - 2, h - 2);
+        } else if (br.type === 'tough') {
+            // 加固砖：多层+裂纹+数字
+            const g = ctx.createLinearGradient(x, y, x, y + h);
+            g.addColorStop(0, br.color);
+            g.addColorStop(1, br.color + '88');
+            ctx.fillStyle = g;
+            ctx.fillRect(x, y, w, h);
+            // 内层
+            ctx.fillStyle = 'rgba(0,0,0,0.2)';
+            ctx.fillRect(x + 3, y + 3, w - 6, h - 6);
+            // 高光
+            ctx.fillStyle = 'rgba(255,255,255,0.25)';
+            ctx.fillRect(x + 2, y + 1, w - 4, h * 0.3);
+            // 裂纹
+            if (br.hp === 1) {
+                ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(x + w * 0.3, y); ctx.lineTo(x + w * 0.5, y + h * 0.5); ctx.lineTo(x + w * 0.7, y + h);
+                ctx.stroke();
+            }
+            // 数字
+            ctx.fillStyle = '#fff'; ctx.font = 'bold 10px Arial'; ctx.textAlign = 'center';
+            ctx.fillText(br.hp, x + w / 2, y + h / 2 + 4);
+        } else if (br.type === 'bomb') {
+            // 炸弹砖：暗红底+爆炸图标+脉冲
+            const g = ctx.createLinearGradient(x, y, x, y + h);
+            g.addColorStop(0, '#d32f2f');
+            g.addColorStop(1, '#b71c1c');
+            ctx.fillStyle = g;
+            ctx.fillRect(x, y, w, h);
+            ctx.fillStyle = 'rgba(255,255,255,0.15)';
+            ctx.fillRect(x + 2, y + 1, w - 4, h * 0.3);
+            // 爆炸图标
+            ctx.fillStyle = '#ff8a65';
+            ctx.font = '14px Arial'; ctx.textAlign = 'center';
+            ctx.fillText('💥', x + w / 2, y + h / 2 + 5);
+        } else if (br.type === 'power') {
+            // 道具砖：闪烁+礼物图标
+            const pulse = 0.7 + Math.sin(Date.now() * 0.005) * 0.3;
+            const g = ctx.createLinearGradient(x, y, x, y + h);
+            g.addColorStop(0, '#7b1fa2');
+            g.addColorStop(1, '#4a148c');
+            ctx.fillStyle = g;
+            ctx.globalAlpha = pulse;
+            ctx.fillRect(x, y, w, h);
+            ctx.globalAlpha = 1;
+            ctx.fillStyle = 'rgba(255,255,255,0.2)';
+            ctx.fillRect(x + 2, y + 1, w - 4, h * 0.3);
+            // 礼物图标
+            ctx.fillStyle = '#ce93d8';
+            ctx.font = '14px Arial'; ctx.textAlign = 'center';
+            ctx.fillText('🎁', x + w / 2, y + h / 2 + 5);
+        } else {
+            // 普通砖：渐变+圆角+高光+底部阴影
+            const g = ctx.createLinearGradient(x, y, x, y + h);
+            g.addColorStop(0, br.color);
+            g.addColorStop(0.6, br.color + 'dd');
+            g.addColorStop(1, br.color + '99');
+            ctx.fillStyle = g;
+            // 圆角矩形
+            const r = 3;
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+            ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+            ctx.lineTo(x + r, y + h); ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+            ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y);
+            ctx.closePath(); ctx.fill();
+            // 高光
+            ctx.fillStyle = 'rgba(255,255,255,0.3)';
+            ctx.fillRect(x + 3, y + 1, w - 6, h * 0.35);
+            // 底部阴影
+            ctx.fillStyle = 'rgba(0,0,0,0.15)';
+            ctx.fillRect(x + 2, y + h * 0.7, w - 4, h * 0.25);
         }
     });
 }

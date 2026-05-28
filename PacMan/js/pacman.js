@@ -1,13 +1,14 @@
 import { CELL } from './config.js';
 
 export function createPacman() {
-    return { x: 9, y: 15, dir: { x: 0, y: 0 }, nextDir: { x: 0, y: 0 }, mouth: 0, mouthDir: 1 };
+    return { x: 9, y: 15, dir: { x: 0, y: 0 }, nextDir: { x: 0, y: 0 }, mouth: 0, mouthDir: 1, moveTimer: 0 };
 }
 
 export function resetPacman(pacman) {
     pacman.x = 9; pacman.y = 15;
     pacman.dir = { x: 0, y: 0 };
     pacman.nextDir = { x: 0, y: 0 };
+    pacman.moveTimer = 0;
 }
 
 export function drawPacman(ctx, pacman) {

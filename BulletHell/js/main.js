@@ -187,12 +187,13 @@ function gameLoop() {
     for (let i = enemies.length - 1; i >= 0; i--) {
         if (!enemies[i].update()) enemies.splice(i, 1);
     }
-    pBullets = pBullets.filter(b => b.update());
-    eBullets = eBullets.filter(b => b.update(player));
-    expOrbs = expOrbs.filter(o => o.update());
-    powerups = powerups.filter(p => p.update());
-    particles = particles.filter(p => p.update());
-    dmgNums = dmgNums.filter(n => n.update());
+    // 使用splice原地移除，保持deps引用同步（filter会创建新数组导致引用断裂）
+    for (let i = pBullets.length - 1; i >= 0; i--) { if (!pBullets[i].update()) pBullets.splice(i, 1); }
+    for (let i = eBullets.length - 1; i >= 0; i--) { if (!eBullets[i].update(player)) eBullets.splice(i, 1); }
+    for (let i = expOrbs.length - 1; i >= 0; i--) { if (!expOrbs[i].update()) expOrbs.splice(i, 1); }
+    for (let i = powerups.length - 1; i >= 0; i--) { if (!powerups[i].update()) powerups.splice(i, 1); }
+    for (let i = particles.length - 1; i >= 0; i--) { if (!particles[i].update()) particles.splice(i, 1); }
+    for (let i = dmgNums.length - 1; i >= 0; i--) { if (!dmgNums[i].update()) dmgNums.splice(i, 1); }
 
     // ---- 渲染（带屏幕震动）----
     ctx.save();

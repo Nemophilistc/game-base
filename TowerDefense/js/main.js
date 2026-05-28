@@ -2,10 +2,10 @@
 
 import {
   CANVAS_WIDTH, CANVAS_HEIGHT,
-  TOWER_TYPES
+  TOWER_TYPES, MAPS
 } from './config.js';
 import { initAudio, playBuild, playUpgrade, playSell, playWaveStart, playVictory, playDefeat, playEnemyDeath } from './sound.js';
-import { initMap, drawMap, canBuild, placeTower, removeTower } from './map.js';
+import { initMap, drawMap, canBuild, placeTower, removeTower, selectMap } from './map.js';
 import { Tower } from './tower.js';
 import { Projectile } from './projectile.js';
 import { WaveManager } from './wave.js';
@@ -65,7 +65,8 @@ function init() {
   canvas.height = CANVAS_HEIGHT + 100; // 额外100px给面板
   ctx = canvas.getContext('2d');
 
-  initMap();
+  // 使用默认地图初始化
+  initMap(MAPS[0].path);
   initUI(canvas);
   waveManager = new WaveManager();
 
@@ -77,16 +78,27 @@ function init() {
     onTowerSelect: handleTowerSelect,
     onTowerPlace: handleTowerPlace,
     onTowerUpgrade: handleTowerUpgrade,
-    onTowerSell: handleTowerSell
+    onTowerSell: handleTowerSell,
+    onMapSelect: handleMapSelect
   });
 
   requestAnimationFrame(gameLoop);
 }
 
 // ---- 回调处理 ----
+function handleMapSelect(index) {
+  selectMap(index);
+  // 重新初始化地图
+  initMap(MAPS[index].path);
+}
+
 function startGame() {
   initAudio();
+  // 使用选中的地图重新初始化
+  const mapIndex = uiState.selectedMapIndex || 0;
+  initMap(MAPS[mapIndex].path);
   gameStarted = true;
+  waveManager = new WaveManager();
   waveManager.startNextWave();
   uiState.waveNumber = 1;
   playWaveStart();

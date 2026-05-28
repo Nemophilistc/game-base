@@ -180,14 +180,21 @@ function draw() {
 
     // 玩家子弹
     bullets.forEach(b => {
-        ctx.fillStyle = items.triple > 0 ? '#ff0' : '#00ff96';
+        const color = items.triple > 0 ? '#ff0' : '#00ff96';
+        ctx.fillStyle = color;
         ctx.fillRect(b.x - 2, b.y - 8, 4, 12);
+        // 子弹发光
+        ctx.fillStyle = color + '40';
+        ctx.beginPath(); ctx.arc(b.x, b.y - 2, 6, 0, Math.PI * 2); ctx.fill();
     });
 
     // 敌人子弹
-    ctx.fillStyle = '#ff4444';
     enemyBullets.forEach(b => {
+        ctx.fillStyle = '#ff4444';
         ctx.fillRect(b.x - 2, b.y, 4, 10);
+        // 子弹发光
+        ctx.fillStyle = 'rgba(255,68,68,0.3)';
+        ctx.beginPath(); ctx.arc(b.x, b.y + 5, 5, 0, Math.PI * 2); ctx.fill();
     });
 
     // 道具

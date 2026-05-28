@@ -26,8 +26,11 @@ function startGame() {
     updateHUD(state);
 }
 
-// 暴露给 HTML onclick
+// 暴露给 HTML onclick + 绑定事件（双重保险）
 window.startGame = startGame;
+document.getElementById('startOverlay').querySelector('.menu-btn').addEventListener('click', startGame);
+document.getElementById('gameOverOverlay').querySelector('.menu-btn').addEventListener('click', startGame);
+document.querySelector('.restart-btn').addEventListener('click', startGame);
 
 // ========== 游戏结束 ==========
 

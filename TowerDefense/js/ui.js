@@ -2,7 +2,8 @@
 
 import {
   CANVAS_WIDTH, CANVAS_HEIGHT, CELL_SIZE,
-  TOWER_TYPES, GAME_SPEEDS, INITIAL_GOLD, INITIAL_LIVES
+  TOWER_TYPES, GAME_SPEEDS, INITIAL_GOLD, INITIAL_LIVES,
+  GRID_COLS, GRID_ROWS, MAPS
 } from './config.js';
 
 // ---- UI状态 ----
@@ -23,7 +24,8 @@ export const uiState = {
   totalWaves: 30,
   enemyCount: 0,
   killCount: 0,
-  towerCount: 0
+  towerCount: 0,
+  selectedMapIndex: 0        // 选中的地图
 };
 
 // ---- 事件回调 ----
@@ -35,6 +37,7 @@ let onStartGame = null;
 let onPauseToggle = null;
 let onSpeedChange = null;
 let onSkipWait = null;
+let onMapSelect = null;
 
 export function setCallbacks(cbs) {
   onTowerSelect = cbs.onTowerSelect;
@@ -45,6 +48,7 @@ export function setCallbacks(cbs) {
   onPauseToggle = cbs.onPauseToggle;
   onSpeedChange = cbs.onSpeedChange;
   onSkipWait = cbs.onSkipWait;
+  onMapSelect = cbs.onMapSelect;
 }
 
 // ---- 塔选择面板 ----
@@ -320,27 +324,63 @@ function drawStartMenu(ctx) {
 
   // 标题
   ctx.fillStyle = '#f1c40f';
-  ctx.font = 'bold 48px Arial';
-  ctx.fillText('塔防大战', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 100);
+  ctx.font = 'bold 42px Arial';
+  ctx.fillText('塔防大战', CANVAS_WIDTH / 2, 50);
 
   ctx.fillStyle = '#bdc3c7';
-  ctx.font = '16px Arial';
-  ctx.fillText('30波敌人入侵，建造防御塔保卫家园！', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 50);
+  ctx.font = '14px Arial';
+  ctx.fillText('30波敌人入侵，建造防御塔保卫家园！', CANVAS_WIDTH / 2, 80);
+
+  // 地图选择
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 16px Arial';
+  ctx.fillText('选择地图', CANVAS_WIDTH / 2, 115);
+
+  uiState._mapBtnRects = [];
+  const mapBtnW = 160;
+  const mapBtnH = 70;
+  const mapStartX = CANVAS_WIDTH / 2 - (MAPS.length * (mapBtnW + 12) - 12) / 2;
+  const mapY = 135;
+
+  MAPS.forEach((m, i) => {
+    const mx = mapStartX + i * (mapBtnW + 12);
+    const isSelected = uiState.selectedMapIndex === i;
+
+    ctx.fillStyle = isSelected ? 'rgba(52,152,219,0.5)' : 'rgba(40,40,50,0.8)';
+    ctx.beginPath();
+    ctx.roundRect(mx, mapY, mapBtnW, mapBtnH, 8);
+    ctx.fill();
+    ctx.strokeStyle = isSelected ? '#3498db' : '#555';
+    ctx.lineWidth = isSelected ? 2 : 1;
+    ctx.strokeRect(mx, mapY, mapBtnW, mapBtnH);
+
+    ctx.fillStyle = '#fff';
+    ctx.font = '20px Arial';
+    ctx.fillText(m.icon, mx + mapBtnW / 2, mapY + 22);
+    ctx.font = 'bold 13px Arial';
+    ctx.fillStyle = isSelected ? '#5dade2' : '#ddd';
+    ctx.fillText(m.name, mx + mapBtnW / 2, mapY + 42);
+    ctx.font = '10px Arial';
+    ctx.fillStyle = '#999';
+    ctx.fillText(m.desc, mx + mapBtnW / 2, mapY + 58);
+
+    uiState._mapBtnRects.push({ x: mx, y: mapY, w: mapBtnW, h: mapBtnH, index: i });
+  });
 
   // 塔介绍
-  ctx.font = '14px Arial';
+  ctx.font = '13px Arial';
   const types = Object.values(TOWER_TYPES);
-  const startY = CANVAS_HEIGHT / 2 - 10;
+  const startY = 225;
   types.forEach((t, i) => {
     ctx.fillStyle = '#ddd';
-    ctx.fillText(`${t.icon} ${t.name} - ${t.description}`, CANVAS_WIDTH / 2, startY + i * 22);
+    ctx.fillText(`${t.icon} ${t.name} - ${t.description}`, CANVAS_WIDTH / 2, startY + i * 20);
   });
 
   // 开始按钮
   const btnW = 200;
   const btnH = 50;
   const btnX = CANVAS_WIDTH / 2 - btnW / 2;
-  const btnY = CANVAS_HEIGHT / 2 + 90;
+  const btnY = CANVAS_HEIGHT / 2 + 120;
 
   ctx.fillStyle = '#2ecc71';
   ctx.beginPath();
@@ -449,6 +489,16 @@ export function initUI(canvas) {
 function handleClick(mx, my) {
   // 开始菜单
   if (uiState.showStartMenu) {
+    // 地图选择
+    if (uiState._mapBtnRects) {
+      for (const r of uiState._mapBtnRects) {
+        if (hitTest(mx, my, r)) {
+          uiState.selectedMapIndex = r.index;
+          onMapSelect?.(r.index);
+          return;
+        }
+      }
+    }
     if (uiState._startBtnRect && hitTest(mx, my, uiState._startBtnRect)) {
       uiState.showStartMenu = false;
       uiState.isRunning = true;
@@ -521,7 +571,7 @@ function handleClick(mx, my) {
     const col = Math.floor(mx / CELL_SIZE);
     const row = Math.floor(my / CELL_SIZE);
 
-    if (col >= 0 && col < 15 && row >= 0 && row < 10) {
+    if (col >= 0 && col < GRID_COLS && row >= 0 && row < GRID_ROWS) {
       if (uiState.selectedTowerType) {
         // 建造塔
         onTowerPlace?.(col, row);

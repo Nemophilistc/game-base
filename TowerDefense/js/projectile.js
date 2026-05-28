@@ -1,6 +1,6 @@
 // ==================== 投射物系统 ====================
 
-import { CELL_SIZE } from './config.js';
+import { CELL_SIZE, CANVAS_WIDTH, CANVAS_HEIGHT } from './config.js';
 import { playExplosion, playEnemyDeath } from './sound.js';
 
 export class Projectile {
@@ -66,7 +66,7 @@ export class Projectile {
     }
 
     // 超出屏幕
-    if (this.x < -50 || this.x > 1000 || this.y < -50 || this.y > 700) {
+    if (this.x < -50 || this.x > CANVAS_WIDTH + 50 || this.y < -50 || this.y > CANVAS_HEIGHT + 100) {
       this.alive = false;
     }
   }

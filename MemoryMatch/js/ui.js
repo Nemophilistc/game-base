@@ -3,7 +3,7 @@
 export function renderBoard(cardsArr, flippedArr, matchedArr, cols, onCardClick) {
     const board = document.getElementById('board');
     board.innerHTML = '';
-    board.style.gridTemplateColumns = `repeat(${cols},70px)`;
+    board.style.gridTemplateColumns = `repeat(${cols},90px)`;
     for (let i = 0; i < cardsArr.length; i++) {
         const card = document.createElement('div');
         card.className = 'card';

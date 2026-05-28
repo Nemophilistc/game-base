@@ -244,46 +244,204 @@ export class Enemy {
 
     _body(ctx) {
         const s = this.size;
+        const t = this.angle;
         switch (this.type) {
-            case 'small':
+            case 'small': {
+                // 小型战斗机：三角机身+机翼+引擎火焰
+                ctx.fillStyle = this.hitFlash > 0 ? '#fff' : this.color;
+                // 机身
                 ctx.beginPath(); ctx.moveTo(this.x, this.y + s);
-                ctx.lineTo(this.x - s, this.y - s * 0.5);
-                ctx.lineTo(this.x + s, this.y - s * 0.5);
-                ctx.closePath(); ctx.fill(); break;
-            case 'medium':
-                ctx.beginPath(); ctx.moveTo(this.x, this.y + s);
-                ctx.lineTo(this.x - s * 0.8, this.y);
-                ctx.lineTo(this.x - s * 0.3, this.y - s * 0.8);
-                ctx.lineTo(this.x + s * 0.3, this.y - s * 0.8);
-                ctx.lineTo(this.x + s * 0.8, this.y);
-                ctx.closePath(); ctx.fill(); break;
-            case 'large':
-                ctx.beginPath(); ctx.moveTo(this.x, this.y + s * 0.8);
-                ctx.lineTo(this.x - s, this.y + s * 0.3);
-                ctx.lineTo(this.x - s * 0.8, this.y - s * 0.5);
-                ctx.lineTo(this.x - s * 0.3, this.y - s);
-                ctx.lineTo(this.x + s * 0.3, this.y - s);
-                ctx.lineTo(this.x + s * 0.8, this.y - s * 0.5);
-                ctx.lineTo(this.x + s, this.y + s * 0.3);
-                ctx.closePath(); ctx.fill(); break;
-            case 'tracker':
+                ctx.lineTo(this.x - s * 0.3, this.y - s * 0.2);
+                ctx.lineTo(this.x + s * 0.3, this.y - s * 0.2);
+                ctx.closePath(); ctx.fill();
+                // 左翼
+                ctx.beginPath(); ctx.moveTo(this.x - s * 0.2, this.y);
+                ctx.lineTo(this.x - s, this.y + s * 0.4);
+                ctx.lineTo(this.x - s * 0.4, this.y + s * 0.2);
+                ctx.closePath(); ctx.fill();
+                // 右翼
+                ctx.beginPath(); ctx.moveTo(this.x + s * 0.2, this.y);
+                ctx.lineTo(this.x + s, this.y + s * 0.4);
+                ctx.lineTo(this.x + s * 0.4, this.y + s * 0.2);
+                ctx.closePath(); ctx.fill();
+                // 驾驶舱
+                ctx.fillStyle = '#4dd0e1';
+                ctx.beginPath(); ctx.arc(this.x, this.y - s * 0.1, s * 0.2, 0, Math.PI * 2); ctx.fill();
+                // 引擎火焰
+                ctx.fillStyle = '#ff6b35';
+                ctx.beginPath(); ctx.moveTo(this.x - s * 0.15, this.y + s * 0.2);
+                ctx.lineTo(this.x, this.y + s * 0.8 + Math.random() * s * 0.3);
+                ctx.lineTo(this.x + s * 0.15, this.y + s * 0.2);
+                ctx.closePath(); ctx.fill();
+                break;
+            }
+            case 'medium': {
+                // 中型战舰：宽翼+双引擎+铆钉
+                ctx.fillStyle = this.hitFlash > 0 ? '#fff' : this.color;
+                // 主体
+                ctx.beginPath();
+                ctx.moveTo(this.x, this.y + s * 0.8);
+                ctx.lineTo(this.x - s * 0.6, this.y + s * 0.2);
+                ctx.lineTo(this.x - s * 0.4, this.y - s * 0.6);
+                ctx.lineTo(this.x + s * 0.4, this.y - s * 0.6);
+                ctx.lineTo(this.x + s * 0.6, this.y + s * 0.2);
+                ctx.closePath(); ctx.fill();
+                // 左翼
+                ctx.beginPath(); ctx.moveTo(this.x - s * 0.4, this.y);
+                ctx.lineTo(this.x - s * 1.1, this.y + s * 0.3);
+                ctx.lineTo(this.x - s * 0.5, this.y + s * 0.4);
+                ctx.closePath(); ctx.fill();
+                // 右翼
+                ctx.beginPath(); ctx.moveTo(this.x + s * 0.4, this.y);
+                ctx.lineTo(this.x + s * 1.1, this.y + s * 0.3);
+                ctx.lineTo(this.x + s * 0.5, this.y + s * 0.4);
+                ctx.closePath(); ctx.fill();
+                // 铆钉
+                ctx.fillStyle = '#555';
+                for (let i = -1; i <= 1; i++) {
+                    ctx.beginPath(); ctx.arc(this.x + i * s * 0.25, this.y - s * 0.2, 1.5, 0, Math.PI * 2); ctx.fill();
+                }
+                // 双引擎
+                ctx.fillStyle = '#ff4444';
+                ctx.beginPath(); ctx.moveTo(this.x - s * 0.3, this.y + s * 0.5);
+                ctx.lineTo(this.x - s * 0.2, this.y + s + Math.random() * s * 0.3);
+                ctx.lineTo(this.x - s * 0.1, this.y + s * 0.5);
+                ctx.closePath(); ctx.fill();
+                ctx.beginPath(); ctx.moveTo(this.x + s * 0.1, this.y + s * 0.5);
+                ctx.lineTo(this.x + s * 0.2, this.y + s + Math.random() * s * 0.3);
+                ctx.lineTo(this.x + s * 0.3, this.y + s * 0.5);
+                ctx.closePath(); ctx.fill();
+                break;
+            }
+            case 'large': {
+                // 大型战列舰：多层装甲+炮塔+护盾
+                ctx.fillStyle = this.hitFlash > 0 ? '#fff' : this.color;
+                // 主装甲
+                ctx.beginPath();
+                ctx.moveTo(this.x, this.y + s * 0.9);
+                ctx.lineTo(this.x - s * 0.8, this.y + s * 0.4);
+                ctx.lineTo(this.x - s, this.y - s * 0.2);
+                ctx.lineTo(this.x - s * 0.6, this.y - s * 0.8);
+                ctx.lineTo(this.x + s * 0.6, this.y - s * 0.8);
+                ctx.lineTo(this.x + s, this.y - s * 0.2);
+                ctx.lineTo(this.x + s * 0.8, this.y + s * 0.4);
+                ctx.closePath(); ctx.fill();
+                // 内层装甲
+                ctx.fillStyle = '#7e57c2';
+                ctx.beginPath();
+                ctx.moveTo(this.x, this.y + s * 0.5);
+                ctx.lineTo(this.x - s * 0.5, this.y);
+                ctx.lineTo(this.x - s * 0.4, this.y - s * 0.5);
+                ctx.lineTo(this.x + s * 0.4, this.y - s * 0.5);
+                ctx.lineTo(this.x + s * 0.5, this.y);
+                ctx.closePath(); ctx.fill();
+                // 左炮塔
+                ctx.fillStyle = '#9575cd';
+                ctx.beginPath(); ctx.arc(this.x - s * 0.6, this.y - s * 0.1, s * 0.15, 0, Math.PI * 2); ctx.fill();
+                // 右炮塔
+                ctx.beginPath(); ctx.arc(this.x + s * 0.6, this.y - s * 0.1, s * 0.15, 0, Math.PI * 2); ctx.fill();
+                // 中央核心
+                ctx.fillStyle = '#e040fb';
+                ctx.beginPath(); ctx.arc(this.x, this.y - s * 0.2, s * 0.2, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = '#fff';
+                ctx.beginPath(); ctx.arc(this.x, this.y - s * 0.2, s * 0.08, 0, Math.PI * 2); ctx.fill();
+                // 护盾光环
+                ctx.strokeStyle = 'rgba(149,117,205,0.3)';
+                ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.arc(this.x, this.y, s * 1.2, 0, Math.PI * 2); ctx.stroke();
+                break;
+            }
+            case 'tracker': {
+                // 追踪者：球形+机械眼+旋转环
+                ctx.fillStyle = this.hitFlash > 0 ? '#fff' : this.color;
+                // 外壳
                 ctx.beginPath(); ctx.arc(this.x, this.y, s, 0, Math.PI * 2); ctx.fill();
-                ctx.fillStyle = '#fff'; ctx.beginPath();
-                ctx.arc(this.x, this.y, s * 0.4, 0, Math.PI * 2); ctx.fill(); break;
-            case 'splitter':
+                // 装甲带
+                ctx.strokeStyle = '#00acc1';
+                ctx.lineWidth = 3;
+                ctx.beginPath(); ctx.arc(this.x, this.y, s * 0.75, 0, Math.PI * 2); ctx.stroke();
+                // 机械眼
+                ctx.fillStyle = '#fff';
+                ctx.beginPath(); ctx.arc(this.x, this.y, s * 0.45, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = '#d32f2f';
+                ctx.beginPath(); ctx.arc(this.x, this.y, s * 0.25, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = '#000';
+                ctx.beginPath(); ctx.arc(this.x + Math.cos(t * 2) * s * 0.1, this.y + Math.sin(t * 2) * s * 0.1, s * 0.1, 0, Math.PI * 2); ctx.fill();
+                // 旋转装饰环
+                ctx.strokeStyle = 'rgba(0,229,255,0.4)';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.ellipse(this.x, this.y, s * 1.3, s * 0.5, t, 0, Math.PI * 2);
+                ctx.stroke();
+                break;
+            }
+            case 'splitter': {
+                // 分裂体：六角星+脉冲核心+分裂裂纹
+                ctx.fillStyle = this.hitFlash > 0 ? '#fff' : this.color;
+                // 外星
                 ctx.beginPath();
                 for (let i = 0; i < 6; i++) {
-                    const a = Math.PI / 3 * i + this.angle;
-                    const r = i % 2 === 0 ? s : s * 0.6;
+                    const a = Math.PI / 3 * i + t;
+                    const r = i % 2 === 0 ? s : s * 0.55;
                     ctx.lineTo(this.x + Math.cos(a) * r, this.y + Math.sin(a) * r);
                 }
-                ctx.closePath(); ctx.fill(); break;
-            case 'armored':
+                ctx.closePath(); ctx.fill();
+                // 内星
+                ctx.fillStyle = '#81c784';
+                ctx.beginPath();
+                for (let i = 0; i < 6; i++) {
+                    const a = Math.PI / 3 * i + t + Math.PI / 6;
+                    const r = i % 2 === 0 ? s * 0.5 : s * 0.3;
+                    ctx.lineTo(this.x + Math.cos(a) * r, this.y + Math.sin(a) * r);
+                }
+                ctx.closePath(); ctx.fill();
+                // 脉冲核心
+                const pulse = 0.8 + Math.sin(t * 3) * 0.2;
+                ctx.fillStyle = '#c8e6c9';
+                ctx.beginPath(); ctx.arc(this.x, this.y, s * 0.2 * pulse, 0, Math.PI * 2); ctx.fill();
+                // 裂纹
+                ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+                ctx.lineWidth = 1;
+                for (let i = 0; i < 3; i++) {
+                    const a = Math.PI * 2 / 3 * i + t * 0.5;
+                    ctx.beginPath();
+                    ctx.moveTo(this.x + Math.cos(a) * s * 0.2, this.y + Math.sin(a) * s * 0.2);
+                    ctx.lineTo(this.x + Math.cos(a) * s * 0.8, this.y + Math.sin(a) * s * 0.8);
+                    ctx.stroke();
+                }
+                break;
+            }
+            case 'armored': {
+                // 重装甲：多层方块+铆钉+前挡板
+                ctx.fillStyle = this.hitFlash > 0 ? '#fff' : this.color;
+                // 外装甲
                 ctx.fillRect(this.x - s, this.y - s, s * 2, s * 2);
+                // 内装甲
                 ctx.fillStyle = '#546e7a';
-                ctx.fillRect(this.x - s + 3, this.y - s + 3, s * 2 - 6, s * 2 - 6); break;
+                ctx.fillRect(this.x - s + 4, this.y - s + 4, s * 2 - 8, s * 2 - 8);
+                // 核心区域
+                ctx.fillStyle = '#37474f';
+                ctx.fillRect(this.x - s * 0.4, this.y - s * 0.4, s * 0.8, s * 0.8);
+                // 铆钉
+                ctx.fillStyle = '#90a4ae';
+                const corners = [[-1,-1],[1,-1],[-1,1],[1,1]];
+                for (const [cx, cy] of corners) {
+                    ctx.beginPath();
+                    ctx.arc(this.x + cx * (s - 6), this.y + cy * (s - 6), 3, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                // 中央铆钉
+                ctx.beginPath(); ctx.arc(this.x, this.y, 4, 0, Math.PI * 2); ctx.fill();
+                // 前挡板高光
+                ctx.fillStyle = 'rgba(200,200,200,0.15)';
+                ctx.fillRect(this.x - s, this.y - s, s * 2, s * 0.5);
+                break;
+            }
             default:
                 if (this.type.startsWith('boss_')) {
+                    // Boss：复杂多层+光环+装饰
+                    ctx.fillStyle = this.hitFlash > 0 ? '#fff' : this.color;
+                    // 主体
                     ctx.beginPath(); ctx.moveTo(this.x, this.y + s);
                     ctx.lineTo(this.x - s * 1.5, this.y + s * 0.3);
                     ctx.lineTo(this.x - s * 1.2, this.y - s * 0.5);
@@ -292,9 +450,37 @@ export class Enemy {
                     ctx.lineTo(this.x + s * 1.2, this.y - s * 0.5);
                     ctx.lineTo(this.x + s * 1.5, this.y + s * 0.3);
                     ctx.closePath(); ctx.fill();
+                    // 装甲层
+                    ctx.fillStyle = this.bossType === 'ghost' ? '#7b1fa2' : this.bossType === 'final' ? '#c62828' : '#e65100';
+                    ctx.beginPath(); ctx.moveTo(this.x, this.y + s * 0.6);
+                    ctx.lineTo(this.x - s, this.y + s * 0.1);
+                    ctx.lineTo(this.x - s * 0.8, this.y - s * 0.4);
+                    ctx.lineTo(this.x + s * 0.8, this.y - s * 0.4);
+                    ctx.lineTo(this.x + s, this.y + s * 0.1);
+                    ctx.closePath(); ctx.fill();
+                    // 核心
+                    ctx.fillStyle = '#fff';
+                    ctx.beginPath(); ctx.arc(this.x, this.y - s * 0.2, s * 0.25, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = this.bossType === 'ghost' ? '#ce93d8' : this.bossType === 'final' ? '#ff0' : '#ff6b35';
+                    ctx.beginPath(); ctx.arc(this.x, this.y - s * 0.2, s * 0.15, 0, Math.PI * 2); ctx.fill();
+                    // 翅膀装饰
+                    ctx.fillStyle = this.bossType === 'ghost' ? 'rgba(206,147,216,0.4)' : 'rgba(255,107,53,0.4)';
+                    ctx.beginPath(); ctx.moveTo(this.x - s * 1.5, this.y + s * 0.3);
+                    ctx.lineTo(this.x - s * 2, this.y - s * 0.2);
+                    ctx.lineTo(this.x - s * 1.2, this.y - s * 0.5);
+                    ctx.closePath(); ctx.fill();
+                    ctx.beginPath(); ctx.moveTo(this.x + s * 1.5, this.y + s * 0.3);
+                    ctx.lineTo(this.x + s * 2, this.y - s * 0.2);
+                    ctx.lineTo(this.x + s * 1.2, this.y - s * 0.5);
+                    ctx.closePath(); ctx.fill();
+                    // 光环
                     ctx.strokeStyle = this.bossType === 'ghost' ? '#ce93d8' : this.bossType === 'final' ? '#ff0' : '#ff6b35';
                     ctx.lineWidth = 2; ctx.beginPath();
                     ctx.arc(this.x, this.y, s * 1.5, 0, Math.PI * 2); ctx.stroke();
+                    // 内光环
+                    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+                    ctx.lineWidth = 1; ctx.beginPath();
+                    ctx.arc(this.x, this.y, s * 1.2 + Math.sin(t * 3) * 5, 0, Math.PI * 2); ctx.stroke();
                 }
                 break;
         }

@@ -45,15 +45,19 @@ window.startGame = startGame;
 function update() {
     if (!gameActive || paused) return;
 
-    // Pacman movement
-    const nx = pacman.x + pacman.nextDir.x, ny = pacman.y + pacman.nextDir.y;
-    if (canMove(nx, ny)) pacman.dir = pacman.nextDir;
+    // Pacman movement（每6帧移动一次，约10格/秒，经典吃豆人节奏）
+    pacman.moveTimer = (pacman.moveTimer || 0) + 1;
+    if (pacman.moveTimer >= 6) {
+        pacman.moveTimer = 0;
+        const nx = pacman.x + pacman.nextDir.x, ny = pacman.y + pacman.nextDir.y;
+        if (canMove(nx, ny)) pacman.dir = pacman.nextDir;
 
-    const mx = pacman.x + pacman.dir.x, my = pacman.y + pacman.dir.y;
-    if (canMove(mx, my)) {
-        pacman.x = mx; pacman.y = my;
-        if (pacman.x < 0) pacman.x = COLS - 1;
-        if (pacman.x >= COLS) pacman.x = 0;
+        const mx = pacman.x + pacman.dir.x, my = pacman.y + pacman.dir.y;
+        if (canMove(mx, my)) {
+            pacman.x = mx; pacman.y = my;
+            if (pacman.x < 0) pacman.x = COLS - 1;
+            if (pacman.x >= COLS) pacman.x = 0;
+        }
     }
 
     // Mouth animation
@@ -74,9 +78,9 @@ function update() {
     if (powerTimer > 0) powerTimer--;
     ghosts.forEach(g => { if (g.frightened > 0) g.frightened--; });
 
-    // Ghost movement (every 8 frames) -- Bug fix: replaced Date.now()%8<2 with frameCount
+    // Ghost movement (every 10 frames，比吃豆人略慢)
     frameCount++;
-    if (frameCount % 8 === 0) moveGhosts(ghosts, pacman, canMove);
+    if (frameCount % 10 === 0) moveGhosts(ghosts, pacman, canMove);
 
     // Collision with ghosts
     for (const g of ghosts) {

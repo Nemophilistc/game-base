@@ -324,12 +324,49 @@
         <!-- 画布 -->
         <div class="canvas-wrap">
             <canvas id="game-canvas"></canvas>
+            <!-- 帮助覆盖层 -->
+            <div id="helpOverlay" style="position:absolute;inset:0;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:100;backdrop-filter:blur(8px)">
+                <div style="max-width:520px;padding:30px;background:rgba(30,30,60,0.95);border:1px solid rgba(78,205,196,0.3);border-radius:16px;color:#e0e0e0;font-size:14px;line-height:1.8">
+                    <h2 style="text-align:center;color:#4ECDC4;margin-bottom:16px;font-size:22px">🧪 物理沙盒</h2>
+                    <p style="color:#aaa;text-align:center;margin-bottom:16px">自由创造物体，观察真实物理效果！</p>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+                        <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:10px">
+                            <div style="color:#4ECDC4;font-weight:bold;margin-bottom:4px">🔧 工具栏（左侧）</div>
+                            <div><kbd style="background:rgba(255,255,255,0.1);padding:1px 5px;border-radius:3px;font-size:11px">1</kbd> 放置 — 点击画布创建物体</div>
+                            <div><kbd style="background:rgba(255,255,255,0.1);padding:1px 5px;border-radius:3px;font-size:11px">2</kbd> 拖拽 — 拖动已有物体</div>
+                            <div><kbd style="background:rgba(255,255,255,0.1);padding:1px 5px;border-radius:3px;font-size:11px">3</kbd> 删除 — 点击移除物体</div>
+                            <div><kbd style="background:rgba(255,255,255,0.1);padding:1px 5px;border-radius:3px;font-size:11px">4</kbd> 连接 — 拖拽创建弹簧</div>
+                            <div><kbd style="background:rgba(255,255,255,0.1);padding:1px 5px;border-radius:3px;font-size:11px">5</kbd> 发射 — 拖拽弹射物体</div>
+                        </div>
+                        <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:10px">
+                            <div style="color:#4ECDC4;font-weight:bold;margin-bottom:4px">🔶 形状选择</div>
+                            <div><kbd style="background:rgba(255,255,255,0.1);padding:1px 5px;border-radius:3px;font-size:11px">Q</kbd> 圆形</div>
+                            <div><kbd style="background:rgba(255,255,255,0.1);padding:1px 5px;border-radius:3px;font-size:11px">W</kbd> 矩形</div>
+                            <div><kbd style="background:rgba(255,255,255,0.1);padding:1px 5px;border-radius:3px;font-size:11px">E</kbd> 三角形</div>
+                            <div><kbd style="background:rgba(255,255,255,0.1);padding:1px 5px;border-radius:3px;font-size:11px">R</kbd> 多边形</div>
+                        </div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:10px;margin-bottom:16px">
+                        <div style="color:#4ECDC4;font-weight:bold;margin-bottom:4px">🎮 其他操作</div>
+                        <div>🖱️ <b>滚轮</b> 缩放画布 · <b>中键拖拽</b> 平移视角</div>
+                        <div>🖱️ <b>右键点击</b> 查看物体属性（质量/速度/摩擦力）</div>
+                        <div>⏸️ <b>空格</b> 暂停/继续 · <b>Z</b> 撤销 · <b>Esc</b> 取消</div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:10px;margin-bottom:16px">
+                        <div style="color:#4ECDC4;font-weight:bold;margin-bottom:4px">📐 物理参数（左侧面板调节）</div>
+                        <div>🌍 <b>重力</b> — 控制物体下落加速度</div>
+                        <div>🔄 <b>弹性</b> — 碰撞后反弹力度（0=不弹，1=完美弹跳）</div>
+                        <div>🧈 <b>摩擦力</b> — 物体表面粗糙度</div>
+                    </div>
+                    <div style="text-align:center">
+                        <button onclick="document.getElementById('helpOverlay').style.display='none'" style="background:linear-gradient(135deg,#4ECDC4,#26a69a);border:none;padding:10px 36px;font-size:15px;color:#fff;border-radius:8px;cursor:pointer;font-weight:bold">开始创造 →</button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
     <script type="module" src="js/main.js"></script>
-<script>
-if(location.protocol==="file:"){document.body.innerHTML='<div style="position:fixed;inset:0;background:#0a0a0a;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px;font-family:sans-serif;color:#fff;z-index:9999"><div style="font-size:48px;margin-bottom:20px">⚠️</div><h2 style="color:#ff6b4a;font-size:20px;margin-bottom:12px">需要启动HTTP服务器</h2><p style="color:#888;font-size:13px;line-height:1.8;max-width:400px">此游戏使用ES Modules，无法通过file://打开。<br>请在游戏目录运行:</p><div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:12px 20px;margin:16px;font-family:monospace;color:#4aeaff;font-size:13px">python -m http.server 8000</div><p style="color:#666;font-size:12px">然后访问 http://localhost:8000</p><a href="../index.html" style="margin-top:16px;color:#ff6b4a;font-size:13px;text-decoration:none">← 返回游戏合集</a></div>'}
-</script>
+
 </body>
 </html>
