@@ -1,0 +1,3016 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>生存岛屿 - Survival Island</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #0a140a;
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+        }
+
+        #gameContainer {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(ellipse at center, #1a2e1a 0%, #0a140a 100%);
+        }
+
+        #gameCanvas {
+            border: 2px solid rgba(100, 160, 80, 0.3);
+            border-radius: 8px;
+            box-shadow:
+                0 0 30px rgba(0, 0, 0, 0.5),
+                0 0 60px rgba(46, 125, 50, 0.1);
+            image-rendering: pixelated;
+            cursor: default;
+            max-width: 100vw;
+            max-height: 100vh;
+        }
+
+        /* Loading state */
+        #loading {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: #0a140a;
+            z-index: 100;
+            transition: opacity 0.5s;
+        }
+
+        #loading.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        #loading h1 {
+            color: #4caf50;
+            font-size: 36px;
+            margin-bottom: 20px;
+            text-shadow: 0 0 20px rgba(76, 175, 80, 0.3);
+        }
+
+        .loading-bar {
+            width: 200px;
+            height: 4px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .loading-bar::after {
+            content: '';
+            display: block;
+            width: 60%;
+            height: 100%;
+            background: #4caf50;
+            border-radius: 2px;
+            animation: loading 1s ease-in-out infinite;
+        }
+
+        @keyframes loading {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(200%); }
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="960" height="640"></canvas>
+    </div>
+
+    <div id="loading">
+        <h1>生存岛屿</h1>
+        <div class="loading-bar"></div>
+    </div>
+
+    <script>
+// === ./config.js ===
+// ============================================================
+// config.js - Game constants and configuration
+// ============================================================
+
+const TILE_SIZE = 32;
+const WORLD_COLS = 40;
+const WORLD_ROWS = 40;
+const CANVAS_W = 960;
+const CANVAS_H = 640;
+
+// Tile types
+const TILE = {
+    WATER: 0,
+    SAND: 1,
+    GRASS: 2,
+    FOREST: 3,
+    MOUNTAIN: 4,
+    DEEP_WATER: 5,
+};
+
+const TILE_COLORS = {
+    [TILE.DEEP_WATER]: '#1a6b8a',
+    [TILE.WATER]: '#2e99c4',
+    [TILE.SAND]: '#d4b96a',
+    [TILE.GRASS]: '#5a9e4b',
+    [TILE.FOREST]: '#2d6b30',
+    [TILE.MOUNTAIN]: '#7a7a7a',
+};
+
+const TILE_WALKABLE = {
+    [TILE.DEEP_WATER]: false,
+    [TILE.WATER]: false,
+    [TILE.SAND]: true,
+    [TILE.GRASS]: true,
+    [TILE.FOREST]: true,
+    [TILE.MOUNTAIN]: false,
+};
+
+// Player
+const PLAYER_SPEED = 120; // pixels per second
+const PLAYER_SIZE = 24;
+const MAX_HEALTH = 100;
+const MAX_HUNGER = 100;
+const MAX_THIRST = 100;
+const HUNGER_RATE = 1.8; // per second
+const THIRST_RATE = 2.5; // per second
+const STARVING_DAMAGE = 5; // per second when hunger=0
+const DEHYDRATION_DAMAGE = 8; // per second when thirst=0
+const INVENTORY_SLOTS = 8;
+const GATHER_RANGE = 48;
+const GATHER_TIME = 0.8; // seconds base
+const STRUCTURE_RANGE = 64;
+
+// Resources
+const RESOURCE_TYPES = {
+    WOOD: 'wood',
+    STONE: 'stone',
+    FIBER: 'fiber',
+    BERRY: 'berry',
+    RAW_MEAT: 'rawMeat',
+    COOKED_MEAT: 'cookedMeat',
+    FISH: 'fish',
+    COOKED_FISH: 'cookedFish',
+};
+
+const RESOURCE_NAMES = {
+    wood: '木材',
+    stone: '石头',
+    fiber: '纤维',
+    berry: '浆果',
+    rawMeat: '生肉',
+    cookedMeat: '熟肉',
+    fish: '鱼',
+    cookedFish: '烤鱼',
+};
+
+const RESOURCE_COLORS = {
+    wood: '#8B5E3C',
+    stone: '#888',
+    fiber: '#b8a044',
+    berry: '#c44569',
+    rawMeat: '#d63031',
+    cookedMeat: '#e17055',
+    fish: '#74b9ff',
+    cookedFish: '#fdcb6e',
+};
+
+// Nutrition values
+const NUTRITION = {
+    berry: { hunger: 8, thirst: 3 },
+    rawMeat: { hunger: 20, thirst: 0, health: -5 },
+    cookedMeat: { hunger: 40, thirst: 0 },
+    fish: { hunger: 15, thirst: 0, health: -3 },
+    cookedFish: { hunger: 35, thirst: 0 },
+};
+
+// Structure types
+const STRUCTURE_TYPES = {
+    CAMPFIRE: 'campfire',
+    SHELTER: 'shelter',
+    FARM: 'farm',
+    STORAGE: 'storage',
+    BOAT: 'boat',
+};
+
+const STRUCTURE_NAMES = {
+    campfire: '篝火',
+    shelter: '庇护所',
+    farm: '农田',
+    storage: '储物箱',
+    boat: '木筏',
+};
+
+const STRUCTURE_COLORS = {
+    campfire: '#e67e22',
+    shelter: '#8d6e63',
+    farm: '#7cb342',
+    storage: '#a1887f',
+    boat: '#5d4037',
+};
+
+// Day/Night cycle
+const DAY_LENGTH = 120; // seconds per full day
+const DAWN_START = 0.2;  // 20% of day
+const DAY_START = 0.3;
+const DUSK_START = 0.7;
+const NIGHT_START = 0.8;
+
+// Weather
+const WEATHER_CHANGE_INTERVAL = 30; // seconds between weather checks
+const RAIN_THIRST_RESTORE = 3; // per second
+const STORM_SHELTER_DAMAGE = 10; // per second
+
+// Animal types
+const ANIMAL_TYPES = {
+    RABBIT: 'rabbit',
+    WOLF: 'wolf',
+};
+
+const ANIMAL_CONFIG = {
+    rabbit: {
+        name: '兔子',
+        speed: 60,
+        health: 15,
+        damage: 0,
+        size: 14,
+        color: '#c4a882',
+        drop: 'rawMeat',
+        dropCount: 1,
+        aggressive: false,
+        spawnWeight: 5,
+    },
+    wolf: {
+        name: '狼',
+        speed: 90,
+        health: 40,
+        damage: 15,
+        size: 18,
+        color: '#555',
+        drop: 'rawMeat',
+        dropCount: 2,
+        aggressive: true,
+        nightOnly: true,
+        spawnWeight: 2,
+    },
+};
+
+// Crafting recipes
+const RECIPES = [
+    {
+        id: 'axe',
+        name: '石斧',
+        ingredients: { wood: 2, stone: 2 },
+        result: 'axe',
+        type: 'tool',
+        description: '砍树速度x2',
+    },
+    {
+        id: 'pickaxe',
+        name: '石镐',
+        ingredients: { wood: 2, stone: 3 },
+        result: 'pickaxe',
+        type: 'tool',
+        description: '采石速度x2',
+    },
+    {
+        id: 'fishingRod',
+        name: '钓鱼竿',
+        ingredients: { wood: 2, fiber: 3 },
+        result: 'fishingRod',
+        type: 'tool',
+        description: '可以钓鱼',
+    },
+    {
+        id: 'campfire',
+        name: '篝火',
+        ingredients: { wood: 5, stone: 3 },
+        result: 'campfire',
+        type: 'structure',
+        description: '夜间照明，烹饪食物',
+    },
+    {
+        id: 'shelter',
+        name: '庇护所',
+        ingredients: { wood: 10, fiber: 5 },
+        result: 'shelter',
+        type: 'structure',
+        description: '安全休息，躲避风暴',
+    },
+    {
+        id: 'farm',
+        name: '农田',
+        ingredients: { wood: 4, fiber: 3 },
+        result: 'farm',
+        type: 'structure',
+        description: '种植食物',
+    },
+    {
+        id: 'storage',
+        name: '储物箱',
+        ingredients: { wood: 8, stone: 2 },
+        result: 'storage',
+        type: 'structure',
+        description: '额外存储空间',
+    },
+    {
+        id: 'boat',
+        name: '木筏',
+        ingredients: { wood: 20, fiber: 10, stone: 5 },
+        result: 'boat',
+        type: 'structure',
+        description: '建造木筏逃离岛屿！',
+    },
+];
+
+// Colors
+const UI_BG = 'rgba(20, 30, 20, 0.85)';
+const UI_BORDER = 'rgba(100, 160, 80, 0.4)';
+const UI_TEXT = '#d4e8c0';
+const UI_ACCENT = '#6abf4b';
+const UI_DANGER = '#e74c3c';
+const UI_WARNING = '#f39c12';
+
+// === ./sound.js ===
+// ============================================================
+// sound.js - Web Audio API sound effects
+// ============================================================
+
+let audioCtx = null;
+
+function getCtx() {
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    return audioCtx;
+}
+
+function playTone(freq, duration, type = 'sine', volume = 0.3, detune = 0) {
+    const ctx = getCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    if (detune) osc.detune.value = detune;
+    gain.gain.setValueAtTime(volume, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + duration);
+}
+
+function playNoise(duration, volume = 0.15) {
+    const ctx = getCtx();
+    const bufferSize = ctx.sampleRate * duration;
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+        data[i] = (Math.random() * 2 - 1) * volume;
+    }
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(volume, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+    source.connect(gain);
+    gain.connect(ctx.destination);
+    source.start();
+}
+
+const Sound = {
+    resume() {
+        const ctx = getCtx();
+        if (ctx.state === 'suspended') ctx.resume();
+    },
+
+    chop() {
+        playTone(220, 0.1, 'sawtooth', 0.2);
+        setTimeout(() => playTone(180, 0.08, 'sawtooth', 0.15), 60);
+        playNoise(0.08, 0.1);
+    },
+
+    mine() {
+        playTone(400, 0.08, 'square', 0.15);
+        setTimeout(() => playTone(300, 0.06, 'square', 0.12), 50);
+        playNoise(0.06, 0.08);
+    },
+
+    gather() {
+        playTone(500, 0.1, 'sine', 0.15);
+        setTimeout(() => playTone(600, 0.1, 'sine', 0.12), 80);
+    },
+
+    eat() {
+        playTone(300, 0.08, 'sine', 0.2);
+        setTimeout(() => playTone(350, 0.08, 'sine', 0.15), 100);
+        setTimeout(() => playTone(400, 0.08, 'sine', 0.12), 200);
+    },
+
+    drink() {
+        playTone(600, 0.15, 'sine', 0.15);
+        setTimeout(() => playTone(500, 0.12, 'sine', 0.12), 100);
+    },
+
+    craft() {
+        playTone(400, 0.1, 'triangle', 0.25);
+        setTimeout(() => playTone(500, 0.1, 'triangle', 0.2), 100);
+        setTimeout(() => playTone(600, 0.15, 'triangle', 0.25), 200);
+    },
+
+    build() {
+        playTone(200, 0.15, 'square', 0.2);
+        setTimeout(() => playTone(250, 0.12, 'square', 0.15), 100);
+        setTimeout(() => playTone(300, 0.15, 'square', 0.2), 200);
+        playNoise(0.2, 0.08);
+    },
+
+    wolfHowl() {
+        const ctx = getCtx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(200, ctx.currentTime);
+        osc.frequency.linearRampToValueAtTime(350, ctx.currentTime + 0.3);
+        osc.frequency.linearRampToValueAtTime(180, ctx.currentTime + 0.8);
+        gain.gain.setValueAtTime(0.15, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.8);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.8);
+    },
+
+    rain() {
+        for (let i = 0; i < 3; i++) {
+            setTimeout(() => playNoise(0.3, 0.04), i * 100);
+        }
+    },
+
+    fire() {
+        playNoise(0.15, 0.06);
+        playTone(100 + Math.random() * 50, 0.1, 'sawtooth', 0.03);
+    },
+
+    hit() {
+        playTone(150, 0.1, 'sawtooth', 0.25);
+        playNoise(0.08, 0.15);
+    },
+
+    gameOver() {
+        playTone(300, 0.3, 'sine', 0.3);
+        setTimeout(() => playTone(250, 0.3, 'sine', 0.25), 300);
+        setTimeout(() => playTone(200, 0.5, 'sine', 0.3), 600);
+    },
+
+    win() {
+        const notes = [400, 500, 600, 800];
+        notes.forEach((n, i) => {
+            setTimeout(() => playTone(n, 0.2, 'triangle', 0.25), i * 150);
+        });
+    },
+
+    pickup() {
+        playTone(700, 0.08, 'sine', 0.15);
+        setTimeout(() => playTone(900, 0.08, 'sine', 0.12), 60);
+    },
+
+    damage() {
+        playTone(120, 0.15, 'sawtooth', 0.3);
+        playNoise(0.1, 0.2);
+    },
+};
+
+// === ./world.js ===
+// ============================================================
+// world.js - Island map, tile types, day/night cycle
+// ============================================================
+
+
+// Simple seeded random
+function mulberry32(seed) {
+    return function () {
+        seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+        let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+        t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+}
+
+// Simple value noise
+function createNoise(seed) {
+    const rng = mulberry32(seed);
+    const size = 128;
+    const grid = [];
+    for (let i = 0; i < size * size; i++) grid.push(rng());
+
+    function getGrid(gx, gy) {
+        gx = ((gx % size) + size) % size;
+        gy = ((gy % size) + size) % size;
+        return grid[gy * size + gx];
+    }
+
+    function lerp(a, b, t) { return a + (b - a) * t; }
+    function fade(t) { return t * t * t * (t * (t * 6 - 15) + 10); }
+
+    return function (x, y) {
+        const ix = Math.floor(x), iy = Math.floor(y);
+        const fx = fade(x - ix), fy = fade(y - iy);
+        const a = getGrid(ix, iy), b = getGrid(ix + 1, iy);
+        const c = getGrid(ix, iy + 1), d = getGrid(ix + 1, iy + 1);
+        return lerp(lerp(a, b, fx), lerp(c, d, fx), fy);
+    };
+}
+
+function createWorld(seed) {
+    seed = seed || (Math.random() * 999999 | 0);
+    const rng = mulberry32(seed);
+    const noise1 = createNoise(seed);
+    const noise2 = createNoise(seed + 1000);
+
+    const tiles = [];
+    const resources = []; // { type, x, y, hp, maxHp, id }
+    const structures = []; // { type, x, y, hp, maxHp, id, ...extra }
+    const animals = []; // { type, x, y, hp, vx, vy, ... }
+
+    let dayTime = 0.3; // start at morning
+    let dayCount = 1;
+    let weather = 'clear'; // clear, rain, storm
+    let weatherTimer = 0;
+
+    let nextId = 1;
+    function genId() { return nextId++; }
+
+    // Generate island tiles
+    const cx = WORLD_COLS / 2, cy = WORLD_ROWS / 2;
+    const maxR = Math.min(cx, cy) * 0.85;
+
+    for (let y = 0; y < WORLD_ROWS; y++) {
+        tiles[y] = [];
+        for (let x = 0; x < WORLD_COLS; x++) {
+            const dx = x - cx, dy = y - cy;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const n1 = noise1(x * 0.08, y * 0.08);
+            const n2 = noise2(x * 0.15, y * 0.15);
+            const height = n1 * 0.7 + n2 * 0.3;
+            const edgeFade = 1 - Math.pow(dist / maxR, 2);
+            const val = height * Math.max(0, edgeFade);
+
+            let tile;
+            if (val < 0.1) tile = TILE.DEEP_WATER;
+            else if (val < 0.2) tile = TILE.WATER;
+            else if (val < 0.3) tile = TILE.SAND;
+            else if (val < 0.55) tile = TILE.GRASS;
+            else if (val < 0.75) tile = TILE.FOREST;
+            else tile = TILE.MOUNTAIN;
+
+            tiles[y][x] = tile;
+        }
+    }
+
+    // Spawn resources
+    for (let y = 0; y < WORLD_ROWS; y++) {
+        for (let x = 0; x < WORLD_COLS; x++) {
+            const tile = tiles[y][x];
+            const r = rng();
+            if (tile === TILE.FOREST && r < 0.5) {
+                resources.push({ type: 'tree', x, y, hp: 5, maxHp: 5, id: genId() });
+            } else if (tile === TILE.GRASS && r < 0.08) {
+                resources.push({ type: 'rock', x, y, hp: 4, maxHp: 4, id: genId() });
+            } else if (tile === TILE.GRASS && r < 0.15) {
+                resources.push({ type: 'bush', x, y, hp: 2, maxHp: 2, id: genId() });
+            } else if (tile === TILE.FOREST && r < 0.6) {
+                resources.push({ type: 'bush', x, y, hp: 2, maxHp: 2, id: genId() });
+            }
+        }
+    }
+
+    // Find a good spawn point (grass tile near center)
+    function findSpawnPoint() {
+        for (let r = 0; r < 15; r++) {
+            for (let i = 0; i < 30; i++) {
+                const x = (cx + (rng() * r * 2 - r)) | 0;
+                const y = (cy + (rng() * r * 2 - r)) | 0;
+                if (x >= 0 && y >= 0 && x < WORLD_COLS && y < WORLD_ROWS) {
+                    const t = tiles[y][x];
+                    if (t === TILE.GRASS || t === TILE.SAND) {
+                        return { x: x * TILE_SIZE + TILE_SIZE / 2, y: y * TILE_SIZE + TILE_SIZE / 2 };
+                    }
+                }
+            }
+        }
+        return { x: cx * TILE_SIZE + TILE_SIZE / 2, y: cy * TILE_SIZE + TILE_SIZE / 2 };
+    }
+
+    function isWalkable(wx, wy) {
+        const tx = Math.floor(wx / TILE_SIZE);
+        const ty = Math.floor(wy / TILE_SIZE);
+        if (tx < 0 || ty < 0 || tx >= WORLD_COLS || ty >= WORLD_ROWS) return false;
+        return TILE_WALKABLE[tiles[ty][tx]];
+    }
+
+    function getTile(wx, wy) {
+        const tx = Math.floor(wx / TILE_SIZE);
+        const ty = Math.floor(wy / TILE_SIZE);
+        if (tx < 0 || ty < 0 || tx >= WORLD_COLS || ty >= WORLD_ROWS) return TILE.DEEP_WATER;
+        return tiles[ty][tx];
+    }
+
+    function getResourceAt(wx, wy, range) {
+        const tx = Math.floor(wx / TILE_SIZE);
+        const ty = Math.floor(wy / TILE_SIZE);
+        let best = null, bestDist = range;
+        for (const res of resources) {
+            const rx = res.x * TILE_SIZE + TILE_SIZE / 2;
+            const ry = res.y * TILE_SIZE + TILE_SIZE / 2;
+            const d = Math.sqrt((wx - rx) ** 2 + (wy - ry) ** 2);
+            if (d < bestDist) {
+                bestDist = d;
+                best = res;
+            }
+        }
+        return best;
+    }
+
+    function removeResource(res) {
+        const idx = resources.indexOf(res);
+        if (idx >= 0) resources.splice(idx, 1);
+    }
+
+    function getStructureAt(wx, wy, range) {
+        let best = null, bestDist = range;
+        for (const s of structures) {
+            const sx = s.x * TILE_SIZE + TILE_SIZE / 2;
+            const sy = s.y * TILE_SIZE + TILE_SIZE / 2;
+            const d = Math.sqrt((wx - sx) ** 2 + (wy - sy) ** 2);
+            if (d < bestDist) {
+                bestDist = d;
+                best = s;
+            }
+        }
+        return best;
+    }
+
+    function addStructure(type, wx, wy) {
+        const tx = Math.floor(wx / TILE_SIZE);
+        const ty = Math.floor(wy / TILE_SIZE);
+        const s = { type, x: tx, y: ty, hp: 100, maxHp: 100, id: genId(), buildTime: 0 };
+        structures.push(s);
+        return s;
+    }
+
+    // Water tile check for fishing
+    function isAdjacentToWater(wx, wy) {
+        const tx = Math.floor(wx / TILE_SIZE);
+        const ty = Math.floor(wy / TILE_SIZE);
+        for (let dy = -1; dy <= 1; dy++) {
+            for (let dx = -1; dx <= 1; dx++) {
+                const nx = tx + dx, ny = ty + dy;
+                if (nx >= 0 && ny >= 0 && nx < WORLD_COLS && ny < WORLD_ROWS) {
+                    const t = tiles[ny][nx];
+                    if (t === TILE.WATER || t === TILE.DEEP_WATER) return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    // Update day/night and weather
+    function update(dt) {
+        dayTime += dt / DAY_LENGTH;
+        if (dayTime >= 1) {
+            dayTime -= 1;
+            dayCount++;
+        }
+
+        // Weather
+        weatherTimer -= dt;
+        if (weatherTimer <= 0) {
+            weatherTimer = 20 + rng() * 40;
+            const r = rng();
+            if (r < 0.5) weather = 'clear';
+            else if (r < 0.8) weather = 'rain';
+            else weather = 'storm';
+        }
+
+        // Spawn wolves at night
+        if (isNight() && animals.filter(a => a.type === 'wolf').length < 3) {
+            if (rng() < 0.003) {
+                const angle = rng() * Math.PI * 2;
+                const dist = 200 + rng() * 150;
+                const wx = cx * TILE_SIZE + Math.cos(angle) * dist;
+                const wy = cy * TILE_SIZE + Math.sin(angle) * dist;
+                if (isWalkable(wx, wy)) {
+                    animals.push({
+                        type: 'wolf',
+                        x: wx, y: wy,
+                        hp: 40, maxHp: 40,
+                        vx: 0, vy: 0,
+                        targetX: 0, targetY: 0,
+                        stateTimer: 0,
+                        state: 'idle',
+                    });
+                }
+            }
+        }
+
+        // Remove wolves at dawn
+        if (!isNight()) {
+            for (let i = animals.length - 1; i >= 0; i--) {
+                if (animals[i].type === 'wolf') {
+                    animals.splice(i, 1);
+                }
+            }
+        }
+
+        // Spawn rabbits
+        if (animals.filter(a => a.type === 'rabbit').length < 8) {
+            if (rng() < 0.005) {
+                const angle = rng() * Math.PI * 2;
+                const dist = 100 + rng() * 300;
+                const wx = cx * TILE_SIZE + Math.cos(angle) * dist;
+                const wy = cy * TILE_SIZE + Math.sin(angle) * dist;
+                if (isWalkable(wx, wy)) {
+                    animals.push({
+                        type: 'rabbit',
+                        x: wx, y: wy,
+                        hp: 15, maxHp: 15,
+                        vx: 0, vy: 0,
+                        targetX: wx, targetY: wy,
+                        stateTimer: 0,
+                        state: 'idle',
+                    });
+                }
+            }
+        }
+    }
+
+    function isNight() {
+        return dayTime >= NIGHT_START || dayTime < DAWN_START;
+    }
+
+    function isDawn() {
+        return dayTime >= DAWN_START && dayTime < DAY_START;
+    }
+
+    function isDusk() {
+        return dayTime >= DUSK_START && dayTime < NIGHT_START;
+    }
+
+    function getDaylight() {
+        if (dayTime >= DAY_START && dayTime < DUSK_START) return 1; // full day
+        if (dayTime >= NIGHT_START || dayTime < DAWN_START) return 0.25; // night
+        if (dayTime >= DAWN_START && dayTime < DAY_START) {
+            return 0.25 + (dayTime - DAWN_START) / (DAY_START - DAWN_START) * 0.75;
+        }
+        // dusk
+        return 1 - (dayTime - DUSK_START) / (NIGHT_START - DUSK_START) * 0.75;
+    }
+
+    function getTimeString() {
+        const hours = Math.floor(dayTime * 24);
+        const mins = Math.floor((dayTime * 24 - hours) * 60);
+        return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+    }
+
+    function getTimeOfDayName() {
+        if (dayTime >= DAY_START && dayTime < DUSK_START) return '白天';
+        if (dayTime >= DUSK_START && dayTime < NIGHT_START) return '黄昏';
+        if (dayTime >= NIGHT_START) return '夜晚';
+        if (dayTime < DAWN_START) return '夜晚';
+        return '黎明';
+    }
+
+    return {
+        tiles, resources, structures, animals,
+        findSpawnPoint, isWalkable, getTile,
+        getResourceAt, removeResource,
+        getStructureAt, addStructure,
+        isAdjacentToWater,
+        update, isNight, isDawn, isDusk,
+        getDaylight, getTimeString, getTimeOfDayName,
+        get dayTime() { return dayTime; },
+        get dayCount() { return dayCount; },
+        get weather() { return weather; },
+        set weather(v) { weather = v; },
+        get seed() { return seed; },
+    };
+}
+
+// === ./player.js ===
+// ============================================================
+// player.js - Player stats, movement, inventory
+// ============================================================
+
+
+function createPlayer(spawnX, spawnY) {
+    const player = {
+        x: spawnX,
+        y: spawnY,
+        size: PLAYER_SIZE,
+        speed: PLAYER_SPEED,
+        health: MAX_HEALTH,
+        hunger: MAX_HUNGER,
+        thirst: MAX_THIRST,
+        alive: true,
+        win: false,
+
+        // Movement
+        vx: 0, vy: 0,
+        facing: 'down', // up, down, left, right
+
+        // Inventory: array of { type, count }
+        inventory: [],
+        tools: {
+            axe: false,
+            pickaxe: false,
+            fishingRod: false,
+        },
+
+        // Gathering
+        gathering: null, // { resource, progress, total }
+        interacting: false,
+
+        // Stats tracking
+        itemsCrafted: 0,
+        structuresBuilt: 0,
+        animalsKilled: 0,
+
+        // Attack
+        attackCooldown: 0,
+        attackDamage: 10,
+    };
+
+    // Inventory management
+    function addItem(type, count = 1) {
+        const existing = player.inventory.find(s => s.type === type);
+        if (existing) {
+            existing.count += count;
+        } else if (player.inventory.length < INVENTORY_SLOTS) {
+            player.inventory.push({ type, count });
+        } else {
+            return false; // full
+        }
+        return true;
+    }
+
+    function removeItem(type, count = 1) {
+        const slot = player.inventory.find(s => s.type === type);
+        if (!slot || slot.count < count) return false;
+        slot.count -= count;
+        if (slot.count <= 0) {
+            player.inventory = player.inventory.filter(s => s !== slot);
+        }
+        return true;
+    }
+
+    function getItemCount(type) {
+        const slot = player.inventory.find(s => s.type === type);
+        return slot ? slot.count : 0;
+    }
+
+    function hasItems(requirements) {
+        for (const [type, count] of Object.entries(requirements)) {
+            if (getItemCount(type) < count) return false;
+        }
+        return true;
+    }
+
+    // Crafting
+    function canCraft(recipe) {
+        return hasItems(recipe.ingredients);
+    }
+
+    function craft(recipe) {
+        if (!canCraft(recipe)) return false;
+        for (const [type, count] of Object.entries(recipe.ingredients)) {
+            removeItem(type, count);
+        }
+        if (recipe.type === 'tool') {
+            player.tools[recipe.result] = true;
+        } else {
+            // For structures, we add a "token" to inventory
+            addItem(recipe.result);
+        }
+        player.itemsCrafted++;
+        Sound.craft();
+        return true;
+    }
+
+    // Eating
+    function eat(foodType) {
+        const nutr = NUTRITION[foodType];
+        if (!nutr) return false;
+        if (getItemCount(foodType) <= 0) return false;
+        removeItem(foodType);
+        player.hunger = Math.min(MAX_HUNGER, player.hunger + nutr.hunger);
+        if (nutr.thirst) player.thirst = Math.min(MAX_THIRST, player.thirst + nutr.thirst);
+        if (nutr.health) player.health = Math.min(MAX_HEALTH, Math.max(0, player.health + nutr.health));
+        Sound.eat();
+        return true;
+    }
+
+    // Gathering
+    function startGather(resource) {
+        let time = GATHER_TIME;
+        if (resource.type === 'tree' && player.tools.axe) time *= 0.5;
+        if (resource.type === 'rock' && player.tools.pickaxe) time *= 0.5;
+        player.gathering = { resource, progress: 0, total: time };
+    }
+
+    function update(dt, world) {
+        if (!player.alive || player.win) return;
+
+        // Hunger and thirst
+        player.hunger -= HUNGER_RATE * dt;
+        player.thirst -= THIRST_RATE * dt;
+
+        if (player.hunger <= 0) {
+            player.hunger = 0;
+            player.health -= STARVING_DAMAGE * dt;
+        }
+        if (player.thirst <= 0) {
+            player.thirst = 0;
+            player.health -= DEHYDRATION_DAMAGE * dt;
+        }
+
+        // Rain restores thirst
+        if (world.weather === 'rain' || world.weather === 'storm') {
+            player.thirst = Math.min(MAX_THIRST, player.thirst + 1.5 * dt);
+        }
+
+        // Shelter bonus
+        const shelter = world.structures.find(s =>
+            s.type === 'shelter' &&
+            Math.abs(s.x * 32 + 16 - player.x) < 48 &&
+            Math.abs(s.y * 32 + 16 - player.y) < 48
+        );
+
+        if (world.weather === 'storm' && !shelter) {
+            player.health -= 3 * dt;
+        }
+
+        // Health regen when well-fed
+        if (player.hunger > 50 && player.thirst > 50) {
+            player.health = Math.min(MAX_HEALTH, player.health + 1 * dt);
+        }
+
+        // Movement
+        if (!player.gathering) {
+            player.x += player.vx * dt;
+            player.y += player.vy * dt;
+
+            // Clamp to world bounds
+            const margin = player.size;
+            player.x = Math.max(margin, Math.min(39 * 32 + 32 - margin, player.x));
+            player.y = Math.max(margin, Math.min(39 * 32 + 32 - margin, player.y));
+
+            // Collision with non-walkable
+            if (!world.isWalkable(player.x, player.y)) {
+                player.x -= player.vx * dt;
+                player.y -= player.vy * dt;
+            }
+        }
+
+        // Gathering progress
+        if (player.gathering) {
+            player.gathering.progress += dt;
+            if (player.gathering.progress >= player.gathering.total) {
+                const res = player.gathering.resource;
+                // Gather resource
+                if (res.type === 'tree') {
+                    const amount = player.tools.axe ? 3 : 1;
+                    addItem(RESOURCE_TYPES.WOOD, amount);
+                    Sound.chop();
+                } else if (res.type === 'rock') {
+                    const amount = player.tools.pickaxe ? 3 : 1;
+                    addItem(RESOURCE_TYPES.STONE, amount);
+                    Sound.mine();
+                } else if (res.type === 'bush') {
+                    addItem(RESOURCE_TYPES.FIBER, 1);
+                    if (Math.random() < 0.5) addItem(RESOURCE_TYPES.BERRY, 1);
+                    Sound.gather();
+                }
+                res.hp--;
+                if (res.hp <= 0) {
+                    world.removeResource(res);
+                }
+                player.gathering = null;
+            }
+        }
+
+        // Attack cooldown
+        if (player.attackCooldown > 0) {
+            player.attackCooldown -= dt;
+        }
+
+        // Death check
+        if (player.health <= 0) {
+            player.health = 0;
+            player.alive = false;
+        }
+    }
+
+    function attack(animals) {
+        if (player.attackCooldown > 0) return;
+        player.attackCooldown = 0.4;
+        Sound.hit();
+
+        // Find animal in range
+        for (const animal of animals) {
+            const dx = animal.x - player.x;
+            const dy = animal.y - player.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < 48) {
+                animal.hp -= player.attackDamage;
+                // Knockback
+                if (dist > 0) {
+                    animal.x += (dx / dist) * 20;
+                    animal.y += (dy / dist) * 20;
+                }
+                if (animal.hp <= 0) {
+                    const config = { rabbit: { drop: 'rawMeat', count: 1 }, wolf: { drop: 'rawMeat', count: 2 } };
+                    const cfg = config[animal.type];
+                    if (cfg) addItem(cfg.drop, cfg.count);
+                    player.animalsKilled++;
+                    return animal; // signal to remove
+                }
+                break;
+            }
+        }
+        return null;
+    }
+
+    function tryPlaceStructure(type, world) {
+        if (!removeItem(type)) return false;
+        // Place in front of player
+        let px = player.x, py = player.y;
+        if (player.facing === 'up') py -= 48;
+        else if (player.facing === 'down') py += 48;
+        else if (player.facing === 'left') px -= 48;
+        else px += 48;
+
+        // Check walkable
+        if (!world.isWalkable(px, py)) {
+            addItem(type); // refund
+            return false;
+        }
+
+        world.addStructure(type, px, py);
+        if (type === 'boat') {
+            player.win = true;
+        }
+        Sound.build();
+        player.structuresBuilt++;
+        return true;
+    }
+
+    function tryFish(world) {
+        if (!player.tools.fishingRod) return false;
+        if (!world.isAdjacentToWater(player.x, player.y)) return false;
+        if (Math.random() < 0.6) {
+            addItem(RESOURCE_TYPES.FISH);
+            Sound.gather();
+            return true;
+        }
+        Sound.gather();
+        return true; // still successful action, just no fish
+    }
+
+    // Cook meat at campfire
+    function tryCook(world) {
+        const campfire = world.structures.find(s =>
+            s.type === 'campfire' &&
+            Math.abs(s.x * 32 + 16 - player.x) < 48 &&
+            Math.abs(s.y * 32 + 16 - player.y) < 48
+        );
+        if (!campfire) return false;
+
+        if (getItemCount('rawMeat') > 0) {
+            removeItem('rawMeat');
+            addItem('cookedMeat');
+            Sound.fire();
+            return true;
+        }
+        if (getItemCount('fish') > 0) {
+            removeItem('fish');
+            addItem('cookedFish');
+            Sound.fire();
+            return true;
+        }
+        return false;
+    }
+
+    return {
+        ...player,
+        addItem, removeItem, getItemCount, hasItems,
+        canCraft, craft, eat,
+        startGather, update, attack,
+        tryPlaceStructure, tryFish, tryCook,
+    };
+}
+
+// === ./crafting.js ===
+// ============================================================
+// crafting.js - Crafting recipes and crafting menu logic
+// ============================================================
+
+
+function getAvailableRecipes(player) {
+    return RECIPES.map(recipe => ({
+        ...recipe,
+        canCraft: player.canCraft(recipe),
+        owned: recipe.type === 'tool' ? player.tools[recipe.result] : false,
+    }));
+}
+
+function formatRecipe(recipe) {
+    const ingredients = Object.entries(recipe.ingredients)
+        .map(([type, count]) => `${RESOURCE_NAMES[type] || STRUCTURE_NAMES[type] || type}x${count}`)
+        .join(' + ');
+    return `${recipe.name}: ${ingredients}`;
+}
+
+function createCraftingMenu() {
+    let visible = false;
+    let selectedIndex = 0;
+
+    function toggle() {
+        visible = !visible;
+        if (visible) selectedIndex = 0;
+    }
+
+    function show() { visible = true; selectedIndex = 0; }
+    function hide() { visible = false; }
+    function isVisible() { return visible; }
+
+    function selectNext() {
+        selectedIndex = (selectedIndex + 1) % RECIPES.length;
+    }
+
+    function selectPrev() {
+        selectedIndex = (selectedIndex - 1 + RECIPES.length) % RECIPES.length;
+    }
+
+    function getSelectedIndex() { return selectedIndex; }
+    function setSelectedIndex(i) { selectedIndex = i; }
+
+    function craftSelected(player) {
+        const recipe = RECIPES[selectedIndex];
+        if (recipe && player.canCraft(recipe)) {
+            if (recipe.type === 'structure') {
+                // For structures, just craft (adds to inventory)
+                return player.craft(recipe);
+            }
+            return player.craft(recipe);
+        }
+        return false;
+    }
+
+    return {
+        toggle, show, hide, isVisible,
+        selectNext, selectPrev,
+        getSelectedIndex, setSelectedIndex,
+        craftSelected,
+    };
+}
+
+// === ./resources.js ===
+// ============================================================
+// resources.js - Resource spawning and gathering visuals
+// ============================================================
+
+
+// Resource rendering
+function drawResources(ctx, world, camX, camY, canvasW, canvasH) {
+    const startCol = Math.max(0, Math.floor(camX / TILE_SIZE) - 1);
+    const startRow = Math.max(0, Math.floor(camY / TILE_SIZE) - 1);
+    const endCol = Math.min(39, Math.ceil((camX + canvasW) / TILE_SIZE) + 1);
+    const endRow = Math.min(39, Math.ceil((camY + canvasH) / TILE_SIZE) + 1);
+
+    for (const res of world.resources) {
+        if (res.x < startCol || res.x > endCol || res.y < startRow || res.y > endRow) continue;
+        const sx = res.x * TILE_SIZE + TILE_SIZE / 2 - camX;
+        const sy = res.y * TILE_SIZE + TILE_SIZE / 2 - camY;
+        drawResource(ctx, res.type, sx, sy, res.hp / res.maxHp);
+    }
+}
+
+function drawResource(ctx, type, x, y, hpRatio) {
+    ctx.save();
+    if (type === 'tree') {
+        // Trunk
+        ctx.fillStyle = '#5d3a1a';
+        ctx.fillRect(x - 3, y - 2, 6, 10);
+        // Crown - darker when damaged
+        const green = Math.floor(100 + hpRatio * 80);
+        ctx.fillStyle = `rgb(30, ${green}, 30)`;
+        ctx.beginPath();
+        ctx.arc(x, y - 8, 12, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = `rgb(20, ${green - 20}, 20)`;
+        ctx.beginPath();
+        ctx.arc(x - 4, y - 6, 8, 0, Math.PI * 2);
+        ctx.fill();
+    } else if (type === 'rock') {
+        const gray = Math.floor(100 + hpRatio * 50);
+        ctx.fillStyle = `rgb(${gray}, ${gray}, ${gray + 10})`;
+        ctx.beginPath();
+        ctx.moveTo(x - 10, y + 5);
+        ctx.lineTo(x - 6, y - 8);
+        ctx.lineTo(x + 4, y - 10);
+        ctx.lineTo(x + 10, y - 3);
+        ctx.lineTo(x + 8, y + 5);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = `rgba(255,255,255,0.15)`;
+        ctx.beginPath();
+        ctx.moveTo(x - 4, y - 6);
+        ctx.lineTo(x + 2, y - 8);
+        ctx.lineTo(x + 6, y - 2);
+        ctx.lineTo(x, y);
+        ctx.closePath();
+        ctx.fill();
+    } else if (type === 'bush') {
+        ctx.fillStyle = '#3a7a20';
+        ctx.beginPath();
+        ctx.arc(x, y, 8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#2d6018';
+        ctx.beginPath();
+        ctx.arc(x + 5, y - 2, 6, 0, Math.PI * 2);
+        ctx.fill();
+        // Berries
+        ctx.fillStyle = '#c44569';
+        ctx.beginPath();
+        ctx.arc(x - 3, y + 2, 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(x + 4, y - 1, 2, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    ctx.restore();
+}
+
+// Draw structures
+function drawStructures(ctx, world, camX, camY, canvasW, canvasH) {
+    for (const s of world.structures) {
+        const sx = s.x * TILE_SIZE + TILE_SIZE / 2;
+        const sy = s.y * TILE_SIZE + TILE_SIZE / 2;
+        const dx = sx - camX, dy = sy - camY;
+        if (dx < -48 || dy < -48 || dx > canvasW + 48 || dy > canvasH + 48) continue;
+        drawStructure(ctx, s.type, dx, dy, s.hp / s.maxHp, s);
+    }
+}
+
+function drawStructure(ctx, type, x, y, hpRatio, struct) {
+    ctx.save();
+    if (type === 'campfire') {
+        // Base stones
+        ctx.fillStyle = '#666';
+        for (let i = 0; i < 6; i++) {
+            const angle = i * Math.PI / 3;
+            ctx.beginPath();
+            ctx.arc(x + Math.cos(angle) * 10, y + Math.sin(angle) * 10, 4, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        // Fire
+        ctx.fillStyle = '#e67e22';
+        ctx.beginPath();
+        ctx.arc(x, y, 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#f39c12';
+        ctx.beginPath();
+        ctx.arc(x, y - 2, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#f1c40f';
+        ctx.beginPath();
+        ctx.arc(x, y - 4, 2, 0, Math.PI * 2);
+        ctx.fill();
+    } else if (type === 'shelter') {
+        // Tent shape
+        ctx.fillStyle = '#8d6e63';
+        ctx.beginPath();
+        ctx.moveTo(x - 18, y + 12);
+        ctx.lineTo(x, y - 14);
+        ctx.lineTo(x + 18, y + 12);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = '#6d4c41';
+        ctx.beginPath();
+        ctx.moveTo(x - 14, y + 12);
+        ctx.lineTo(x, y - 8);
+        ctx.lineTo(x + 14, y + 12);
+        ctx.closePath();
+        ctx.fill();
+        // Door
+        ctx.fillStyle = '#3e2723';
+        ctx.fillRect(x - 4, y + 2, 8, 10);
+    } else if (type === 'farm') {
+        // Tilled soil
+        ctx.fillStyle = '#5d4037';
+        ctx.fillRect(x - 14, y - 10, 28, 20);
+        // Crops
+        ctx.fillStyle = '#7cb342';
+        for (let row = 0; row < 3; row++) {
+            for (let col = 0; col < 4; col++) {
+                ctx.fillRect(x - 12 + col * 7, y - 8 + row * 7, 3, 5);
+            }
+        }
+    } else if (type === 'storage') {
+        // Chest
+        ctx.fillStyle = '#8d6e63';
+        ctx.fillRect(x - 12, y - 8, 24, 16);
+        ctx.fillStyle = '#6d4c41';
+        ctx.fillRect(x - 12, y - 8, 24, 4);
+        ctx.fillStyle = '#ffc107';
+        ctx.fillRect(x - 3, y - 4, 6, 6);
+    } else if (type === 'boat') {
+        // Boat hull
+        ctx.fillStyle = '#5d4037';
+        ctx.beginPath();
+        ctx.moveTo(x - 16, y);
+        ctx.lineTo(x - 12, y + 10);
+        ctx.lineTo(x + 12, y + 10);
+        ctx.lineTo(x + 16, y);
+        ctx.closePath();
+        ctx.fill();
+        // Mast
+        ctx.fillStyle = '#8d6e63';
+        ctx.fillRect(x - 1, y - 16, 3, 18);
+        // Sail
+        ctx.fillStyle = '#e8e8e8';
+        ctx.beginPath();
+        ctx.moveTo(x + 2, y - 14);
+        ctx.lineTo(x + 14, y - 6);
+        ctx.lineTo(x + 2, y - 2);
+        ctx.closePath();
+        ctx.fill();
+    }
+
+    // Health bar for damaged structures
+    if (hpRatio < 1) {
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.fillRect(x - 16, y + 16, 32, 4);
+        ctx.fillStyle = hpRatio > 0.5 ? '#4caf50' : hpRatio > 0.25 ? '#ff9800' : '#f44336';
+        ctx.fillRect(x - 16, y + 16, 32 * hpRatio, 4);
+    }
+    ctx.restore();
+}
+
+// Draw animals
+function drawAnimals(ctx, world, camX, camY, canvasW, canvasH) {
+    for (const a of world.animals) {
+        const dx = a.x - camX, dy = a.y - camY;
+        if (dx < -32 || dy < -32 || dx > canvasW + 32 || dy > canvasH + 32) continue;
+        drawAnimal(ctx, a, dx, dy);
+    }
+}
+
+function drawAnimal(ctx, animal, x, y) {
+    ctx.save();
+    if (animal.type === 'rabbit') {
+        // Body
+        ctx.fillStyle = '#c4a882';
+        ctx.beginPath();
+        ctx.ellipse(x, y + 2, 7, 5, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // Head
+        ctx.beginPath();
+        ctx.arc(x + 5, y - 2, 4, 0, Math.PI * 2);
+        ctx.fill();
+        // Ears
+        ctx.fillStyle = '#b09070';
+        ctx.fillRect(x + 3, y - 9, 2, 6);
+        ctx.fillRect(x + 6, y - 8, 2, 5);
+        // Eye
+        ctx.fillStyle = '#222';
+        ctx.beginPath();
+        ctx.arc(x + 7, y - 3, 1, 0, Math.PI * 2);
+        ctx.fill();
+        // Tail
+        ctx.fillStyle = '#ddd';
+        ctx.beginPath();
+        ctx.arc(x - 6, y, 2, 0, Math.PI * 2);
+        ctx.fill();
+    } else if (animal.type === 'wolf') {
+        // Body
+        ctx.fillStyle = '#555';
+        ctx.beginPath();
+        ctx.ellipse(x, y, 10, 6, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // Head
+        ctx.fillStyle = '#444';
+        ctx.beginPath();
+        ctx.ellipse(x + 8, y - 3, 6, 5, -0.3, 0, Math.PI * 2);
+        ctx.fill();
+        // Ears
+        ctx.fillStyle = '#333';
+        ctx.beginPath();
+        ctx.moveTo(x + 6, y - 8);
+        ctx.lineTo(x + 8, y - 14);
+        ctx.lineTo(x + 10, y - 8);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(x + 10, y - 7);
+        ctx.lineTo(x + 12, y - 13);
+        ctx.lineTo(x + 14, y - 7);
+        ctx.fill();
+        // Eyes - red at night
+        ctx.fillStyle = '#c0392b';
+        ctx.beginPath();
+        ctx.arc(x + 10, y - 4, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+        // Mouth
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(x + 12, y - 1);
+        ctx.lineTo(x + 15, y);
+        ctx.stroke();
+        // Tail
+        ctx.fillStyle = '#666';
+        ctx.beginPath();
+        ctx.moveTo(x - 10, y);
+        ctx.quadraticCurveTo(x - 14, y - 6, x - 12, y - 10);
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#666';
+        ctx.stroke();
+    }
+
+    // Health bar
+    if (animal.hp < animal.maxHp) {
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.fillRect(x - 12, y - 16, 24, 3);
+        ctx.fillStyle = '#e74c3c';
+        ctx.fillRect(x - 12, y - 16, 24 * (animal.hp / animal.maxHp), 3);
+    }
+    ctx.restore();
+}
+
+// === ./structures.js ===
+// ============================================================
+// structures.js - Building: campfire, shelter, storage, farm plot, boat
+// ============================================================
+
+
+function updateStructures(world, dt) {
+    for (const s of world.structures) {
+        // Campfire: flicker effect stored as buildTime
+        if (s.type === 'campfire') {
+            s.buildTime += dt;
+        }
+
+        // Farm: slowly produces food
+        if (s.type === 'farm') {
+            s.buildTime += dt;
+            if (s.buildTime >= 60) { // every 60 seconds
+                s.buildTime = 0;
+                s.produceReady = true;
+            }
+        }
+
+        // Storm damage to shelter
+        if (world.weather === 'storm' && s.type === 'shelter') {
+            s.hp -= 2 * dt;
+            if (s.hp <= 0) {
+                s.hp = 0;
+                // Mark for removal
+                s.destroyed = true;
+            }
+        }
+    }
+
+    // Remove destroyed structures
+    for (let i = world.structures.length - 1; i >= 0; i--) {
+        if (world.structures[i].destroyed) {
+            world.structures.splice(i, 1);
+        }
+    }
+}
+
+// Update animal AI
+function updateAnimals(world, player, dt) {
+    for (const a of world.animals) {
+        a.stateTimer -= dt;
+
+        const dx = player.x - a.x;
+        const dy = player.y - a.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (a.type === 'rabbit') {
+            // Rabbits flee from player
+            if (dist < 80) {
+                a.state = 'flee';
+                a.stateTimer = 2;
+            }
+
+            if (a.state === 'flee' && a.stateTimer > 0) {
+                // Move away from player
+                if (dist > 0) {
+                    a.vx = -(dx / dist) * 120;
+                    a.vy = -(dy / dist) * 120;
+                }
+            } else {
+                a.state = 'idle';
+                // Wander
+                if (a.stateTimer <= 0) {
+                    a.stateTimer = 1 + Math.random() * 3;
+                    const angle = Math.random() * Math.PI * 2;
+                    a.vx = Math.cos(angle) * 30;
+                    a.vy = Math.sin(angle) * 30;
+                }
+            }
+        } else if (a.type === 'wolf') {
+            // Wolves chase player at night
+            const isNight = world.isNight();
+            if (isNight && dist < 200) {
+                a.state = 'chase';
+                a.stateTimer = 1;
+            } else if (dist < 60) {
+                a.state = 'chase';
+                a.stateTimer = 1;
+            }
+
+            if (a.state === 'chase') {
+                if (dist > 0 && dist < 300) {
+                    a.vx = (dx / dist) * 90;
+                    a.vy = (dy / dist) * 90;
+                } else {
+                    a.state = 'idle';
+                }
+
+                // Attack player if close
+                if (dist < 24) {
+                    player.health -= 15 * dt;
+                    Sound.damage();
+                }
+            } else {
+                a.state = 'idle';
+                if (a.stateTimer <= 0) {
+                    a.stateTimer = 2 + Math.random() * 3;
+                    const angle = Math.random() * Math.PI * 2;
+                    a.vx = Math.cos(angle) * 40;
+                    a.vy = Math.sin(angle) * 40;
+                }
+            }
+        }
+
+        // Move animal
+        a.x += a.vx * dt;
+        a.y += a.vy * dt;
+
+        // Keep in bounds and on walkable tiles
+        a.x = Math.max(32, Math.min(39 * 32, a.x));
+        a.y = Math.max(32, Math.min(39 * 32, a.y));
+        if (!world.isWalkable(a.x, a.y)) {
+            a.x -= a.vx * dt;
+            a.y -= a.vy * dt;
+            a.vx = -a.vx;
+            a.vy = -a.vy;
+        }
+
+        // Dampen velocity
+        a.vx *= 0.95;
+        a.vy *= 0.95;
+    }
+}
+
+function drawCampfireLight(ctx, world, camX, camY, canvasW, canvasH) {
+    // Draw light circles around campfires at night
+    if (!world.isNight()) return;
+
+    for (const s of world.structures) {
+        if (s.type !== 'campfire') continue;
+        const sx = s.x * TILE_SIZE + TILE_SIZE / 2 - camX;
+        const sy = s.y * TILE_SIZE + TILE_SIZE / 2 - camY;
+
+        // Skip if off screen
+        if (sx < -150 || sy < -150 || sx > canvasW + 150 || sy > canvasH + 150) continue;
+
+        // Flicker
+        const flicker = 0.85 + Math.sin(s.buildTime * 8) * 0.1 + Math.sin(s.buildTime * 13) * 0.05;
+
+        const gradient = ctx.createRadialGradient(sx, sy, 0, sx, sy, 120 * flicker);
+        gradient.addColorStop(0, 'rgba(255, 180, 50, 0.4)');
+        gradient.addColorStop(0.5, 'rgba(255, 140, 20, 0.15)');
+        gradient.addColorStop(1, 'rgba(255, 100, 0, 0)');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(sx - 150, sy - 150, 300, 300);
+    }
+}
+
+// === ./effects.js ===
+// ============================================================
+// effects.js - Weather effects, fire particles, damage effects
+// ============================================================
+
+const particles = [];
+const MAX_PARTICLES = 500;
+
+function spawnParticle(p) {
+    if (particles.length >= MAX_PARTICLES) return;
+    particles.push({
+        x: p.x, y: p.y,
+        vx: p.vx || 0, vy: p.vy || 0,
+        life: p.life || 1,
+        maxLife: p.life || 1,
+        size: p.size || 3,
+        color: p.color || '#fff',
+        alpha: p.alpha || 1,
+        gravity: p.gravity || 0,
+        shrink: p.shrink !== undefined ? p.shrink : true,
+        type: p.type || 'default',
+    });
+}
+
+function spawnHitEffect(x, y) {
+    for (let i = 0; i < 6; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 40 + Math.random() * 60;
+        spawnParticle({
+            x, y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            life: 0.3 + Math.random() * 0.2,
+            size: 2 + Math.random() * 2,
+            color: '#ff6b6b',
+            gravity: 80,
+        });
+    }
+}
+
+function spawnGatherEffect(x, y, type) {
+    const colors = {
+        tree: '#8B5E3C',
+        rock: '#888',
+        bush: '#4caf50',
+    };
+    for (let i = 0; i < 4; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 20 + Math.random() * 40;
+        spawnParticle({
+            x, y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed - 20,
+            life: 0.4 + Math.random() * 0.3,
+            size: 2 + Math.random() * 3,
+            color: colors[type] || '#fff',
+            gravity: 60,
+        });
+    }
+}
+
+function spawnFireParticle(x, y) {
+    spawnParticle({
+        x: x + (Math.random() - 0.5) * 10,
+        y: y,
+        vx: (Math.random() - 0.5) * 15,
+        vy: -30 - Math.random() * 40,
+        life: 0.5 + Math.random() * 0.5,
+        size: 2 + Math.random() * 3,
+        color: Math.random() > 0.5 ? '#f39c12' : '#e74c3c',
+        gravity: -20,
+        type: 'fire',
+    });
+}
+
+function spawnRainDrop(camX, camY, canvasW) {
+    spawnParticle({
+        x: camX + Math.random() * canvasW,
+        y: camY - 5,
+        vx: -20 + Math.random() * 10,
+        vy: 300 + Math.random() * 200,
+        life: 0.8,
+        size: 1,
+        color: '#74b9ff',
+        alpha: 0.4,
+        shrink: false,
+        gravity: 0,
+        type: 'rain',
+    });
+}
+
+function spawnCraftEffect(x, y) {
+    for (let i = 0; i < 12; i++) {
+        const angle = (i / 12) * Math.PI * 2;
+        const speed = 50 + Math.random() * 30;
+        spawnParticle({
+            x, y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            life: 0.5,
+            size: 3,
+            color: '#6abf4b',
+            gravity: 0,
+        });
+    }
+}
+
+function spawnSmokeParticle(x, y) {
+    spawnParticle({
+        x: x + (Math.random() - 0.5) * 6,
+        y: y,
+        vx: (Math.random() - 0.5) * 8,
+        vy: -15 - Math.random() * 20,
+        life: 1 + Math.random(),
+        size: 4 + Math.random() * 4,
+        color: '#777',
+        alpha: 0.3,
+        gravity: -5,
+        type: 'smoke',
+    });
+}
+
+function updateEffects(dt, canvasW, canvasH) {
+    for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.life -= dt;
+        if (p.life <= 0) {
+            particles.splice(i, 1);
+            continue;
+        }
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.vy += p.gravity * dt;
+        if (p.shrink) {
+            p.size *= (1 - dt * 2);
+        }
+    }
+}
+
+function drawEffects(ctx, world, camX, camY, canvasW, canvasH) {
+    for (const p of particles) {
+        const progress = p.life / p.maxLife;
+        const alpha = p.alpha * progress;
+        ctx.globalAlpha = alpha;
+
+        // Convert world coords to screen coords
+        const sx = p.x - camX;
+        const sy = p.y - camY;
+
+        if (p.type === 'rain') {
+            ctx.strokeStyle = p.color;
+            ctx.lineWidth = p.size;
+            ctx.beginPath();
+            ctx.moveTo(sx, sy);
+            ctx.lineTo(sx + p.vx * 0.02, sy + p.vy * 0.02);
+            ctx.stroke();
+        } else {
+            ctx.fillStyle = p.color;
+            ctx.beginPath();
+            ctx.arc(sx, sy, Math.max(0.5, p.size), 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+    ctx.globalAlpha = 1;
+}
+
+function drawWeatherOverlay(ctx, world, canvasW, canvasH) {
+    // Rain/snow particles are spawned from main loop
+    if (world.weather === 'storm') {
+        // Lightning flash occasionally
+        if (Math.random() < 0.003) {
+            ctx.fillStyle = 'rgba(255,255,255,0.15)';
+            ctx.fillRect(0, 0, canvasW, canvasH);
+        }
+    }
+}
+
+function drawDayNightOverlay(ctx, world, canvasW, canvasH) {
+    const daylight = world.getDaylight();
+    if (daylight >= 1) return;
+
+    const darkness = 1 - daylight;
+    ctx.fillStyle = `rgba(10, 15, 40, ${darkness * 0.6})`;
+    ctx.fillRect(0, 0, canvasW, canvasH);
+}
+
+// Clear all effects
+function clearEffects() {
+    particles.length = 0;
+}
+
+// === ./ui.js ===
+// ============================================================
+// ui.js - UI rendering: HUD, crafting menu, overlays
+// ============================================================
+
+
+// ============ Drawing helpers ============
+
+function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+}
+
+function drawGlassPanel(ctx, x, y, w, h) {
+    ctx.save();
+    // Shadow
+    ctx.shadowColor = 'rgba(0,0,0,0.3)';
+    ctx.shadowBlur = 12;
+    ctx.shadowOffsetY = 4;
+
+    // Glass background
+    roundRect(ctx, x, y, w, h, 10);
+    ctx.fillStyle = UI_BG;
+    ctx.fill();
+
+    // Border
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = UI_BORDER;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Highlight
+    const grad = ctx.createLinearGradient(x, y, x, y + h);
+    grad.addColorStop(0, 'rgba(255,255,255,0.06)');
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    ctx.restore();
+}
+
+function drawBar(ctx, x, y, w, h, value, max, color, icon) {
+    const ratio = Math.max(0, value / max);
+    // BG
+    roundRect(ctx, x, y, w, h, 3);
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fill();
+    // Fill
+    if (ratio > 0) {
+        roundRect(ctx, x, y, w * ratio, h, 3);
+        ctx.fillStyle = color;
+        ctx.fill();
+    }
+    // Border
+    roundRect(ctx, x, y, w, h, 3);
+    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    // Icon
+    if (icon) {
+        ctx.fillStyle = '#fff';
+        ctx.font = `${h - 2}px sans-serif`;
+        ctx.textAlign = 'left';
+        ctx.fillText(icon, x + 4, y + h - 3);
+    }
+    // Text
+    ctx.fillStyle = '#fff';
+    ctx.font = `bold ${h - 3}px sans-serif`;
+    ctx.textAlign = 'right';
+    ctx.fillText(`${Math.ceil(value)}`, x + w - 4, y + h - 3);
+}
+
+// ============ HUD ============
+
+function drawHUD(ctx, player, world, canvasW, canvasH, craftingMenu) {
+    ctx.save();
+
+    // ---- Top-left: Stats ----
+    const panelX = 10, panelY = 10;
+    const panelW = 200, panelH = 110;
+    drawGlassPanel(ctx, panelX, panelY, panelW, panelH);
+
+    // Health
+    const hpColor = player.health > 60 ? '#4caf50' : player.health > 30 ? '#ff9800' : '#f44336';
+    drawBar(ctx, panelX + 10, panelY + 10, 180, 16, player.health, MAX_HEALTH, hpColor, '♥');
+    // Hunger
+    const hungerColor = player.hunger > 40 ? '#8d6e63' : '#f44336';
+    drawBar(ctx, panelX + 10, panelY + 32, 180, 14, player.hunger, MAX_HUNGER, hungerColor, '🍖');
+    // Thirst
+    const thirstColor = player.thirst > 40 ? '#2196f3' : '#f44336';
+    drawBar(ctx, panelX + 10, panelY + 52, 180, 14, player.thirst, MAX_THIRST, thirstColor, '💧');
+
+    // Day info
+    ctx.fillStyle = UI_TEXT;
+    ctx.font = 'bold 14px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(`第 ${world.dayCount} 天`, panelX + 10, panelY + 85);
+
+    const todColor = world.isNight() ? '#74b9ff' : world.isDusk() ? '#fdcb6e' : '#f1c40f';
+    ctx.fillStyle = todColor;
+    ctx.font = '12px sans-serif';
+    ctx.fillText(`${world.getTimeOfDayName()} ${world.getTimeString()}`, panelX + 10, panelY + 102);
+
+    // Weather indicator
+    if (world.weather !== 'clear') {
+        const weatherIcon = world.weather === 'rain' ? '🌧' : '⛈';
+        ctx.fillStyle = UI_WARNING;
+        ctx.font = '14px sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText(weatherIcon, panelX + panelW - 10, panelY + 102);
+    }
+
+    // ---- Bottom-center: Inventory ----
+    drawInventoryBar(ctx, player, canvasW, canvasH);
+
+    // ---- Top-right: Tools ----
+    drawToolsPanel(ctx, player, canvasW);
+
+    // ---- Bottom-right: Action hints ----
+    drawActionHints(ctx, player, world, canvasW, canvasH);
+
+    // ---- Crafting menu (center) ----
+    if (craftingMenu.isVisible()) {
+        drawCraftingMenu(ctx, player, canvasW, canvasH, craftingMenu);
+    }
+
+    // ---- Controls hint ----
+    ctx.fillStyle = 'rgba(200,220,200,0.5)';
+    ctx.font = '11px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('WASD移动 | E采集/互动 | C制作 | F放置/吃 | Space攻击 | Q钓鱼', canvasW / 2, canvasH - 5);
+
+    ctx.restore();
+}
+
+function drawInventoryBar(ctx, player, canvasW, canvasH) {
+    const slotSize = 44;
+    const gap = 4;
+    const totalW = INVENTORY_SLOTS * slotSize + (INVENTORY_SLOTS - 1) * gap;
+    const startX = (canvasW - totalW) / 2;
+    const startY = canvasH - slotSize - 15;
+
+    drawGlassPanel(ctx, startX - 6, startY - 6, totalW + 12, slotSize + 12);
+
+    for (let i = 0; i < INVENTORY_SLOTS; i++) {
+        const x = startX + i * (slotSize + gap);
+        const y = startY;
+
+        // Slot bg
+        roundRect(ctx, x, y, slotSize, slotSize, 6);
+        ctx.fillStyle = 'rgba(0,0,0,0.4)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        if (i < player.inventory.length) {
+            const item = player.inventory[i];
+            const color = RESOURCE_COLORS[item.type] || STRUCTURE_COLORS[item.type] || '#aaa';
+            const name = RESOURCE_NAMES[item.type] || STRUCTURE_NAMES[item.type] || item.type;
+
+            // Item icon (colored circle)
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(x + slotSize / 2, y + slotSize / 2 - 4, 12, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Item letter
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 12px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(name[0], x + slotSize / 2, y + slotSize / 2 + 1);
+
+            // Count
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 11px sans-serif';
+            ctx.textAlign = 'right';
+            ctx.fillText(item.count, x + slotSize - 4, y + slotSize - 4);
+        }
+
+        // Slot number
+        ctx.fillStyle = 'rgba(255,255,255,0.3)';
+        ctx.font = '10px sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(i + 1, x + 3, y + 12);
+    }
+}
+
+function drawToolsPanel(ctx, player, canvasW) {
+    const tools = [];
+    if (player.tools.axe) tools.push({ name: '石斧', icon: '🪓', color: '#8d6e63' });
+    if (player.tools.pickaxe) tools.push({ name: '石镐', icon: '⛏', color: '#78909c' });
+    if (player.tools.fishingRod) tools.push({ name: '钓鱼竿', icon: '🎣', color: '#5d4037' });
+
+    if (tools.length === 0) return;
+
+    const panelW = 120;
+    const panelH = 24 + tools.length * 22;
+    const px = canvasW - panelW - 10;
+    const py = 10;
+
+    drawGlassPanel(ctx, px, py, panelW, panelH);
+
+    ctx.fillStyle = UI_ACCENT;
+    ctx.font = 'bold 12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('工具', px + panelW / 2, py + 16);
+
+    tools.forEach((t, i) => {
+        ctx.fillStyle = t.color;
+        ctx.font = '13px sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(`${t.icon} ${t.name}`, px + 10, py + 36 + i * 22);
+    });
+}
+
+function drawActionHints(ctx, player, world, canvasW, canvasH) {
+    const hints = [];
+
+    // Check what player can interact with
+    const nearResource = world.getResourceAt(player.x, player.y, 48);
+    if (nearResource) {
+        hints.push('[E] 采集');
+    }
+
+    const nearCampfire = world.structures.find(s =>
+        s.type === 'campfire' &&
+        Math.abs(s.x * 32 + 16 - player.x) < 48 &&
+        Math.abs(s.y * 32 + 16 - player.y) < 48
+    );
+    if (nearCampfire) {
+        if (player.getItemCount('rawMeat') > 0) hints.push('[F] 烹饪生肉');
+        if (player.getItemCount('fish') > 0) hints.push('[F] 烹饪鱼');
+    }
+
+    // Check for food to eat
+    const foods = ['berry', 'cookedMeat', 'cookedFish'];
+    for (const f of foods) {
+        if (player.getItemCount(f) > 0) {
+            hints.push(`[F] 吃${RESOURCE_NAMES[f]}`);
+            break;
+        }
+    }
+
+    // Place structure hints
+    const placeable = ['campfire', 'shelter', 'farm', 'storage', 'boat'];
+    for (const p of placeable) {
+        if (player.getItemCount(p) > 0) {
+            hints.push(`[R] 放置${STRUCTURE_NAMES[p]}`);
+        }
+    }
+
+    // Fishing
+    if (player.tools.fishingRod && world.isAdjacentToWater(player.x, player.y)) {
+        hints.push('[Q] 钓鱼');
+    }
+
+    if (hints.length === 0) return;
+
+    const panelW = 140;
+    const panelH = 20 + hints.length * 18;
+    const px = canvasW - panelW - 10;
+    const py = canvasH - panelH - 70;
+
+    drawGlassPanel(ctx, px, py, panelW, panelH);
+
+    ctx.fillStyle = UI_TEXT;
+    ctx.font = '12px sans-serif';
+    ctx.textAlign = 'left';
+    hints.forEach((h, i) => {
+        ctx.fillText(h, px + 10, py + 18 + i * 18);
+    });
+}
+
+function drawCraftingMenu(ctx, player, canvasW, canvasH, craftingMenu) {
+    const recipes = getAvailableRecipes(player);
+    const menuW = 360;
+    const menuH = 340;
+    const mx = (canvasW - menuW) / 2;
+    const my = (canvasH - menuH) / 2;
+
+    drawGlassPanel(ctx, mx, my, menuW, menuH);
+
+    // Title
+    ctx.fillStyle = UI_ACCENT;
+    ctx.font = 'bold 18px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('制 作', mx + menuW / 2, my + 28);
+
+    // Recipe list
+    const listY = my + 44;
+    const itemH = 36;
+    const sel = craftingMenu.getSelectedIndex();
+
+    for (let i = 0; i < recipes.length; i++) {
+        const r = recipes[i];
+        const iy = listY + i * itemH;
+        if (iy + itemH > my + menuH - 10) break;
+
+        // Selection highlight
+        if (i === sel) {
+            roundRect(ctx, mx + 8, iy, menuW - 16, itemH - 2, 6);
+            ctx.fillStyle = 'rgba(106, 191, 75, 0.15)';
+            ctx.fill();
+            ctx.strokeStyle = UI_ACCENT;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+
+        // Recipe name
+        ctx.fillStyle = r.owned ? '#888' : r.canCraft ? UI_TEXT : '#666';
+        ctx.font = r.owned ? '13px sans-serif' : 'bold 14px sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(r.name, mx + 16, iy + 16);
+
+        // Type tag
+        ctx.fillStyle = r.type === 'tool' ? '#74b9ff' : '#fdcb6e';
+        ctx.font = '11px sans-serif';
+        ctx.textAlign = 'left';
+        const tag = r.type === 'tool' ? '工具' : '建筑';
+        ctx.fillText(`[${tag}]`, mx + 70, iy + 16);
+
+        // Owned marker
+        if (r.owned) {
+            ctx.fillStyle = '#888';
+            ctx.font = '12px sans-serif';
+            ctx.fillText('已拥有', mx + 110, iy + 16);
+        }
+
+        // Ingredients
+        const ingStr = Object.entries(r.ingredients)
+            .map(([t, c]) => {
+                const have = player.getItemCount(t);
+                const name = RESOURCE_NAMES[t] || t;
+                return `${name}${have}/${c}`;
+            }).join('  ');
+        ctx.fillStyle = r.canCraft ? '#8bc34a' : '#e74c3c';
+        ctx.font = '11px sans-serif';
+        ctx.fillText(ingStr, mx + 16, iy + 30);
+
+        // Description
+        ctx.fillStyle = '#888';
+        ctx.font = '10px sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText(r.description, mx + menuW - 16, iy + 16);
+    }
+
+    // Footer
+    ctx.fillStyle = 'rgba(200,220,200,0.5)';
+    ctx.font = '11px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('↑↓选择 | Enter制作 | C关闭', mx + menuW / 2, my + menuH - 10);
+}
+
+// ============ Overlays ============
+
+function drawStartOverlay(ctx, canvasW, canvasH) {
+    ctx.save();
+    // Dark background
+    ctx.fillStyle = 'rgba(10, 20, 10, 0.92)';
+    ctx.fillRect(0, 0, canvasW, canvasH);
+
+    const cx = canvasW / 2;
+
+    // Title
+    ctx.fillStyle = '#4caf50';
+    ctx.font = 'bold 52px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('生存岛屿', cx, 120);
+
+    ctx.fillStyle = '#8bc34a';
+    ctx.font = '18px sans-serif';
+    ctx.fillText('Survival Island', cx, 155);
+
+    // Decorative island
+    ctx.fillStyle = '#2e7d32';
+    ctx.beginPath();
+    ctx.ellipse(cx, 220, 60, 30, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#4caf50';
+    ctx.beginPath();
+    ctx.ellipse(cx, 210, 40, 20, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#795548';
+    ctx.beginPath();
+    ctx.moveTo(cx - 5, 195);
+    ctx.lineTo(cx, 180);
+    ctx.lineTo(cx + 5, 195);
+    ctx.fill();
+    ctx.fillStyle = '#4caf50';
+    ctx.beginPath();
+    ctx.arc(cx, 180, 8, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Water
+    ctx.fillStyle = '#1565c0';
+    ctx.beginPath();
+    ctx.ellipse(cx, 240, 80, 10, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Help box
+    const helpY = 270;
+    const helpW = 400;
+    const helpH = 200;
+    drawGlassPanel(ctx, cx - helpW / 2, helpY, helpW, helpH);
+
+    ctx.fillStyle = UI_ACCENT;
+    ctx.font = 'bold 16px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('操作说明', cx, helpY + 25);
+
+    const controls = [
+        'WASD / 方向键 - 移动',
+        'E - 采集资源 / 互动',
+        'C - 打开制作菜单',
+        'Space - 攻击',
+        'Q - 钓鱼（需钓鱼竿）',
+        'F - 吃食物 / 烹饪',
+        'R - 放置建筑',
+        '',
+        '白天采集资源，夜晚注意狼群！',
+        '建造木筏逃离岛屿即可获胜！',
+    ];
+
+    ctx.fillStyle = UI_TEXT;
+    ctx.font = '13px sans-serif';
+    ctx.textAlign = 'left';
+    controls.forEach((line, i) => {
+        ctx.fillStyle = line.startsWith('建造') || line.startsWith('白天') ? UI_WARNING : UI_TEXT;
+        ctx.fillText(line, cx - helpW / 2 + 30, helpY + 50 + i * 16);
+    });
+
+    // Start button
+    const btnW = 200, btnH = 48;
+    const btnX = cx - btnW / 2, btnY = helpY + helpH + 20;
+
+    roundRect(ctx, btnX, btnY, btnW, btnH, 8);
+    ctx.fillStyle = '#2e7d32';
+    ctx.fill();
+    ctx.strokeStyle = '#4caf50';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 22px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('开始生存', cx, btnY + 32);
+
+    // Version
+    ctx.fillStyle = '#555';
+    ctx.font = '11px sans-serif';
+    ctx.fillText('v1.0', cx, canvasH - 15);
+
+    ctx.restore();
+}
+
+function drawGameOverOverlay(ctx, player, world, canvasW, canvasH, deathReason) {
+    ctx.save();
+    ctx.fillStyle = 'rgba(30, 10, 10, 0.9)';
+    ctx.fillRect(0, 0, canvasW, canvasH);
+
+    const cx = canvasW / 2;
+
+    ctx.fillStyle = '#e74c3c';
+    ctx.font = 'bold 48px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('你死了', cx, 130);
+
+    ctx.fillStyle = '#bbb';
+    ctx.font = '16px sans-serif';
+    ctx.fillText(deathReason || '你在荒岛上倒下了...', cx, 170);
+
+    // Stats
+    const statsY = 200;
+    const stats = [
+        { label: '存活天数', value: world.dayCount, color: '#f1c40f' },
+        { label: '制作物品', value: player.itemsCrafted, color: '#3498db' },
+        { label: '建造建筑', value: player.structuresBuilt, color: '#2ecc71' },
+        { label: '击杀动物', value: player.animalsKilled, color: '#e74c3c' },
+    ];
+
+    drawGlassPanel(ctx, cx - 150, statsY, 300, stats.length * 36 + 20);
+
+    stats.forEach((s, i) => {
+        ctx.fillStyle = '#888';
+        ctx.font = '14px sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(s.label, cx - 130, statsY + 28 + i * 36);
+
+        ctx.fillStyle = s.color;
+        ctx.font = 'bold 18px sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText(s.value, cx + 130, statsY + 30 + i * 36);
+    });
+
+    // High score
+    const hs = localStorage.getItem('survivalIsland_highScore') || 0;
+    if (world.dayCount > hs) {
+        localStorage.setItem('survivalIsland_highScore', world.dayCount);
+        ctx.fillStyle = '#f1c40f';
+        ctx.font = 'bold 16px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('新纪录！', cx, statsY + stats.length * 36 + 40);
+    } else {
+        ctx.fillStyle = '#888';
+        ctx.font = '14px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(`最高纪录: ${hs} 天`, cx, statsY + stats.length * 36 + 40);
+    }
+
+    // Restart button
+    const btnW = 200, btnH = 44;
+    const btnX = cx - btnW / 2;
+    const btnY = statsY + stats.length * 36 + 60;
+
+    roundRect(ctx, btnX, btnY, btnW, btnH, 8);
+    ctx.fillStyle = '#c0392b';
+    ctx.fill();
+    ctx.strokeStyle = '#e74c3c';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 20px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('再来一次', cx, btnY + 30);
+
+    ctx.restore();
+}
+
+function drawWinOverlay(ctx, player, world, canvasW, canvasH) {
+    ctx.save();
+    ctx.fillStyle = 'rgba(10, 30, 10, 0.9)';
+    ctx.fillRect(0, 0, canvasW, canvasH);
+
+    const cx = canvasW / 2;
+
+    ctx.fillStyle = '#f1c40f';
+    ctx.font = 'bold 48px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('逃离成功！', cx, 130);
+
+    ctx.fillStyle = '#8bc34a';
+    ctx.font = '18px sans-serif';
+    ctx.fillText('你建造了木筏，成功逃离了荒岛！', cx, 170);
+
+    // Stats
+    const statsY = 200;
+    const stats = [
+        { label: '存活天数', value: world.dayCount, color: '#f1c40f' },
+        { label: '制作物品', value: player.itemsCrafted, color: '#3498db' },
+        { label: '建造建筑', value: player.structuresBuilt, color: '#2ecc71' },
+        { label: '击杀动物', value: player.animalsKilled, color: '#e74c3c' },
+    ];
+
+    drawGlassPanel(ctx, cx - 150, statsY, 300, stats.length * 36 + 20);
+
+    stats.forEach((s, i) => {
+        ctx.fillStyle = '#888';
+        ctx.font = '14px sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(s.label, cx - 130, statsY + 28 + i * 36);
+
+        ctx.fillStyle = s.color;
+        ctx.font = 'bold 18px sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText(s.value, cx + 130, statsY + 30 + i * 36);
+    });
+
+    // Restart button
+    const btnW = 200, btnH = 44;
+    const btnX = cx - btnW / 2;
+    const btnY = statsY + stats.length * 36 + 40;
+
+    roundRect(ctx, btnX, btnY, btnW, btnH, 8);
+    ctx.fillStyle = '#2e7d32';
+    ctx.fill();
+    ctx.strokeStyle = '#4caf50';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 20px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('再玩一次', cx, btnY + 30);
+
+    ctx.restore();
+}
+
+// Minimap
+function drawMinimap(ctx, world, player, canvasW, canvasH) {
+    const mapSize = 100;
+    const mx = canvasW - mapSize - 10;
+    const my = canvasH - mapSize - 70;
+    const scale = mapSize / (40 * TILE_SIZE);
+
+    drawGlassPanel(ctx, mx - 4, my - 4, mapSize + 8, mapSize + 8);
+
+    // Draw tiles
+    const tileScale = mapSize / 40;
+    for (let y = 0; y < 40; y++) {
+        for (let x = 0; x < 40; x++) {
+            const tile = world.tiles[y][x];
+            const colors = {
+                0: '#1a6b8a', 1: '#d4b96a', 2: '#5a9e4b',
+                3: '#2d6b30', 4: '#7a7a7a', 5: '#1a6b8a',
+            };
+            ctx.fillStyle = colors[tile] || '#000';
+            ctx.fillRect(mx + x * tileScale, my + y * tileScale, tileScale + 0.5, tileScale + 0.5);
+        }
+    }
+
+    // Structures
+    for (const s of world.structures) {
+        ctx.fillStyle = STRUCTURE_COLORS[s.type] || '#fff';
+        ctx.fillRect(mx + s.x * tileScale - 1, my + s.y * tileScale - 1, 3, 3);
+    }
+
+    // Player
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(mx + player.x * scale, my + player.y * scale, 3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Campfire lights at night
+    if (world.isNight()) {
+        for (const s of world.structures) {
+            if (s.type === 'campfire') {
+                ctx.fillStyle = 'rgba(255,180,50,0.4)';
+                ctx.beginPath();
+                ctx.arc(mx + s.x * tileScale + tileScale / 2, my + s.y * tileScale + tileScale / 2, 5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+    }
+}
+
+// Notification system
+const notifications = [];
+
+function addNotification(text, color = '#fff') {
+    notifications.push({ text, color, time: 3, alpha: 1 });
+}
+
+function updateNotifications(dt) {
+    for (let i = notifications.length - 1; i >= 0; i--) {
+        notifications[i].time -= dt;
+        if (notifications[i].time < 1) {
+            notifications[i].alpha = notifications[i].time;
+        }
+        if (notifications[i].time <= 0) {
+            notifications.splice(i, 1);
+        }
+    }
+}
+
+function drawNotifications(ctx, canvasW) {
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.font = '15px sans-serif';
+    notifications.forEach((n, i) => {
+        ctx.globalAlpha = n.alpha;
+        ctx.fillStyle = n.color;
+        ctx.fillText(n.text, canvasW / 2, 140 + i * 22);
+    });
+    ctx.globalAlpha = 1;
+    ctx.restore();
+}
+
+// === main.js ===
+// ============================================================
+// main.js - Game loop, initialization, input handling
+// ============================================================
+
+
+let canvas, ctx;
+let gameState = 'start'; // start, playing, gameover, win
+let player, world, craftingMenu;
+let lastTime = 0;
+let deathReason = '';
+let camX = 0, camY = 0; // current camera position
+
+// Input state
+const keys = {};
+let mouseX = 0, mouseY = 0;
+let mouseDown = false;
+
+function init() {
+    canvas = document.getElementById('gameCanvas');
+    ctx = canvas.getContext('2d');
+    canvas.width = CANVAS_W;
+    canvas.height = CANVAS_H;
+
+    // Input handlers
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    canvas.addEventListener('mousedown', onMouseDown);
+    canvas.addEventListener('mousemove', onMouseMove);
+    canvas.addEventListener('mouseup', onMouseUp);
+
+    // Prevent context menu
+    canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+    // Start loop
+    requestAnimationFrame(gameLoop);
+    render();
+}
+
+function startGame() {
+    Sound.resume();
+    world = createWorld();
+    const spawn = world.findSpawnPoint();
+    player = createPlayer(spawn.x, spawn.y);
+    craftingMenu = createCraftingMenu();
+    clearEffects();
+    gameState = 'playing';
+    deathReason = '';
+    addNotification('欢迎来到荒岛！活下去！', '#4caf50');
+}
+
+function onKeyDown(e) {
+    keys[e.code] = true;
+
+    if (gameState === 'start') {
+        if (e.code === 'Enter' || e.code === 'Space') {
+            startGame();
+        }
+        return;
+    }
+
+    if (gameState === 'gameover' || gameState === 'win') {
+        if (e.code === 'Enter' || e.code === 'Space') {
+            startGame();
+        }
+        return;
+    }
+
+    // Playing state
+    if (e.code === 'KeyC') {
+        craftingMenu.toggle();
+    }
+
+    if (craftingMenu && craftingMenu.isVisible()) {
+        if (e.code === 'ArrowUp' || e.code === 'KeyW') {
+            craftingMenu.selectPrev();
+            e.preventDefault();
+        }
+        if (e.code === 'ArrowDown' || e.code === 'KeyS') {
+            craftingMenu.selectNext();
+            e.preventDefault();
+        }
+        if (e.code === 'Enter') {
+            const recipe = craftingMenu.craftSelected(player);
+            if (recipe) {
+                spawnCraftEffect(player.x, player.y);
+                const crafted = RECIPES[craftingMenu.getSelectedIndex()];
+                addNotification(`制作了 ${crafted.name}！`, '#6abf4b');
+            }
+        }
+        return; // Don't process movement while crafting menu is open
+    }
+
+    // Gather / Interact
+    if (e.code === 'KeyE') {
+        handleGather();
+    }
+
+    // Eat / Cook
+    if (e.code === 'KeyF') {
+        handleEatOrCook();
+    }
+
+    // Place structure
+    if (e.code === 'KeyR') {
+        handlePlaceStructure();
+    }
+
+    // Attack
+    if (e.code === 'Space') {
+        handleAttack();
+        e.preventDefault();
+    }
+
+    // Fish
+    if (e.code === 'KeyQ') {
+        handleFish();
+    }
+}
+
+function onKeyUp(e) {
+    keys[e.code] = false;
+}
+
+function onMouseDown(e) {
+    mouseDown = true;
+    if (gameState === 'start') {
+        // Check start button click
+        const rect = canvas.getBoundingClientRect();
+        const x = (e.clientX - rect.left) * (CANVAS_W / rect.width);
+        const y = (e.clientY - rect.top) * (CANVAS_H / rect.height);
+        if (x > CANVAS_W / 2 - 100 && x < CANVAS_W / 2 + 100 && y > 490 && y < 538) {
+            startGame();
+        }
+        return;
+    }
+    if (gameState === 'gameover' || gameState === 'win') {
+        const rect = canvas.getBoundingClientRect();
+        const x = (e.clientX - rect.left) * (CANVAS_W / rect.width);
+        const y = (e.clientY - rect.top) * (CANVAS_H / rect.height);
+        if (x > CANVAS_W / 2 - 100 && x < CANVAS_W / 2 + 100 && y > 390 && y < 460) {
+            startGame();
+        }
+    }
+}
+
+function onMouseMove(e) {
+    const rect = canvas.getBoundingClientRect();
+    mouseX = (e.clientX - rect.left) * (CANVAS_W / rect.width);
+    mouseY = (e.clientY - rect.top) * (CANVAS_H / rect.height);
+}
+
+function onMouseUp(e) {
+    mouseDown = false;
+}
+
+function handleGather() {
+    if (player.gathering) return;
+    const res = world.getResourceAt(player.x, player.y, GATHER_RANGE);
+    if (res) {
+        player.startGather(res);
+        spawnGatherEffect(
+            res.x * TILE_SIZE + TILE_SIZE / 2,
+            res.y * TILE_SIZE + TILE_SIZE / 2,
+            res.type
+        );
+    }
+}
+
+function handleEatOrCook() {
+    // Try cooking first
+    if (player.tryCook(world)) {
+        addNotification('烹饪成功！', '#e67e22');
+        return;
+    }
+    // Try eating
+    const foods = ['cookedMeat', 'cookedFish', 'berry', 'rawMeat', 'fish'];
+    for (const f of foods) {
+        if (player.getItemCount(f) > 0) {
+            if (player.eat(f)) {
+                addNotification(`吃了 ${RESOURCE_NAMES[f]}`, '#8d6e63');
+                return;
+            }
+        }
+    }
+}
+
+function handlePlaceStructure() {
+    const placeable = ['campfire', 'shelter', 'farm', 'storage', 'boat'];
+    for (const p of placeable) {
+        if (player.getItemCount(p) > 0) {
+            if (player.tryPlaceStructure(p, world)) {
+                addNotification(`放置了 ${STRUCTURE_NAMES[p]}`, '#795548');
+                if (p === 'boat') {
+                    gameState = 'win';
+                    Sound.win();
+                }
+                return;
+            }
+        }
+    }
+}
+
+function handleAttack() {
+    const killed = player.attack(world.animals);
+    if (killed) {
+        spawnHitEffect(killed.x, killed.y);
+        const idx = world.animals.indexOf(killed);
+        if (idx >= 0) world.animals.splice(idx, 1);
+        addNotification('击杀！获得食物', '#e74c3c');
+    }
+}
+
+function handleFish() {
+    const fishBefore = player.getItemCount('fish');
+    if (player.tryFish(world)) {
+        const fishAfter = player.getItemCount('fish');
+        if (fishAfter > fishBefore) {
+            addNotification('钓到了一条鱼！', '#2196f3');
+        } else {
+            addNotification('什么都没钓到...', '#888');
+        }
+    }
+}
+
+// ============ Game Loop ============
+
+function gameLoop(time) {
+    const dt = Math.min((time - lastTime) / 1000, 0.05);
+    lastTime = time;
+
+    if (gameState === 'playing') {
+        update(dt);
+    }
+
+    render();
+    requestAnimationFrame(gameLoop);
+}
+
+function update(dt) {
+    // Player movement
+    let mx = 0, my = 0;
+    if (keys['KeyW'] || keys['ArrowUp']) my = -1;
+    if (keys['KeyS'] || keys['ArrowDown']) my = 1;
+    if (keys['KeyA'] || keys['ArrowLeft']) mx = -1;
+    if (keys['KeyD'] || keys['ArrowRight']) mx = 1;
+
+    if (!craftingMenu.isVisible()) {
+        const len = Math.sqrt(mx * mx + my * my);
+        if (len > 0) {
+            player.vx = (mx / len) * player.speed;
+            player.vy = (my / len) * player.speed;
+            if (mx > 0) player.facing = 'right';
+            else if (mx < 0) player.facing = 'left';
+            else if (my > 0) player.facing = 'down';
+            else player.facing = 'up';
+        } else {
+            player.vx = 0;
+            player.vy = 0;
+        }
+    } else {
+        player.vx = 0;
+        player.vy = 0;
+    }
+
+    // Update systems
+    player.update(dt, world);
+    world.update(dt);
+    updateStructures(world, dt);
+    updateAnimals(world, player, dt);
+    updateEffects(dt, CANVAS_W, CANVAS_H);
+    updateNotifications(dt);
+
+    // Weather effects
+    if (world.weather === 'rain') {
+        if (Math.random() < 0.3) spawnRainDrop(camX, camY, CANVAS_W);
+        if (Math.random() < 0.01) Sound.rain();
+    }
+    if (world.weather === 'storm') {
+        for (let i = 0; i < 3; i++) {
+            if (Math.random() < 0.5) spawnRainDrop(camX, camY, CANVAS_W);
+        }
+    }
+
+    // Campfire effects
+    for (const s of world.structures) {
+        if (s.type === 'campfire') {
+            if (Math.random() < 0.15) {
+                spawnFireParticle(
+                    s.x * TILE_SIZE + TILE_SIZE / 2,
+                    s.y * TILE_SIZE + TILE_SIZE / 2
+                );
+            }
+            if (Math.random() < 0.05) {
+                spawnSmokeParticle(
+                    s.x * TILE_SIZE + TILE_SIZE / 2,
+                    s.y * TILE_SIZE + TILE_SIZE / 2 - 5
+                );
+            }
+            // Fire sound
+            if (world.isNight() && Math.random() < 0.02) {
+                Sound.fire();
+            }
+        }
+    }
+
+    // Wolf howl at night
+    if (world.isNight() && world.animals.some(a => a.type === 'wolf') && Math.random() < 0.002) {
+        Sound.wolfHowl();
+    }
+
+    // Check death
+    if (!player.alive) {
+        if (player.health <= 0 && player.hunger <= 0) {
+            deathReason = '你饿死在了荒岛上...';
+        } else if (player.health <= 0 && player.thirst <= 0) {
+            deathReason = '你渴死在了荒岛上...';
+        } else if (player.health <= 0) {
+            deathReason = '你在荒岛上倒下了...';
+        }
+        gameState = 'gameover';
+        Sound.gameOver();
+    }
+
+    // Check win
+    if (player.win) {
+        gameState = 'win';
+    }
+}
+
+function render() {
+    ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
+
+    if (gameState === 'start') {
+        drawStartOverlay(ctx, CANVAS_W, CANVAS_H);
+        return;
+    }
+
+    if (!world || !player) return;
+
+    // Camera
+    const rawCamX = player.x - CANVAS_W / 2;
+    const rawCamY = player.y - CANVAS_H / 2;
+    const maxCamX = 40 * TILE_SIZE - CANVAS_W;
+    const maxCamY = 40 * TILE_SIZE - CANVAS_H;
+    camX = Math.max(0, Math.min(maxCamX, rawCamX));
+    camY = Math.max(0, Math.min(maxCamY, rawCamY));
+    const cx = camX, cy = camY;
+
+    ctx.save();
+
+    // Draw world tiles
+    const startCol = Math.max(0, Math.floor(cx / TILE_SIZE));
+    const startRow = Math.max(0, Math.floor(cy / TILE_SIZE));
+    const endCol = Math.min(39, Math.ceil((cx + CANVAS_W) / TILE_SIZE));
+    const endRow = Math.min(39, Math.ceil((cy + CANVAS_H) / TILE_SIZE));
+
+    for (let y = startRow; y <= endRow; y++) {
+        for (let x = startCol; x <= endCol; x++) {
+            const tile = world.tiles[y][x];
+            const sx = x * TILE_SIZE - cx;
+            const sy = y * TILE_SIZE - cy;
+            ctx.fillStyle = TILE_COLORS[tile] || '#000';
+            ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
+            ctx.strokeStyle = 'rgba(0,0,0,0.08)';
+            ctx.lineWidth = 0.5;
+            ctx.strokeRect(sx, sy, TILE_SIZE, TILE_SIZE);
+        }
+    }
+
+    // Draw resources (screen space)
+    drawResources(ctx, world, cx, cy, CANVAS_W, CANVAS_H);
+
+    // Draw structures (screen space)
+    drawStructures(ctx, world, cx, cy, CANVAS_W, CANVAS_H);
+
+    // Draw animals (screen space)
+    drawAnimals(ctx, world, cx, cy, CANVAS_W, CANVAS_H);
+
+    // Draw player (screen space)
+    drawPlayer(ctx, player, cx, cy);
+
+    // Draw gathering progress (screen space)
+    if (player.gathering) {
+        const g = player.gathering;
+        const rx = g.resource.x * TILE_SIZE + TILE_SIZE / 2 - cx;
+        const ry = g.resource.y * TILE_SIZE - 8 - cy;
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        ctx.fillRect(rx - 16, ry, 32, 5);
+        ctx.fillStyle = '#6abf4b';
+        ctx.fillRect(rx - 16, ry, 32 * (g.progress / g.total), 5);
+    }
+
+    // Draw particles (screen space)
+    drawEffects(ctx, world, cx, cy, CANVAS_W, CANVAS_H);
+
+    // Draw campfire light (screen space)
+    drawCampfireLight(ctx, world, cx, cy, CANVAS_W, CANVAS_H);
+
+    ctx.restore();
+
+    // Screen-space effects
+    drawWeatherOverlay(ctx, world, CANVAS_W, CANVAS_H);
+    drawDayNightOverlay(ctx, world, CANVAS_W, CANVAS_H);
+
+    // HUD
+    drawHUD(ctx, player, world, CANVAS_W, CANVAS_H, craftingMenu);
+    drawMinimap(ctx, world, player, CANVAS_W, CANVAS_H);
+    drawNotifications(ctx, CANVAS_W);
+
+    // Overlays
+    if (gameState === 'gameover') {
+        drawGameOverOverlay(ctx, player, world, CANVAS_W, CANVAS_H, deathReason);
+    }
+    if (gameState === 'win') {
+        drawWinOverlay(ctx, player, world, CANVAS_W, CANVAS_H);
+    }
+}
+
+function drawPlayer(ctx, player, camX, camY) {
+    ctx.save();
+    const x = player.x - camX, y = player.y - camY;
+    const size = player.size;
+
+    // Shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.2)';
+    ctx.beginPath();
+    ctx.ellipse(x, y + size / 2, size / 2, size / 4, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Body
+    ctx.fillStyle = '#4a8c5c';
+    ctx.beginPath();
+    ctx.ellipse(x, y, size / 2, size / 2 + 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Shirt/vest
+    ctx.fillStyle = '#5d7a4a';
+    ctx.beginPath();
+    ctx.ellipse(x, y + 2, size / 2 - 2, size / 2 - 1, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Head
+    ctx.fillStyle = '#e8c39e';
+    ctx.beginPath();
+    ctx.arc(x, y - size / 2 + 2, size / 3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Hair
+    ctx.fillStyle = '#5d3a1a';
+    ctx.beginPath();
+    ctx.arc(x, y - size / 2 - 1, size / 3, -Math.PI, 0);
+    ctx.fill();
+
+    // Eyes (based on facing)
+    ctx.fillStyle = '#222';
+    let ex1, ey1, ex2, ey2;
+    const eo = 3;
+    if (player.facing === 'left') {
+        ex1 = x - eo - 1; ey1 = y - size / 2 + 2;
+        ex2 = x - eo + 3; ey2 = ey1;
+    } else if (player.facing === 'right') {
+        ex1 = x + eo - 2; ey1 = y - size / 2 + 2;
+        ex2 = x + eo + 2; ey2 = ey1;
+    } else if (player.facing === 'up') {
+        // Don't show eyes when facing up
+        ex1 = ex2 = -100; ey1 = ey2 = -100;
+    } else {
+        ex1 = x - eo; ey1 = y - size / 2 + 2;
+        ex2 = x + eo; ey2 = ey1;
+    }
+    ctx.beginPath();
+    ctx.arc(ex1, ey1, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(ex2, ey2, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Arms (if gathering, show animation)
+    ctx.strokeStyle = '#e8c39e';
+    ctx.lineWidth = 3;
+    if (player.gathering) {
+        const t = player.gathering.progress * 8;
+        const armAngle = Math.sin(t) * 0.5;
+        ctx.beginPath();
+        ctx.moveTo(x - size / 2, y);
+        ctx.lineTo(x - size / 2 - 8, y + Math.sin(t) * 6);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x + size / 2, y);
+        ctx.lineTo(x + size / 2 + 8, y + Math.sin(t + Math.PI) * 6);
+        ctx.stroke();
+    }
+
+    // Health flash when damaged
+    if (player.health < 30) {
+        ctx.fillStyle = `rgba(255, 0, 0, ${0.2 + Math.sin(Date.now() / 200) * 0.1})`;
+        ctx.beginPath();
+        ctx.arc(x, y, size, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    ctx.restore();
+}
+
+// Boot
+window.startGame = function () {
+    if (gameState !== 'playing') {
+        startGame();
+    }
+};
+
+// Auto-init
+if (document.readyState === 'loading') {
+    init();;
+} else {
+    init();
+}
+
+        
+        // Hide loading after modules loaded
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                document.getElementById('loading').classList.add('hidden');
+            }, 500);
+        });
+    
+</script>
+
+</body>
+</html>

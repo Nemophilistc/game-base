@@ -1,0 +1,2943 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>放置挂机大亨</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      color: #fff;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* 顶部信息栏 */
+    .top-bar {
+      background: rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(10px);
+      padding: 15px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid rgba(255, 215, 0, 0.3);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .game-title {
+      font-size: 24px;
+      font-weight: bold;
+      background: linear-gradient(45deg, #ffd700, #ffed4a);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+    }
+
+    .stats-container {
+      display: flex;
+      gap: 30px;
+    }
+
+    .stat-item {
+      text-align: center;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: #aaa;
+      margin-bottom: 5px;
+    }
+
+    .stat-value {
+      font-size: 20px;
+      font-weight: bold;
+      color: #ffd700;
+    }
+
+    /* 主容器 */
+    .main-container {
+      display: flex;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 20px;
+      gap: 20px;
+      min-height: calc(100vh - 80px);
+    }
+
+    /* 左侧面板 - 点击区域 */
+    .left-panel {
+      flex: 0 0 300px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .click-section {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 15px;
+      padding: 30px;
+      text-align: center;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 215, 0, 0.2);
+    }
+
+    .click-btn {
+      width: 150px;
+      height: 150px;
+      border-radius: 50%;
+      background: linear-gradient(145deg, #ffd700, #ff8c00);
+      border: none;
+      cursor: pointer;
+      font-size: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 20px;
+      transition: all 0.1s ease;
+      box-shadow: 0 10px 30px rgba(255, 215, 0, 0.4);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .click-btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 15px 40px rgba(255, 215, 0, 0.6);
+    }
+
+    .click-btn:active {
+      transform: scale(0.95);
+      box-shadow: 0 5px 15px rgba(255, 215, 0, 0.4);
+    }
+
+    .click-btn::after {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle, rgba(255,255,255,0.3) 0%, transparent 70%);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .click-btn:hover::after {
+      opacity: 1;
+    }
+
+    .click-value {
+      font-size: 14px;
+      color: #aaa;
+    }
+
+    .click-value span {
+      color: #ffd700;
+      font-weight: bold;
+    }
+
+    /* 点击动画 */
+    .click-animation {
+      position: absolute;
+      color: #ffd700;
+      font-size: 18px;
+      font-weight: bold;
+      pointer-events: none;
+      animation: floatUp 1s ease-out forwards;
+      text-shadow: 0 0 10px rgba(255, 215, 0, 0.8);
+    }
+
+    @keyframes floatUp {
+      0% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+      100% {
+        opacity: 0;
+        transform: translateY(-100px) scale(1.5);
+      }
+    }
+
+    /* 成就通知 */
+    .achievement-section {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 15px;
+      padding: 20px;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 215, 0, 0.2);
+    }
+
+    .achievement-summary {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .achievement-summary h3 {
+      font-size: 16px;
+      color: #ffd700;
+    }
+
+    .achievement-stats {
+      font-size: 14px;
+      color: #aaa;
+    }
+
+    .achievement-stats span {
+      color: #ffd700;
+      font-weight: bold;
+    }
+
+    /* 中间面板 - 主要内容 */
+    .center-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* 标签页导航 */
+    .tab-nav {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 12px 20px;
+      background: rgba(255, 255, 255, 0.1);
+      border: none;
+      border-radius: 10px 10px 0 0;
+      color: #aaa;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .tab-btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+      color: #fff;
+    }
+
+    .tab-btn.active {
+      background: rgba(255, 215, 0, 0.2);
+      color: #ffd700;
+      border-bottom: 2px solid #ffd700;
+    }
+
+    /* 标签页内容 */
+    .tab-content {
+      display: none;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 0 15px 15px 15px;
+      padding: 20px;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 215, 0, 0.2);
+      flex: 1;
+      overflow-y: auto;
+      max-height: calc(100vh - 200px);
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    /* 购买数量选择 */
+    .buy-amount-selector {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .buy-amount-btn {
+      flex: 1;
+      padding: 10px;
+      background: rgba(255, 255, 255, 0.1);
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .buy-amount-btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .buy-amount-btn.active {
+      background: rgba(255, 215, 0, 0.3);
+      color: #ffd700;
+      border: 1px solid rgba(255, 215, 0, 0.5);
+    }
+
+    /* 建筑列表 */
+    .building-item {
+      display: flex;
+      align-items: center;
+      padding: 15px;
+      margin-bottom: 10px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 10px;
+      transition: all 0.3s ease;
+      border: 1px solid transparent;
+    }
+
+    .building-item:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 215, 0, 0.3);
+    }
+
+    .building-item.affordable {
+      border-left: 3px solid #4ade80;
+    }
+
+    .building-item.expensive {
+      border-left: 3px solid #ef4444;
+    }
+
+    .building-icon {
+      font-size: 40px;
+      margin-right: 15px;
+      width: 60px;
+      text-align: center;
+    }
+
+    .building-info {
+      flex: 1;
+    }
+
+    .building-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 5px;
+    }
+
+    .building-name {
+      font-size: 16px;
+      font-weight: bold;
+      color: #fff;
+    }
+
+    .building-count {
+      font-size: 14px;
+      color: #ffd700;
+      background: rgba(255, 215, 0, 0.2);
+      padding: 2px 8px;
+      border-radius: 10px;
+    }
+
+    .building-description {
+      font-size: 12px;
+      color: #aaa;
+      margin-bottom: 5px;
+    }
+
+    .building-production {
+      font-size: 12px;
+      color: #4ade80;
+    }
+
+    .building-cost {
+      margin-left: 15px;
+    }
+
+    .buy-btn {
+      padding: 10px 20px;
+      background: linear-gradient(145deg, #ffd700, #ff8c00);
+      border: none;
+      border-radius: 8px;
+      color: #000;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      min-width: 100px;
+    }
+
+    .buy-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(255, 215, 0, 0.4);
+    }
+
+    .buy-btn:active {
+      transform: translateY(0);
+    }
+
+    .buy-btn.disabled {
+      background: #666;
+      cursor: not-allowed;
+      opacity: 0.7;
+    }
+
+    .buy-btn.disabled:hover {
+      transform: none;
+      box-shadow: none;
+    }
+
+    .cost-amount {
+      display: block;
+      font-size: 14px;
+    }
+
+    .cost-label {
+      display: block;
+      font-size: 10px;
+      opacity: 0.8;
+    }
+
+    /* 升级列表 */
+    .upgrade-item {
+      display: flex;
+      align-items: center;
+      padding: 15px;
+      margin-bottom: 10px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 10px;
+      transition: all 0.3s ease;
+      border: 1px solid transparent;
+    }
+
+    .upgrade-item:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .upgrade-item.purchased {
+      opacity: 0.6;
+      border-left: 3px solid #4ade80;
+    }
+
+    .upgrade-item.locked {
+      opacity: 0.4;
+      border-left: 3px solid #666;
+    }
+
+    .upgrade-item.affordable {
+      border-left: 3px solid #ffd700;
+      background: rgba(255, 215, 0, 0.1);
+    }
+
+    .upgrade-item.expensive {
+      border-left: 3px solid #ef4444;
+    }
+
+    .upgrade-icon {
+      font-size: 36px;
+      margin-right: 15px;
+      width: 50px;
+      text-align: center;
+    }
+
+    .upgrade-info {
+      flex: 1;
+    }
+
+    .upgrade-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 5px;
+    }
+
+    .upgrade-name {
+      font-size: 16px;
+      font-weight: bold;
+      color: #fff;
+    }
+
+    .upgrade-multiplier {
+      font-size: 14px;
+      color: #4ade80;
+      background: rgba(74, 222, 128, 0.2);
+      padding: 2px 8px;
+      border-radius: 10px;
+    }
+
+    .upgrade-description {
+      font-size: 12px;
+      color: #aaa;
+      margin-bottom: 5px;
+    }
+
+    .upgrade-status {
+      font-size: 12px;
+      color: #ffd700;
+    }
+
+    .upgrade-cost {
+      margin-left: 15px;
+    }
+
+    /* 成就列表 */
+    .achievement-item {
+      display: flex;
+      align-items: center;
+      padding: 15px;
+      margin-bottom: 10px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 10px;
+      transition: all 0.3s ease;
+    }
+
+    .achievement-item.unlocked {
+      background: rgba(255, 215, 0, 0.1);
+      border: 1px solid rgba(255, 215, 0, 0.3);
+    }
+
+    .achievement-item.locked {
+      opacity: 0.6;
+    }
+
+    .achievement-icon {
+      font-size: 36px;
+      margin-right: 15px;
+      width: 50px;
+      text-align: center;
+    }
+
+    .achievement-info {
+      flex: 1;
+    }
+
+    .achievement-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 5px;
+    }
+
+    .achievement-name {
+      font-size: 16px;
+      font-weight: bold;
+      color: #fff;
+    }
+
+    .achievement-reward {
+      font-size: 14px;
+      color: #4ade80;
+      background: rgba(74, 222, 128, 0.2);
+      padding: 2px 8px;
+      border-radius: 10px;
+    }
+
+    .achievement-description {
+      font-size: 12px;
+      color: #aaa;
+      margin-bottom: 10px;
+    }
+
+    .achievement-progress {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .progress-bar {
+      flex: 1;
+      height: 8px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #ffd700, #ff8c00);
+      border-radius: 4px;
+      transition: width 0.3s ease;
+    }
+
+    .progress-text {
+      font-size: 12px;
+      color: #aaa;
+      min-width: 80px;
+      text-align: right;
+    }
+
+    /* 统计面板 */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 15px;
+    }
+
+    .stat-card {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 10px;
+      padding: 20px;
+      text-align: center;
+    }
+
+    .stat-card-icon {
+      font-size: 30px;
+      margin-bottom: 10px;
+    }
+
+    .stat-card-value {
+      font-size: 24px;
+      font-weight: bold;
+      color: #ffd700;
+      margin-bottom: 5px;
+    }
+
+    .stat-card-label {
+      font-size: 12px;
+      color: #aaa;
+    }
+
+    /* 设置面板 */
+    .settings-section {
+      margin-bottom: 20px;
+    }
+
+    .settings-section h3 {
+      font-size: 16px;
+      color: #ffd700;
+      margin-bottom: 15px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid rgba(255, 215, 0, 0.2);
+    }
+
+    .settings-btn {
+      width: 100%;
+      padding: 12px;
+      margin-bottom: 10px;
+      background: rgba(255, 255, 255, 0.1);
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .settings-btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .settings-btn.danger {
+      background: rgba(239, 68, 68, 0.3);
+    }
+
+    .settings-btn.danger:hover {
+      background: rgba(239, 68, 68, 0.5);
+    }
+
+    /* 右侧面板 - 信息 */
+    .right-panel {
+      flex: 0 0 250px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .info-card {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 15px;
+      padding: 20px;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 215, 0, 0.2);
+    }
+
+    .info-card h3 {
+      font-size: 16px;
+      color: #ffd700;
+      margin-bottom: 15px;
+    }
+
+    .info-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      font-size: 14px;
+    }
+
+    .info-item:last-child {
+      border-bottom: none;
+    }
+
+    .info-label {
+      color: #aaa;
+    }
+
+    .info-value {
+      color: #fff;
+      font-weight: bold;
+    }
+
+    /* 通知 */
+    .notification {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(5px);
+      z-index: 1000;
+    }
+
+    .offline-content {
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      padding: 30px;
+      border-radius: 20px;
+      text-align: center;
+      border: 2px solid rgba(255, 215, 0, 0.5);
+      max-width: 400px;
+    }
+
+    .offline-content h3 {
+      font-size: 24px;
+      color: #ffd700;
+      margin-bottom: 15px;
+    }
+
+    .offline-content p {
+      font-size: 16px;
+      margin-bottom: 10px;
+    }
+
+    .gold-amount {
+      color: #ffd700;
+      font-weight: bold;
+      font-size: 20px;
+    }
+
+    .offline-content button {
+      margin-top: 20px;
+      padding: 12px 40px;
+      background: linear-gradient(145deg, #ffd700, #ff8c00);
+      border: none;
+      border-radius: 10px;
+      color: #000;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .offline-content button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(255, 215, 0, 0.4);
+    }
+
+    /* 成就弹窗 */
+    .achievement-popup {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      padding: 20px;
+      border-radius: 15px;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      border: 2px solid rgba(255, 215, 0, 0.5);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      animation: slideIn 0.5s ease;
+      z-index: 1001;
+    }
+
+    @keyframes slideIn {
+      from {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    .achievement-popup-icon {
+      font-size: 40px;
+    }
+
+    .achievement-popup-title {
+      font-size: 12px;
+      color: #aaa;
+      text-transform: uppercase;
+    }
+
+    .achievement-popup-name {
+      font-size: 18px;
+      font-weight: bold;
+      color: #ffd700;
+      margin: 5px 0;
+    }
+
+    .achievement-popup-desc {
+      font-size: 14px;
+      color: #fff;
+    }
+
+    .achievement-popup-reward {
+      font-size: 12px;
+      color: #4ade80;
+      margin-top: 5px;
+    }
+
+    /* 临时消息 */
+    .temp-message {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.8);
+      color: #fff;
+      padding: 10px 20px;
+      border-radius: 8px;
+      animation: fadeInOut 2s ease;
+      z-index: 1000;
+    }
+
+    @keyframes fadeInOut {
+      0% { opacity: 0; transform: translateX(-50%) translateY(20px); }
+      20% { opacity: 1; transform: translateX(-50%) translateY(0); }
+      80% { opacity: 1; transform: translateX(-50%) translateY(0); }
+      100% { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+    }
+
+    /* 空消息 */
+    .empty-message {
+      text-align: center;
+      color: #aaa;
+      padding: 40px;
+      font-size: 14px;
+    }
+
+    /* 滚动条样式 */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 215, 0, 0.5);
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 215, 0, 0.7);
+    }
+
+    /* 响应式设计 */
+    @media (max-width: 1200px) {
+      .right-panel {
+        display: none;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .main-container {
+        flex-direction: column;
+        padding: 10px;
+      }
+
+      .left-panel {
+        flex: none;
+        flex-direction: row;
+        overflow-x: auto;
+      }
+
+      .click-section,
+      .achievement-section {
+        min-width: 200px;
+      }
+
+      .tab-nav {
+        flex-wrap: wrap;
+      }
+
+      .tab-btn {
+        flex: none;
+        width: calc(50% - 5px);
+      }
+
+      .stats-container {
+        gap: 15px;
+      }
+
+      .stat-value {
+        font-size: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- 顶部信息栏 -->
+  <div class="top-bar">
+    <div class="game-title">放置挂机大亨</div>
+    <div class="stats-container">
+      <div class="stat-item">
+        <div class="stat-label">金币</div>
+        <div class="stat-value" id="gold">0</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">每秒产出</div>
+        <div class="stat-value" id="gold-per-second">0</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">点击价值</div>
+        <div class="stat-value" id="click-value">1</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 主容器 -->
+  <div class="main-container">
+    <!-- 左侧面板 -->
+    <div class="left-panel">
+      <!-- 点击区域 -->
+      <div class="click-section">
+        <button class="click-btn" id="click-btn">
+          💰
+        </button>
+        <div class="click-value">每次点击：<span id="click-value-display">1</span> 金币</div>
+      </div>
+
+      <!-- 成就摘要 -->
+      <div class="achievement-section">
+        <div class="achievement-summary">
+          <h3>成就进度</h3>
+          <div class="achievement-stats">
+            <span id="achievement-count">0/0</span>
+          </div>
+        </div>
+        <div class="achievement-stats">
+          加成：<span id="achievement-bonus">+0%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 中间面板 -->
+    <div class="center-panel">
+      <!-- 标签页导航 -->
+      <div class="tab-nav">
+        <button class="tab-btn active" data-tab="buildings">建筑</button>
+        <button class="tab-btn" data-tab="upgrades">升级</button>
+        <button class="tab-btn" data-tab="achievements">成就</button>
+        <button class="tab-btn" data-tab="stats">统计</button>
+        <button class="tab-btn" data-tab="settings">设置</button>
+        <button class="tab-btn" data-tab="help">玩法说明</button>
+      </div>
+
+      <!-- 建筑标签页 -->
+      <div class="tab-content active" id="buildings-tab">
+        <div class="buy-amount-selector">
+          <button class="buy-amount-btn active" data-amount="1">x1</button>
+          <button class="buy-amount-btn" data-amount="10">x10</button>
+          <button class="buy-amount-btn" data-amount="100">x100</button>
+        </div>
+        <div id="buildings-list"></div>
+      </div>
+
+      <!-- 升级标签页 -->
+      <div class="tab-content" id="upgrades-tab">
+        <div id="upgrades-list"></div>
+      </div>
+
+      <!-- 成就标签页 -->
+      <div class="tab-content" id="achievements-tab">
+        <div id="achievements-list"></div>
+      </div>
+
+      <!-- 统计标签页 -->
+      <div class="tab-content" id="stats-tab">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-card-icon">⏱️</div>
+            <div class="stat-card-value" id="play-time">0秒</div>
+            <div class="stat-card-label">游戏时长</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-icon">👆</div>
+            <div class="stat-card-value" id="total-clicks">0</div>
+            <div class="stat-card-label">总点击次数</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-icon">💰</div>
+            <div class="stat-card-value" id="total-gold">0</div>
+            <div class="stat-card-label">累计金币</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-icon">🏗️</div>
+            <div class="stat-card-value" id="total-buildings">0</div>
+            <div class="stat-card-label">建筑总数</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-icon">⬆️</div>
+            <div class="stat-card-value" id="total-upgrades">0</div>
+            <div class="stat-card-label">升级总数</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 设置标签页 -->
+      <div class="tab-content" id="settings-tab">
+        <div class="settings-section">
+          <h3>显示设置</h3>
+          <button class="settings-btn" id="number-format-toggle">切换中文数字</button>
+        </div>
+        <div class="settings-section">
+          <h3>存档管理</h3>
+          <button class="settings-btn" id="save-btn">手动保存</button>
+          <button class="settings-btn" id="export-btn">导出存档</button>
+          <button class="settings-btn" id="import-btn">导入存档</button>
+          <input type="file" id="import-file" accept=".json" style="display: none;">
+          <button class="settings-btn danger" id="reset-btn">重置游戏</button>
+        </div>
+      </div>
+
+      <!-- 玩法说明标签页 -->
+      <div class="tab-content" id="help-tab">
+        <div style="line-height: 1.8; font-size: 15px;">
+          <h3 style="color: #ffd700; font-size: 20px; margin-bottom: 15px; text-align: center;">
+            欢迎来到放置挂机大亨！
+          </h3>
+
+          <div style="background: rgba(255, 215, 0, 0.1); border-left: 3px solid #ffd700; padding: 12px 16px; border-radius: 0 8px 8px 0; margin-bottom: 15px;">
+            <strong style="color: #ffd700;">基本操作</strong><br>
+            点击左侧的金币按钮即可赚取金币。你的点击价值会随着升级而提高，每次点击赚取更多金币！
+          </div>
+
+          <div style="background: rgba(74, 222, 128, 0.1); border-left: 3px solid #4ade80; padding: 12px 16px; border-radius: 0 8px 8px 0; margin-bottom: 15px;">
+            <strong style="color: #4ade80;">购买建筑</strong><br>
+            在「建筑」标签页中购买各种建筑。每种建筑每秒都会自动为你产出金币。拥有的建筑越多，产出越高。建筑左绿色边框表示买得起，红色则需要攒更多金币。
+          </div>
+
+          <div style="background: rgba(168, 85, 247, 0.1); border-left: 3px solid #a855f7; padding: 12px 16px; border-radius: 0 8px 8px 0; margin-bottom: 15px;">
+            <strong style="color: #a855f7;">升级强化</strong><br>
+            在「升级」标签页中解锁各种升级。升级可以大幅提升建筑产出效率、增加点击价值，甚至解锁全新功能。
+          </div>
+
+          <div style="background: rgba(255, 165, 0, 0.1); border-left: 3px solid #ffa500; padding: 12px 16px; border-radius: 0 8px 8px 0; margin-bottom: 15px;">
+            <strong style="color: #ffa500;">成就奖励</strong><br>
+            在「成就」标签页中查看所有成就。达成成就可以获得永久加成，提升所有金币产出。完成越多成就，收益越高！
+          </div>
+
+          <div style="background: rgba(96, 165, 250, 0.1); border-left: 3px solid #60a5fa; padding: 12px 16px; border-radius: 0 8px 8px 0; margin-bottom: 15px;">
+            <strong style="color: #60a5fa;">离线收益</strong><br>
+            关闭游戏后再次打开，你会获得离线期间积累的金币收益，不用担心错过任何产出。
+          </div>
+
+          <div style="background: rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 12px 16px; text-align: center; color: #aaa; margin-top: 20px;">
+            提示：善用 x1/x10/x100 批量购买功能，可以更高效地管理你的金币投资。
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 右侧面板 -->
+    <div class="right-panel">
+      <!-- 产出信息 -->
+      <div class="info-card">
+        <h3>产出统计</h3>
+        <div class="info-item">
+          <span class="info-label">每秒产出</span>
+          <span class="info-value" id="info-pps">0</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">点击价值</span>
+          <span class="info-value" id="info-click">1</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">成就加成</span>
+          <span class="info-value" id="info-bonus">+0%</span>
+        </div>
+      </div>
+
+      <!-- 建筑统计 -->
+      <div class="info-card">
+        <h3>建筑统计</h3>
+        <div id="buildings-stats"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 离线收益通知 -->
+  <div class="notification" id="offline-notification"></div>
+
+  <!-- 成就通知 -->
+  <div class="notification" id="achievement-notification"></div>
+
+  <!-- 游戏脚本 -->
+  <script>
+// === ./config.js ===
+// 游戏配置常量
+const CONFIG = {
+  // 建筑配置
+  buildings: [
+    {
+      id: 'lemonade',
+      name: '柠檬水摊',
+      icon: '🍋',
+      baseCost: 10,
+      baseProduction: 0.5,
+      description: '清凉柠檬水，童叟无欺'
+    },
+    {
+      id: 'newspaper',
+      name: '报刊亭',
+      icon: '📰',
+      baseCost: 100,
+      baseProduction: 2,
+      description: '最新报刊杂志'
+    },
+    {
+      id: 'pizza',
+      name: '披萨店',
+      icon: '🍕',
+      baseCost: 1000,
+      baseProduction: 10,
+      description: '美味披萨，现做现卖'
+    },
+    {
+      id: 'cinema',
+      name: '电影院',
+      icon: '🎬',
+      baseCost: 10000,
+      baseProduction: 50,
+      description: '视听盛宴'
+    },
+    {
+      id: 'bank',
+      name: '银行',
+      icon: '🏦',
+      baseCost: 100000,
+      baseProduction: 250,
+      description: '钱生钱'
+    },
+    {
+      id: 'factory',
+      name: '工厂',
+      icon: '🏭',
+      baseCost: 1000000,
+      baseProduction: 1200,
+      description: '自动化生产线'
+    },
+    {
+      id: 'laboratory',
+      name: '实验室',
+      icon: '🔬',
+      baseCost: 10000000,
+      baseProduction: 6000,
+      description: '科技创新'
+    },
+    {
+      id: 'spacestation',
+      name: '太空站',
+      icon: '🚀',
+      baseCost: 100000000,
+      baseProduction: 30000,
+      description: '探索宇宙'
+    },
+    {
+      id: 'dyson',
+      name: '戴森球',
+      icon: '☀️',
+      baseCost: 1000000000,
+      baseProduction: 150000,
+      description: '恒星能量收集器'
+    },
+    {
+      id: 'timemachine',
+      name: '时间机器',
+      icon: '⏰',
+      baseCost: 10000000000,
+      baseProduction: 750000,
+      description: '穿越时空'
+    }
+  ],
+
+  // 升级配置 - 每种建筑有多个升级
+  upgrades: [
+    // 柠檬水摊升级
+    { id: 'lemon_1', buildingId: 'lemonade', name: '新鲜柠檬', multiplier: 2, cost: 100, requiredCount: 1, description: '柠檬水产量x2' },
+    { id: 'lemon_2', buildingId: 'lemonade', name: '秘制配方', multiplier: 2, cost: 500, requiredCount: 5, description: '柠檬水产量x2' },
+    { id: 'lemon_3', buildingId: 'lemonade', name: '连锁经营', multiplier: 5, cost: 5000, requiredCount: 25, description: '柠檬水产量x5' },
+    { id: 'lemon_4', buildingId: 'lemonade', name: '品牌效应', multiplier: 10, cost: 50000, requiredCount: 50, description: '柠檬水产量x10' },
+    { id: 'lemon_5', buildingId: 'lemonade', name: '全球垄断', multiplier: 100, cost: 5000000, requiredCount: 100, description: '柠檬水产量x100' },
+
+    // 报刊亭升级
+    { id: 'news_1', buildingId: 'newspaper', name: '头版头条', multiplier: 2, cost: 1000, requiredCount: 1, description: '报刊亭产量x2' },
+    { id: 'news_2', buildingId: 'newspaper', name: '日报周刊', multiplier: 2, cost: 5000, requiredCount: 5, description: '报刊亭产量x2' },
+    { id: 'news_3', buildingId: 'newspaper', name: '媒体帝国', multiplier: 5, cost: 50000, requiredCount: 25, description: '报刊亭产量x5' },
+    { id: 'news_4', buildingId: 'newspaper', name: '新闻自由', multiplier: 10, cost: 500000, requiredCount: 50, description: '报刊亭产量x10' },
+    { id: 'news_5', buildingId: 'newspaper', name: '信息霸权', multiplier: 100, cost: 50000000, requiredCount: 100, description: '报刊亭产量x100' },
+
+    // 披萨店升级
+    { id: 'pizza_1', buildingId: 'pizza', name: '芝士加倍', multiplier: 2, cost: 10000, requiredCount: 1, description: '披萨店产量x2' },
+    { id: 'pizza_2', buildingId: 'pizza', name: '外卖服务', multiplier: 2, cost: 50000, requiredCount: 5, description: '披萨店产量x2' },
+    { id: 'pizza_3', buildingId: 'pizza', name: '连锁披萨', multiplier: 5, cost: 500000, requiredCount: 25, description: '披萨店产量x5' },
+    { id: 'pizza_4', buildingId: 'pizza', name: '披萨帝国', multiplier: 10, cost: 5000000, requiredCount: 50, description: '披萨店产量x10' },
+    { id: 'pizza_5', buildingId: 'pizza', name: '全球披萨', multiplier: 100, cost: 500000000, requiredCount: 100, description: '披萨店产量x100' },
+
+    // 电影院升级
+    { id: 'cinema_1', buildingId: 'cinema', name: '爆米花', multiplier: 2, cost: 100000, requiredCount: 1, description: '电影院产量x2' },
+    { id: 'cinema_2', buildingId: 'cinema', name: '3D放映', multiplier: 2, cost: 500000, requiredCount: 5, description: '电影院产量x2' },
+    { id: 'cinema_3', buildingId: 'cinema', name: 'IMAX巨幕', multiplier: 5, cost: 5000000, requiredCount: 25, description: '电影院产量x5' },
+    { id: 'cinema_4', buildingId: 'cinema', name: '影视帝国', multiplier: 10, cost: 50000000, requiredCount: 50, description: '电影院产量x10' },
+    { id: 'cinema_5', buildingId: 'cinema', name: '奥斯卡奖', multiplier: 100, cost: 5000000000, requiredCount: 100, description: '电影院产量x100' },
+
+    // 银行升级
+    { id: 'bank_1', buildingId: 'bank', name: 'VIP客户', multiplier: 2, cost: 1000000, requiredCount: 1, description: '银行产量x2' },
+    { id: 'bank_2', buildingId: 'bank', name: '理财产品', multiplier: 2, cost: 5000000, requiredCount: 5, description: '银行产量x2' },
+    { id: 'bank_3', buildingId: 'bank', name: '跨国银行', multiplier: 5, cost: 50000000, requiredCount: 25, description: '银行产量x5' },
+    { id: 'bank_4', buildingId: 'bank', name: '金融帝国', multiplier: 10, cost: 500000000, requiredCount: 50, description: '银行产量x10' },
+    { id: 'bank_5', buildingId: 'bank', name: '央行行长', multiplier: 100, cost: 50000000000, requiredCount: 100, description: '银行产量x100' },
+
+    // 工厂升级
+    { id: 'factory_1', buildingId: 'factory', name: '流水线', multiplier: 2, cost: 10000000, requiredCount: 1, description: '工厂产量x2' },
+    { id: 'factory_2', buildingId: 'factory', name: '自动化', multiplier: 2, cost: 50000000, requiredCount: 5, description: '工厂产量x2' },
+    { id: 'factory_3', buildingId: 'factory', name: '智能制造', multiplier: 5, cost: 500000000, requiredCount: 25, description: '工厂产量x5' },
+    { id: 'factory_4', buildingId: 'factory', name: '工业4.0', multiplier: 10, cost: 5000000000, requiredCount: 50, description: '工厂产量x10' },
+    { id: 'factory_5', buildingId: 'factory', name: '纳米工厂', multiplier: 100, cost: 500000000000, requiredCount: 100, description: '工厂产量x100' },
+
+    // 实验室升级
+    { id: 'lab_1', buildingId: 'laboratory', name: '显微镜', multiplier: 2, cost: 100000000, requiredCount: 1, description: '实验室产量x2' },
+    { id: 'lab_2', buildingId: 'laboratory', name: '基因工程', multiplier: 2, cost: 500000000, requiredCount: 5, description: '实验室产量x2' },
+    { id: 'lab_3', buildingId: 'laboratory', name: '量子计算', multiplier: 5, cost: 5000000000, requiredCount: 25, description: '实验室产量x5' },
+    { id: 'lab_4', buildingId: 'laboratory', name: '人工智能', multiplier: 10, cost: 50000000000, requiredCount: 50, description: '实验室产量x10' },
+    { id: 'lab_5', buildingId: 'laboratory', name: '奇点降临', multiplier: 100, cost: 5000000000000, requiredCount: 100, description: '实验室产量x100' },
+
+    // 太空站升级
+    { id: 'space_1', buildingId: 'spacestation', name: '月球基地', multiplier: 2, cost: 1000000000, requiredCount: 1, description: '太空站产量x2' },
+    { id: 'space_2', buildingId: 'spacestation', name: '火星殖民', multiplier: 2, cost: 5000000000, requiredCount: 5, description: '太空站产量x2' },
+    { id: 'space_3', buildingId: 'spacestation', name: '星际旅行', multiplier: 5, cost: 50000000000, requiredCount: 25, description: '太空站产量x5' },
+    { id: 'space_4', buildingId: 'spacestation', name: '虫洞技术', multiplier: 10, cost: 500000000000, requiredCount: 50, description: '太空站产量x10' },
+    { id: 'space_5', buildingId: 'spacestation', name: '银河帝国', multiplier: 100, cost: 50000000000000, requiredCount: 100, description: '太空站产量x100' },
+
+    // 戴森球升级
+    { id: 'dyson_1', buildingId: 'dyson', name: '能量护盾', multiplier: 2, cost: 10000000000, requiredCount: 1, description: '戴森球产量x2' },
+    { id: 'dyson_2', buildingId: 'dyson', name: '恒星引擎', multiplier: 2, cost: 50000000000, requiredCount: 5, description: '戴森球产量x2' },
+    { id: 'dyson_3', buildingId: 'dyson', name: '反物质', multiplier: 5, cost: 500000000000, requiredCount: 25, description: '戴森球产量x5' },
+    { id: 'dyson_4', buildingId: 'dyson', name: '暗能量', multiplier: 10, cost: 5000000000000, requiredCount: 50, description: '戴森球产量x10' },
+    { id: 'dyson_5', buildingId: 'dyson', name: '宇宙之心', multiplier: 100, cost: 500000000000000, requiredCount: 100, description: '戴森球产量x100' },
+
+    // 时间机器升级
+    { id: 'time_1', buildingId: 'timemachine', name: '时光倒流', multiplier: 2, cost: 100000000000, requiredCount: 1, description: '时间机器产量x2' },
+    { id: 'time_2', buildingId: 'timemachine', name: '平行宇宙', multiplier: 2, cost: 500000000000, requiredCount: 5, description: '时间机器产量x2' },
+    { id: 'time_3', buildingId: 'timemachine', name: '因果律', multiplier: 5, cost: 5000000000000, requiredCount: 25, description: '时间机器产量x5' },
+    { id: 'time_4', buildingId: 'timemachine', name: '命运之轮', multiplier: 10, cost: 50000000000000, requiredCount: 50, description: '时间机器产量x10' },
+    { id: 'time_5', buildingId: 'timemachine', name: '永恒之主', multiplier: 100, cost: 5000000000000000, requiredCount: 100, description: '时间机器产量x100' }
+  ],
+
+  // 成就配置
+  achievements: [
+    // 点击成就
+    { id: 'click_1', name: '初次点击', description: '点击1次', condition: { type: 'clicks', value: 1 }, reward: 0.01 },
+    { id: 'click_2', name: '点击新手', description: '点击100次', condition: { type: 'clicks', value: 100 }, reward: 0.01 },
+    { id: 'click_3', name: '点击达人', description: '点击1000次', condition: { type: 'clicks', value: 1000 }, reward: 0.02 },
+    { id: 'click_4', name: '点击大师', description: '点击10000次', condition: { type: 'clicks', value: 10000 }, reward: 0.05 },
+    { id: 'click_5', name: '点击之神', description: '点击100000次', condition: { type: 'clicks', value: 100000 }, reward: 0.1 },
+
+    // 金币成就
+    { id: 'gold_1', name: '小有积蓄', description: '累计获得1000金币', condition: { type: 'totalGold', value: 1000 }, reward: 0.01 },
+    { id: 'gold_2', name: '万元户', description: '累计获得10000金币', condition: { type: 'totalGold', value: 10000 }, reward: 0.01 },
+    { id: 'gold_3', name: '百万富翁', description: '累计获得1000000金币', condition: { type: 'totalGold', value: 1000000 }, reward: 0.02 },
+    { id: 'gold_4', name: '亿万富翁', description: '累计获得1000000000金币', condition: { type: 'totalGold', value: 1000000000 }, reward: 0.05 },
+    { id: 'gold_5', name: '世界首富', description: '累计获得1000000000000金币', condition: { type: 'totalGold', value: 1000000000000 }, reward: 0.1 },
+
+    // 建筑成就 - 每种建筑拥有1个
+    { id: 'build_lemonade', name: '柠檬水大王', description: '拥有50个柠檬水摊', condition: { type: 'building', buildingId: 'lemonade', value: 50 }, reward: 0.02 },
+    { id: 'build_newspaper', name: '报业大亨', description: '拥有50个报刊亭', condition: { type: 'building', buildingId: 'newspaper', value: 50 }, reward: 0.02 },
+    { id: 'build_pizza', name: '披萨之王', description: '拥有50个披萨店', condition: { type: 'building', buildingId: 'pizza', value: 50 }, reward: 0.02 },
+    { id: 'build_cinema', name: '影视大亨', description: '拥有50个电影院', condition: { type: 'building', buildingId: 'cinema', value: 50 }, reward: 0.02 },
+    { id: 'build_bank', name: '银行家', description: '拥有50个银行', condition: { type: 'building', buildingId: 'bank', value: 50 }, reward: 0.02 },
+    { id: 'build_factory', name: '工业巨头', description: '拥有50个工厂', condition: { type: 'building', buildingId: 'factory', value: 50 }, reward: 0.02 },
+    { id: 'build_laboratory', name: '科学狂人', description: '拥有50个实验室', condition: { type: 'building', buildingId: 'laboratory', value: 50 }, reward: 0.02 },
+    { id: 'build_spacestation', name: '太空霸主', description: '拥有50个太空站', condition: { type: 'building', buildingId: 'spacestation', value: 50 }, reward: 0.02 },
+    { id: 'build_dyson', name: '能源之王', description: '拥有50个戴森球', condition: { type: 'building', buildingId: 'dyson', value: 50 }, reward: 0.02 },
+    { id: 'build_timemachine', name: '时间领主', description: '拥有50个时间机器', condition: { type: 'building', buildingId: 'timemachine', value: 50 }, reward: 0.02 },
+
+    // 升级成就
+    { id: 'upgrade_1', name: '初次升级', description: '购买1个升级', condition: { type: 'upgrades', value: 1 }, reward: 0.01 },
+    { id: 'upgrade_2', name: '升级达人', description: '购买10个升级', condition: { type: 'upgrades', value: 10 }, reward: 0.02 },
+    { id: 'upgrade_3', name: '升级大师', description: '购买25个升级', condition: { type: 'upgrades', value: 25 }, reward: 0.05 },
+
+    // 产量成就
+    { id: 'prod_1', name: '小作坊', description: '每秒产出10金币', condition: { type: 'production', value: 10 }, reward: 0.01 },
+    { id: 'prod_2', name: '小工厂', description: '每秒产出1000金币', condition: { type: 'production', value: 1000 }, reward: 0.02 },
+    { id: 'prod_3', name: '大企业', description: '每秒产出100000金币', condition: { type: 'production', value: 100000 }, reward: 0.05 },
+    { id: 'prod_4', name: '商业帝国', description: '每秒产出10000000金币', condition: { type: 'production', value: 10000000 }, reward: 0.1 },
+
+    // 特殊成就
+    { id: 'special_1', name: '全面发展', description: '每种建筑至少拥有1个', condition: { type: 'allBuildings', value: 1 }, reward: 0.05 },
+    { id: 'special_2', name: '建筑狂魔', description: '总计拥有500个建筑', condition: { type: 'totalBuildings', value: 500 }, reward: 0.05 },
+    { id: 'special_3', name: '建筑之神', description: '总计拥有2000个建筑', condition: { type: 'totalBuildings', value: 2000 }, reward: 0.1 }
+  ],
+
+  // 游戏设置
+  settings: {
+    saveInterval: 10000,  // 自动存档间隔（毫秒）
+    offlineEfficiency: 0.5,  // 离线收益效率
+    costMultiplier: 1.15,  // 建筑价格递增倍率
+    clickBaseValue: 1,  // 基础点击价值
+    ticksPerSecond: 1  // 每秒游戏tick数
+  },
+
+  // 数字格式化配置
+  numberFormat: {
+    suffixes: ['', 'K', 'M', 'B', 'T', 'Qa', 'Qi', 'Sx', 'Sp', 'Oc', 'No', 'Dc'],
+    thresholds: [1, 1e3, 1e6, 1e9, 1e12, 1e15, 1e18, 1e21, 1e24, 1e27, 1e30, 1e33]
+  }
+};
+
+// === ./game.js ===
+// 核心游戏状态管理
+
+class GameState {
+  constructor() {
+    this.reset();
+  }
+
+  // 重置游戏状态
+  reset() {
+    this.gold = 0;
+    this.totalGold = 0;
+    this.clicks = 0;
+    this.clickValue = CONFIG.settings.clickBaseValue;
+    this.productionPerSecond = 0;
+    this.achievementMultiplier = 0; // 成就提供的额外倍率
+    this.lastSaveTime = Date.now();
+    this.lastTickTime = Date.now();
+
+    // 建筑数量 { buildingId: count }
+    this.buildings = {};
+    CONFIG.buildings.forEach(b => {
+      this.buildings[b.id] = 0;
+    });
+
+    // 建筑倍率 { buildingId: multiplier }
+    this.buildingMultipliers = {};
+    CONFIG.buildings.forEach(b => {
+      this.buildingMultipliers[b.id] = 1;
+    });
+
+    // 已购买的升级 { upgradeId: true }
+    this.purchasedUpgrades = {};
+
+    // 已达成的成就 { achievementId: true }
+    this.achievements = {};
+
+    // 统计数据
+    this.stats = {
+      totalClicks: 0,
+      totalBuildingsPurchased: 0,
+      totalUpgradesPurchased: 0,
+      startTime: Date.now()
+    };
+  }
+
+  // 点击
+  click() {
+    const value = this.getClickValue();
+    this.gold += value;
+    this.totalGold += value;
+    this.clicks++;
+    this.stats.totalClicks++;
+    return value;
+  }
+
+  // 获取点击价值
+  getClickValue() {
+    return this.clickValue * (1 + this.achievementMultiplier);
+  }
+
+  // 获取建筑当前价格
+  getBuildingCost(buildingId) {
+    const config = CONFIG.buildings.find(b => b.id === buildingId);
+    if (!config) return Infinity;
+    const count = this.buildings[buildingId] || 0;
+    return Math.floor(config.baseCost * Math.pow(CONFIG.settings.costMultiplier, count));
+  }
+
+  // 购买建筑
+  buyBuilding(buildingId) {
+    const cost = this.getBuildingCost(buildingId);
+    if (this.gold < cost) return false;
+
+    this.gold -= cost;
+    this.buildings[buildingId] = (this.buildings[buildingId] || 0) + 1;
+    this.stats.totalBuildingsPurchased++;
+
+    this.recalculateProduction();
+    return true;
+  }
+
+  // 批量购买建筑
+  buyBuildingBulk(buildingId, amount) {
+    let purchased = 0;
+    for (let i = 0; i < amount; i++) {
+      if (this.buyBuilding(buildingId)) {
+        purchased++;
+      } else {
+        break;
+      }
+    }
+    return purchased;
+  }
+
+  // 购买升级
+  buyUpgrade(upgradeId) {
+    const config = CONFIG.upgrades.find(u => u.id === upgradeId);
+    if (!config) return false;
+    if (this.purchasedUpgrades[upgradeId]) return false;
+    if (this.gold < config.cost) return false;
+
+    const buildingCount = this.buildings[config.buildingId] || 0;
+    if (buildingCount < config.requiredCount) return false;
+
+    this.gold -= config.cost;
+    this.purchasedUpgrades[upgradeId] = true;
+    this.stats.totalUpgradesPurchased++;
+
+    // 应用倍率
+    this.buildingMultipliers[config.buildingId] *= config.multiplier;
+
+    this.recalculateProduction();
+    return true;
+  }
+
+  // 重新计算每秒产出
+  recalculateProduction() {
+    let totalProduction = 0;
+
+    CONFIG.buildings.forEach(config => {
+      const count = this.buildings[config.id] || 0;
+      const multiplier = this.buildingMultipliers[config.id] || 1;
+      const achievementBonus = 1 + this.achievementMultiplier;
+      totalProduction += count * config.baseProduction * multiplier * achievementBonus;
+    });
+
+    this.productionPerSecond = totalProduction;
+  }
+
+  // 游戏tick（每秒调用一次）
+  tick() {
+    const now = Date.now();
+    const elapsed = (now - this.lastTickTime) / 1000; // 秒
+    this.lastTickTime = now;
+
+    // 添加产出金币
+    const earned = this.productionPerSecond * elapsed;
+    this.gold += earned;
+    this.totalGold += earned;
+
+    return earned;
+  }
+
+  // 计算离线收益
+  calculateOfflineEarnings(offlineSeconds) {
+    const maxOfflineSeconds = 24 * 60 * 60; // 最多计算24小时
+    const seconds = Math.min(offlineSeconds, maxOfflineSeconds);
+    return this.productionPerSecond * seconds * CONFIG.settings.offlineEfficiency;
+  }
+
+  // 应用离线收益
+  applyOfflineEarnings(amount) {
+    this.gold += amount;
+    this.totalGold += amount;
+  }
+
+  // 获取建筑数量
+  getBuildingCount(buildingId) {
+    return this.buildings[buildingId] || 0;
+  }
+
+  // 获取总建筑数量
+  getTotalBuildingCount() {
+    return Object.values(this.buildings).reduce((sum, count) => sum + count, 0);
+  }
+
+  // 检查升级是否可购买
+  canBuyUpgrade(upgradeId) {
+    const config = CONFIG.upgrades.find(u => u.id === upgradeId);
+    if (!config) return false;
+    if (this.purchasedUpgrades[upgradeId]) return false;
+    if (this.gold < config.cost) return false;
+
+    const buildingCount = this.buildings[config.buildingId] || 0;
+    return buildingCount >= config.requiredCount;
+  }
+
+  // 获取升级状态
+  getUpgradeStatus(upgradeId) {
+    const config = CONFIG.upgrades.find(u => u.id === upgradeId);
+    if (!config) return { purchased: false, affordable: false, locked: true };
+
+    const purchased = !!this.purchasedUpgrades[upgradeId];
+    const buildingCount = this.buildings[config.buildingId] || 0;
+    const locked = buildingCount < config.requiredCount;
+    const affordable = !purchased && !locked && this.gold >= config.cost;
+
+    return { purchased, affordable, locked };
+  }
+
+  // 检查成就
+  checkAchievements() {
+    const newAchievements = [];
+
+    CONFIG.achievements.forEach(achievement => {
+      if (this.achievements[achievement.id]) return; // 已达成
+
+      let earned = false;
+      const condition = achievement.condition;
+
+      switch (condition.type) {
+        case 'clicks':
+          earned = this.clicks >= condition.value;
+          break;
+        case 'totalGold':
+          earned = this.totalGold >= condition.value;
+          break;
+        case 'building':
+          earned = (this.buildings[condition.buildingId] || 0) >= condition.value;
+          break;
+        case 'upgrades':
+          earned = this.stats.totalUpgradesPurchased >= condition.value;
+          break;
+        case 'production':
+          earned = this.productionPerSecond >= condition.value;
+          break;
+        case 'allBuildings':
+          earned = CONFIG.buildings.every(b => (this.buildings[b.id] || 0) >= condition.value);
+          break;
+        case 'totalBuildings':
+          earned = this.getTotalBuildingCount() >= condition.value;
+          break;
+      }
+
+      if (earned) {
+        this.achievements[achievement.id] = true;
+        this.achievementMultiplier += achievement.reward;
+        this.recalculateProduction();
+        newAchievements.push(achievement);
+      }
+    });
+
+    return newAchievements;
+  }
+
+  // 获取存档数据
+  getSaveData() {
+    return {
+      gold: this.gold,
+      totalGold: this.totalGold,
+      clicks: this.clicks,
+      clickValue: this.clickValue,
+      buildings: { ...this.buildings },
+      buildingMultipliers: { ...this.buildingMultipliers },
+      purchasedUpgrades: { ...this.purchasedUpgrades },
+      achievements: { ...this.achievements },
+      achievementMultiplier: this.achievementMultiplier,
+      stats: { ...this.stats },
+      lastSaveTime: Date.now(),
+      version: 1
+    };
+  }
+
+  // 从存档加载
+  loadSaveData(data) {
+    if (!data) return false;
+
+    try {
+      this.gold = data.gold || 0;
+      this.totalGold = data.totalGold || 0;
+      this.clicks = data.clicks || 0;
+      this.clickValue = data.clickValue || CONFIG.settings.clickBaseValue;
+      this.achievementMultiplier = data.achievementMultiplier || 0;
+      this.lastSaveTime = data.lastSaveTime || Date.now();
+      this.lastTickTime = Date.now();
+
+      // 加载建筑
+      this.buildings = {};
+      CONFIG.buildings.forEach(b => {
+        this.buildings[b.id] = (data.buildings && data.buildings[b.id]) || 0;
+      });
+
+      // 加载倍率
+      this.buildingMultipliers = {};
+      CONFIG.buildings.forEach(b => {
+        this.buildingMultipliers[b.id] = (data.buildingMultipliers && data.buildingMultipliers[b.id]) || 1;
+      });
+
+      // 加载升级
+      this.purchasedUpgrades = data.purchasedUpgrades || {};
+
+      // 加载成就
+      this.achievements = data.achievements || {};
+
+      // 加载统计
+      this.stats = data.stats || {
+        totalClicks: this.clicks,
+        totalBuildingsPurchased: 0,
+        totalUpgradesPurchased: 0,
+        startTime: Date.now()
+      };
+
+      this.recalculateProduction();
+      return true;
+    } catch (e) {
+      console.error('加载存档失败:', e);
+      return false;
+    }
+  }
+
+  // 获取游戏统计
+  getPlayTime() {
+    return Date.now() - this.stats.startTime;
+  }
+}
+
+// 导出单例
+const game = new GameState();
+
+// === ./utils.js ===
+// 工具函数
+
+/**
+ * 格式化数字
+ * @param {number} num - 要格式化的数字
+ * @param {boolean} useChinese - 是否使用中文单位（万、亿）
+ * @returns {string} 格式化后的字符串
+ */
+function formatNumber(num, useChinese = false) {
+  if (num === 0) return '0';
+  if (!isFinite(num)) return '∞';
+
+  if (useChinese) {
+    return formatChineseNumber(num);
+  }
+
+  return formatEnglishNumber(num);
+}
+
+/**
+ * 英文格式化 (K, M, B, T, Qa, Qi...)
+ */
+function formatEnglishNumber(num) {
+  const absNum = Math.abs(num);
+  const sign = num < 0 ? '-' : '';
+
+  if (absNum < 1000) {
+    return sign + (absNum % 1 === 0 ? absNum.toString() : absNum.toFixed(1));
+  }
+
+  const suffixes = CONFIG.numberFormat.suffixes;
+  const thresholds = CONFIG.numberFormat.thresholds;
+
+  let index = thresholds.length - 1;
+  while (index > 0 && absNum < thresholds[index]) {
+    index--;
+  }
+
+  const value = absNum / thresholds[index];
+  const suffix = suffixes[index];
+
+  // 保留适当的小数位数
+  if (value >= 100) {
+    return sign + Math.floor(value) + suffix;
+  } else if (value >= 10) {
+    return sign + value.toFixed(1) + suffix;
+  } else {
+    return sign + value.toFixed(2) + suffix;
+  }
+}
+
+/**
+ * 中文格式化（万、亿、兆...）
+ */
+function formatChineseNumber(num) {
+  const absNum = Math.abs(num);
+  const sign = num < 0 ? '-' : '';
+
+  if (absNum < 10000) {
+    return sign + (absNum % 1 === 0 ? absNum.toString() : absNum.toFixed(1));
+  }
+
+  const units = [
+    { value: 1e16, name: '京' },
+    { value: 1e12, name: '兆' },
+    { value: 1e8, name: '亿' },
+    { value: 1e4, name: '万' }
+  ];
+
+  for (const unit of units) {
+    if (absNum >= unit.value) {
+      const value = absNum / unit.value;
+      if (value >= 1000) {
+        return sign + Math.floor(value) + unit.name;
+      } else if (value >= 100) {
+        return sign + value.toFixed(1) + unit.name;
+      } else if (value >= 10) {
+        return sign + value.toFixed(2) + unit.name;
+      } else {
+        return sign + value.toFixed(2) + unit.name;
+      }
+    }
+  }
+
+  return sign + Math.floor(absNum).toString();
+}
+
+/**
+ * 格式化时间
+ * @param {number} seconds - 秒数
+ * @returns {string} 格式化后的时间字符串
+ */
+function formatTime(seconds) {
+  if (seconds < 60) {
+    return `${Math.floor(seconds)}秒`;
+  } else if (seconds < 3600) {
+    const minutes = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${minutes}分${secs > 0 ? secs + '秒' : ''}`;
+  } else if (seconds < 86400) {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    return `${hours}时${minutes > 0 ? minutes + '分' : ''}`;
+  } else {
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
+    return `${days}天${hours > 0 ? hours + '时' : ''}`;
+  }
+}
+
+/**
+ * 格式化游戏时间（从毫秒）
+ * @param {number} ms - 毫秒数
+ * @returns {string} 格式化后的时间字符串
+ */
+function formatPlayTime(ms) {
+  return formatTime(ms / 1000);
+}
+
+// === ./save.js ===
+// 存档系统
+
+class SaveSystem {
+  constructor() {
+    this.saveKey = 'idleClicker_save';
+    this.autoSaveInterval = null;
+  }
+
+  // 初始化存档系统
+  init() {
+    // 加载存档
+    this.load();
+
+    // 启动自动存档
+    this.startAutoSave();
+
+    // 页面关闭前保存
+    window.addEventListener('beforeunload', () => {
+      this.save();
+    });
+
+    // 页面可见性变化时保存
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') {
+        this.save();
+      }
+    });
+  }
+
+  // 启动自动存档
+  startAutoSave() {
+    if (this.autoSaveInterval) {
+      clearInterval(this.autoSaveInterval);
+    }
+
+    this.autoSaveInterval = setInterval(() => {
+      this.save();
+    }, CONFIG.settings.saveInterval);
+  }
+
+  // 停止自动存档
+  stopAutoSave() {
+    if (this.autoSaveInterval) {
+      clearInterval(this.autoSaveInterval);
+      this.autoSaveInterval = null;
+    }
+  }
+
+  // 保存游戏
+  save() {
+    try {
+      const saveData = game.getSaveData();
+      const saveString = JSON.stringify(saveData);
+      localStorage.setItem(this.saveKey, saveString);
+      return true;
+    } catch (e) {
+      console.error('保存游戏失败:', e);
+      return false;
+    }
+  }
+
+  // 加载游戏
+  load() {
+    try {
+      const saveString = localStorage.getItem(this.saveKey);
+      if (!saveString) return false;
+
+      const saveData = JSON.parse(saveString);
+      const loaded = game.loadSaveData(saveData);
+
+      if (loaded) {
+        // 计算离线收益
+        this.calculateOfflineEarnings(saveData);
+      }
+
+      return loaded;
+    } catch (e) {
+      console.error('加载游戏失败:', e);
+      return false;
+    }
+  }
+
+  // 计算离线收益
+  calculateOfflineEarnings(saveData) {
+    if (!saveData.lastSaveTime) return;
+
+    const now = Date.now();
+    const offlineMs = now - saveData.lastSaveTime;
+    const offlineSeconds = offlineMs / 1000;
+
+    // 如果离线时间小于10秒，不计算离线收益
+    if (offlineSeconds < 10) return;
+
+    const earnings = game.calculateOfflineEarnings(offlineSeconds);
+
+    if (earnings > 0) {
+      game.applyOfflineEarnings(earnings);
+
+      // 显示离线收益通知
+      this.showOfflineNotification(earnings, offlineSeconds);
+    }
+  }
+
+  // 显示离线收益通知
+  showOfflineNotification(earnings, offlineSeconds) {
+    const notification = document.getElementById('offline-notification');
+    if (!notification) return;
+
+    const earningsText = formatNumber(earnings);
+    const timeText = formatTime(offlineSeconds);
+
+    notification.innerHTML = `
+      <div class="offline-content">
+        <h3>欢迎回来！</h3>
+        <p>您离线了 ${timeText}</p>
+        <p>离线收益：<span class="gold-amount">${earningsText}</span> 金币</p>
+        <button id="offline-claim-btn">领取</button>
+      </div>
+    `;
+
+    notification.style.display = 'flex';
+
+    const claimBtn = document.getElementById('offline-claim-btn');
+    claimBtn.addEventListener('click', () => {
+      notification.style.display = 'none';
+    });
+  }
+
+  // 删除存档
+  deleteSave() {
+    try {
+      localStorage.removeItem(this.saveKey);
+      return true;
+    } catch (e) {
+      console.error('删除存档失败:', e);
+      return false;
+    }
+  }
+
+  // 导出存档
+  exportSave() {
+    try {
+      const saveData = game.getSaveData();
+      const saveString = JSON.stringify(saveData, null, 2);
+
+      // 创建下载
+      const blob = new Blob([saveString], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `idleClicker_save_${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      return true;
+    } catch (e) {
+      console.error('导出存档失败:', e);
+      return false;
+    }
+  }
+
+  // 导入存档
+  importSave(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+
+      reader.onload = (e) => {
+        try {
+          const saveData = JSON.parse(e.target.result);
+          const loaded = game.loadSaveData(saveData);
+
+          if (loaded) {
+            this.save();
+            resolve(true);
+          } else {
+            reject(new Error('无效的存档文件'));
+          }
+        } catch (err) {
+          reject(err);
+        }
+      };
+
+      reader.onerror = () => {
+        reject(new Error('读取文件失败'));
+      };
+
+      reader.readAsText(file);
+    });
+  }
+
+  // 重置游戏
+  resetGame() {
+    if (confirm('确定要重置游戏吗？所有进度将丢失！')) {
+      this.deleteSave();
+      game.reset();
+      return true;
+    }
+    return false;
+  }
+
+  // 获取存档信息
+  getSaveInfo() {
+    try {
+      const saveString = localStorage.getItem(this.saveKey);
+      if (!saveString) return null;
+
+      const saveData = JSON.parse(saveString);
+      return {
+        exists: true,
+        lastSave: saveData.lastSaveTime ? new Date(saveData.lastSaveTime).toLocaleString('zh-CN') : '未知',
+        gold: saveData.gold || 0,
+        totalGold: saveData.totalGold || 0,
+        buildings: Object.values(saveData.buildings || {}).reduce((sum, count) => sum + count, 0)
+      };
+    } catch (e) {
+      return null;
+    }
+  }
+}
+
+// 导出单例
+const save = new SaveSystem();
+
+// === ./sound.js ===
+// Web Audio API 音效系统
+class SoundManager {
+  constructor() {
+    this.audioContext = null;
+    this.initialized = false;
+  }
+
+  // 初始化音频上下文（需要用户交互后调用）
+  init() {
+    if (this.initialized) return;
+
+    try {
+      this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      this.initialized = true;
+    } catch (e) {
+      console.warn('Web Audio API 不支持:', e);
+    }
+  }
+
+  // 播放点击音效
+  playClick() {
+    this.playTone(600, 0.05, 'sine', 0.3);
+  }
+
+  // 播放购买音效
+  playBuy() {
+    this.playTone(400, 0.1, 'sine', 0.2);
+    setTimeout(() => this.playTone(500, 0.1, 'sine', 0.2), 50);
+    setTimeout(() => this.playTone(600, 0.1, 'sine', 0.2), 100);
+  }
+
+  // 播放升级音效
+  playUpgrade() {
+    this.playTone(300, 0.15, 'sine', 0.3);
+    setTimeout(() => this.playTone(400, 0.15, 'sine', 0.3), 80);
+    setTimeout(() => this.playTone(500, 0.15, 'sine', 0.3), 160);
+    setTimeout(() => this.playTone(600, 0.2, 'sine', 0.3), 240);
+  }
+
+  // 播放成就音效
+  playAchievement() {
+    const notes = [523, 659, 784, 1047]; // C5, E5, G5, C6
+    notes.forEach((freq, i) => {
+      setTimeout(() => this.playTone(freq, 0.2, 'sine', 0.3), i * 100);
+    });
+  }
+
+  // 播放错误音效
+  playError() {
+    this.playTone(200, 0.2, 'square', 0.2);
+  }
+
+  // 基础音调生成
+  playTone(frequency, duration, type = 'sine', volume = 0.3) {
+    if (!this.initialized || !this.audioContext) return;
+
+    // 如果上下文被挂起，尝试恢复
+    if (this.audioContext.state === 'suspended') {
+      this.audioContext.resume();
+    }
+
+    const oscillator = this.audioContext.createOscillator();
+    const gainNode = this.audioContext.createGain();
+
+    oscillator.type = type;
+    oscillator.frequency.setValueAtTime(frequency, this.audioContext.currentTime);
+
+    // 音量包络
+    gainNode.gain.setValueAtTime(volume, this.audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + duration);
+
+    oscillator.connect(gainNode);
+    gainNode.connect(this.audioContext.destination);
+
+    oscillator.start(this.audioContext.currentTime);
+    oscillator.stop(this.audioContext.currentTime + duration);
+  }
+}
+
+// 导出单例
+const sound = new SoundManager();
+
+// === ./buildings.js ===
+// 建筑系统
+
+class BuildingSystem {
+  constructor() {
+    this.buyAmount = 1; // 购买数量：1, 10, 100
+  }
+
+  // 设置购买数量
+  setBuyAmount(amount) {
+    this.buyAmount = amount;
+  }
+
+  // 获取建筑配置
+  getBuildingConfig(buildingId) {
+    return CONFIG.buildings.find(b => b.id === buildingId);
+  }
+
+  // 获取建筑当前价格
+  getBuildingCost(buildingId, amount = 1) {
+    const config = this.getBuildingConfig(buildingId);
+    if (!config) return Infinity;
+
+    const currentCount = game.getBuildingCount(buildingId);
+    let totalCost = 0;
+
+    for (let i = 0; i < amount; i++) {
+      totalCost += Math.floor(config.baseCost * Math.pow(CONFIG.settings.costMultiplier, currentCount + i));
+    }
+
+    return totalCost;
+  }
+
+  // 获取建筑每个的产出
+  getBuildingProduction(buildingId) {
+    const config = this.getBuildingConfig(buildingId);
+    if (!config) return 0;
+
+    const multiplier = game.buildingMultipliers[buildingId] || 1;
+    const achievementBonus = 1 + game.achievementMultiplier;
+    return config.baseProduction * multiplier * achievementBonus;
+  }
+
+  // 获取建筑总产出
+  getBuildingTotalProduction(buildingId) {
+    const count = game.getBuildingCount(buildingId);
+    return this.getBuildingProduction(buildingId) * count;
+  }
+
+  // 购买建筑
+  buy(buildingId) {
+    const cost = this.getBuildingCost(buildingId, this.buyAmount);
+    if (game.gold < cost) {
+      sound.playError();
+      return 0;
+    }
+
+    const purchased = game.buyBuildingBulk(buildingId, this.buyAmount);
+    if (purchased > 0) {
+      sound.playBuy();
+    }
+
+    return purchased;
+  }
+
+  // 获取所有建筑信息（用于UI渲染）
+  getAllBuildingsInfo() {
+    return CONFIG.buildings.map(config => {
+      const count = game.getBuildingCount(config.id);
+      const cost = this.getBuildingCost(config.id, this.buyAmount);
+      const production = this.getBuildingProduction(config.id);
+      const totalProduction = this.getBuildingTotalProduction(config.id);
+      const canAfford = game.gold >= cost;
+      const isVisible = count > 0 || game.totalGold >= config.baseCost * 0.5;
+
+      return {
+        id: config.id,
+        name: config.name,
+        icon: config.icon,
+        description: config.description,
+        count,
+        cost,
+        production,
+        totalProduction,
+        canAfford,
+        isVisible,
+        formattedCost: formatNumber(cost),
+        formattedProduction: formatNumber(production),
+        formattedTotalProduction: formatNumber(totalProduction)
+      };
+    });
+  }
+}
+
+// 导出单例
+const buildings = new BuildingSystem();
+
+// === ./upgrades.js ===
+// 升级系统
+
+class UpgradeSystem {
+  // 获取升级配置
+  getUpgradeConfig(upgradeId) {
+    return CONFIG.upgrades.find(u => u.id === upgradeId);
+  }
+
+  // 获取建筑的所有升级
+  getBuildingUpgrades(buildingId) {
+    return CONFIG.upgrades.filter(u => u.buildingId === buildingId);
+  }
+
+  // 购买升级
+  buy(upgradeId) {
+    if (game.buyUpgrade(upgradeId)) {
+      sound.playUpgrade();
+      return true;
+    }
+    return false;
+  }
+
+  // 获取所有升级信息（用于UI渲染）
+  getAllUpgradesInfo() {
+    const upgrades = [];
+    const processedBuildings = new Set();
+
+    CONFIG.upgrades.forEach(config => {
+      const status = game.getUpgradeStatus(config.id);
+      const buildingConfig = CONFIG.buildings.find(b => b.id === config.buildingId);
+
+      // 确定可见性：建筑已解锁且有购买记录，或满足解锁条件
+      const buildingCount = game.getBuildingCount(config.buildingId);
+      const isVisible = buildingCount > 0 || status.purchased;
+
+      if (isVisible) {
+        upgrades.push({
+          id: config.id,
+          name: config.name,
+          description: config.description,
+          buildingId: config.buildingId,
+          buildingName: buildingConfig ? buildingConfig.name : '',
+          buildingIcon: buildingConfig ? buildingConfig.icon : '',
+          multiplier: config.multiplier,
+          cost: config.cost,
+          requiredCount: config.requiredCount,
+          currentCount: buildingCount,
+          ...status,
+          formattedCost: formatNumber(config.cost)
+        });
+      }
+    });
+
+    return upgrades;
+  }
+
+  // 获取可购买的升级数量
+  getAvailableUpgradeCount() {
+    return CONFIG.upgrades.filter(u => game.canBuyUpgrade(u.id)).length;
+  }
+
+  // 获取建筑的升级进度
+  getBuildingUpgradeProgress(buildingId) {
+    const upgrades = this.getBuildingUpgrades(buildingId);
+    const purchased = upgrades.filter(u => game.purchasedUpgrades[u.id]).length;
+    return {
+      total: upgrades.length,
+      purchased,
+      percentage: upgrades.length > 0 ? (purchased / upgrades.length) * 100 : 0
+    };
+  }
+}
+
+// 导出单例
+const upgrades = new UpgradeSystem();
+
+// === ./achievements.js ===
+// 成就系统
+
+class AchievementSystem {
+  constructor() {
+    this.pendingNotifications = []; // 待显示的成就通知
+  }
+
+  // 获取成就配置
+  getAchievementConfig(achievementId) {
+    return CONFIG.achievements.find(a => a.id === achievementId);
+  }
+
+  // 检查并解锁成就
+  checkAndUnlock() {
+    const newAchievements = game.checkAchievements();
+
+    if (newAchievements.length > 0) {
+      sound.playAchievement();
+      this.pendingNotifications.push(...newAchievements);
+    }
+
+    return newAchievements;
+  }
+
+  // 获取待显示的通知
+  getPendingNotifications() {
+    const notifications = [...this.pendingNotifications];
+    this.pendingNotifications = [];
+    return notifications;
+  }
+
+  // 获取所有成就信息（用于UI渲染）
+  getAllAchievementsInfo() {
+    return CONFIG.achievements.map(config => {
+      const unlocked = !!game.achievements[config.id];
+      const progress = this.getAchievementProgress(config);
+
+      return {
+        id: config.id,
+        name: config.name,
+        description: config.description,
+        reward: config.reward,
+        unlocked,
+        progress,
+        formattedReward: `+${(config.reward * 100).toFixed(0)}%`
+      };
+    });
+  }
+
+  // 获取成就进度
+  getAchievementProgress(achievementConfig) {
+    const condition = achievementConfig.condition;
+    let current = 0;
+    let target = condition.value;
+
+    switch (condition.type) {
+      case 'clicks':
+        current = game.clicks;
+        break;
+      case 'totalGold':
+        current = game.totalGold;
+        break;
+      case 'building':
+        current = game.getBuildingCount(condition.buildingId);
+        break;
+      case 'upgrades':
+        current = game.stats.totalUpgradesPurchased;
+        break;
+      case 'production':
+        current = game.productionPerSecond;
+        break;
+      case 'allBuildings':
+        // 对于"所有建筑"类型，计算满足条件的建筑数量
+        const satisfied = CONFIG.buildings.filter(b =>
+          game.getBuildingCount(b.id) >= condition.value
+        ).length;
+        current = satisfied;
+        target = CONFIG.buildings.length;
+        break;
+      case 'totalBuildings':
+        current = game.getTotalBuildingCount();
+        break;
+    }
+
+    return {
+      current,
+      target,
+      percentage: Math.min((current / target) * 100, 100)
+    };
+  }
+
+  // 获取已解锁成就数量
+  getUnlockedCount() {
+    return Object.keys(game.achievements).length;
+  }
+
+  // 获取成就总数
+  getTotalCount() {
+    return CONFIG.achievements.length;
+  }
+
+  // 获取总成就倍率加成
+  getTotalBonus() {
+    return game.achievementMultiplier;
+  }
+}
+
+// 导出单例
+const achievements = new AchievementSystem();
+
+// === ./ui.js ===
+// DOM界面系统
+
+class UI {
+  constructor() {
+    this.elements = {};
+    this.currentTab = 'buildings';
+    this.useChineseNumbers = false;
+    this.buyAmount = 1;
+  }
+
+  // 初始化UI
+  init() {
+    this.cacheElements();
+    this.bindEvents();
+    this.render();
+  }
+
+  // 缓存DOM元素
+  cacheElements() {
+    this.elements = {
+      // 顶部信息
+      gold: document.getElementById('gold'),
+      goldPerSecond: document.getElementById('gold-per-second'),
+      clickValue: document.getElementById('click-value'),
+      clickBtn: document.getElementById('click-btn'),
+
+      // 标签页
+      tabBtns: document.querySelectorAll('.tab-btn'),
+      tabContents: document.querySelectorAll('.tab-content'),
+
+      // 建筑面板
+      buildingsList: document.getElementById('buildings-list'),
+      buyAmountBtns: document.querySelectorAll('.buy-amount-btn'),
+
+      // 升级面板
+      upgradesList: document.getElementById('upgrades-list'),
+
+      // 成就面板
+      achievementsList: document.getElementById('achievements-list'),
+      achievementCount: document.getElementById('achievement-count'),
+      achievementBonus: document.getElementById('achievement-bonus'),
+
+      // 统计面板
+      playTime: document.getElementById('play-time'),
+      totalClicks: document.getElementById('total-clicks'),
+      totalGold: document.getElementById('total-gold'),
+      totalBuildings: document.getElementById('total-buildings'),
+      totalUpgrades: document.getElementById('total-upgrades'),
+
+      // 设置
+      numberFormatToggle: document.getElementById('number-format-toggle'),
+      exportBtn: document.getElementById('export-btn'),
+      importBtn: document.getElementById('import-btn'),
+      importFile: document.getElementById('import-file'),
+      resetBtn: document.getElementById('reset-btn'),
+      saveBtn: document.getElementById('save-btn'),
+
+      // 右侧信息面板
+      infoPps: document.getElementById('info-pps'),
+      infoClick: document.getElementById('info-click'),
+      infoBonus: document.getElementById('info-bonus'),
+      buildingsStats: document.getElementById('buildings-stats'),
+
+      // 点击价值显示
+      clickValueDisplay: document.getElementById('click-value-display'),
+
+      // 通知
+      offlineNotification: document.getElementById('offline-notification'),
+      achievementNotification: document.getElementById('achievement-notification')
+    };
+  }
+
+  // 绑定事件
+  bindEvents() {
+    // 点击按钮
+    if (this.elements.clickBtn) {
+      this.elements.clickBtn.addEventListener('click', () => {
+        this.handleClick();
+      });
+    }
+
+    // 标签页切换
+    this.elements.tabBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.switchTab(btn.dataset.tab);
+      });
+    });
+
+    // 购买数量切换
+    this.elements.buyAmountBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.setBuyAmount(parseInt(btn.dataset.amount));
+      });
+    });
+
+    // 数字格式切换
+    if (this.elements.numberFormatToggle) {
+      this.elements.numberFormatToggle.addEventListener('click', () => {
+        this.toggleNumberFormat();
+      });
+    }
+
+    // 存档按钮
+    if (this.elements.exportBtn) {
+      this.elements.exportBtn.addEventListener('click', () => {
+        save.exportSave();
+      });
+    }
+
+    if (this.elements.importBtn) {
+      this.elements.importBtn.addEventListener('click', () => {
+        this.elements.importFile.click();
+      });
+    }
+
+    if (this.elements.importFile) {
+      this.elements.importFile.addEventListener('change', async (e) => {
+        if (e.target.files.length > 0) {
+          try {
+            await save.importSave(e.target.files[0]);
+            this.render();
+            alert('存档导入成功！');
+          } catch (err) {
+            alert('导入失败：' + err.message);
+          }
+        }
+      });
+    }
+
+    if (this.elements.resetBtn) {
+      this.elements.resetBtn.addEventListener('click', () => {
+        if (save.resetGame()) {
+          this.render();
+        }
+      });
+    }
+
+    if (this.elements.saveBtn) {
+      this.elements.saveBtn.addEventListener('click', () => {
+        save.save();
+        this.showTemporaryMessage('游戏已保存');
+      });
+    }
+  }
+
+  // 处理点击
+  handleClick() {
+    sound.init(); // 初始化音频（需要用户交互）
+    sound.playClick();
+
+    const value = game.click();
+
+    // 显示点击数字动画
+    this.showClickAnimation(value);
+
+    this.updateStats();
+  }
+
+  // 显示点击数字动画
+  showClickAnimation(value) {
+    const clickBtn = this.elements.clickBtn;
+    if (!clickBtn) return;
+
+    const animation = document.createElement('div');
+    animation.className = 'click-animation';
+    animation.textContent = `+${formatNumber(value, this.useChineseNumbers)}`;
+
+    // 随机位置
+    const rect = clickBtn.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+
+    animation.style.left = `${x}px`;
+    animation.style.top = `${y}px`;
+
+    clickBtn.appendChild(animation);
+
+    // 动画结束后移除
+    setTimeout(() => {
+      animation.remove();
+    }, 1000);
+  }
+
+  // 切换标签页
+  switchTab(tabName) {
+    this.currentTab = tabName;
+
+    // 更新标签按钮状态
+    this.elements.tabBtns.forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.tab === tabName);
+    });
+
+    // 更新标签内容显示
+    this.elements.tabContents.forEach(content => {
+      content.classList.toggle('active', content.id === `${tabName}-tab`);
+    });
+
+    this.render();
+  }
+
+  // 设置购买数量
+  setBuyAmount(amount) {
+    this.buyAmount = amount;
+    buildings.setBuyAmount(amount);
+
+    this.elements.buyAmountBtns.forEach(btn => {
+      btn.classList.toggle('active', parseInt(btn.dataset.amount) === amount);
+    });
+
+    this.render();
+  }
+
+  // 切换数字格式
+  toggleNumberFormat() {
+    this.useChineseNumbers = !this.useChineseNumbers;
+
+    if (this.elements.numberFormatToggle) {
+      this.elements.numberFormatToggle.textContent = this.useChineseNumbers ? '切换英文' : '切换中文';
+    }
+
+    this.render();
+  }
+
+  // 更新顶部统计
+  updateStats() {
+    if (this.elements.gold) {
+      this.elements.gold.textContent = formatNumber(game.gold, this.useChineseNumbers);
+    }
+
+    if (this.elements.goldPerSecond) {
+      this.elements.goldPerSecond.textContent = formatNumber(game.productionPerSecond, this.useChineseNumbers);
+    }
+
+    if (this.elements.clickValue) {
+      this.elements.clickValue.textContent = formatNumber(game.getClickValue(), this.useChineseNumbers);
+    }
+
+    if (this.elements.clickValueDisplay) {
+      this.elements.clickValueDisplay.textContent = formatNumber(game.getClickValue(), this.useChineseNumbers);
+    }
+
+    // 更新右侧面板
+    this.updateInfoPanel();
+  }
+
+  // 更新右侧信息面板
+  updateInfoPanel() {
+    if (this.elements.infoPps) {
+      this.elements.infoPps.textContent = formatNumber(game.productionPerSecond, this.useChineseNumbers) + '/秒';
+    }
+
+    if (this.elements.infoClick) {
+      this.elements.infoClick.textContent = formatNumber(game.getClickValue(), this.useChineseNumbers);
+    }
+
+    if (this.elements.infoBonus) {
+      this.elements.infoBonus.textContent = `+${(game.achievementMultiplier * 100).toFixed(0)}%`;
+    }
+
+    if (this.elements.buildingsStats) {
+      const buildingsInfo = buildings.getAllBuildingsInfo().filter(b => b.count > 0);
+      this.elements.buildingsStats.innerHTML = buildingsInfo.map(b => `
+        <div class="info-item">
+          <span class="info-label">${b.icon} ${b.name}</span>
+          <span class="info-value">x${b.count}</span>
+        </div>
+      `).join('') || '<div class="empty-message">暂无建筑</div>';
+    }
+  }
+
+  // 渲染建筑列表
+  renderBuildings() {
+    if (!this.elements.buildingsList) return;
+
+    const buildingsInfo = buildings.getAllBuildingsInfo();
+    const visibleBuildings = buildingsInfo.filter(b => b.isVisible);
+
+    this.elements.buildingsList.innerHTML = visibleBuildings.map(building => `
+      <div class="building-item ${building.canAfford ? 'affordable' : 'expensive'}" data-id="${building.id}">
+        <div class="building-icon">${building.icon}</div>
+        <div class="building-info">
+          <div class="building-header">
+            <span class="building-name">${building.name}</span>
+            <span class="building-count">x${building.count}</span>
+          </div>
+          <div class="building-description">${building.description}</div>
+          <div class="building-production">
+            每个产出：${building.formattedProduction}/秒
+            ${building.count > 0 ? ` | 总产出：${building.formattedTotalProduction}/秒` : ''}
+          </div>
+        </div>
+        <div class="building-cost">
+          <button class="buy-btn ${building.canAfford ? '' : 'disabled'}" data-id="${building.id}">
+            <span class="cost-amount">${building.formattedCost}</span>
+            <span class="cost-label">金币</span>
+          </button>
+        </div>
+      </div>
+    `).join('');
+
+    // 绑定购买事件
+    this.elements.buildingsList.querySelectorAll('.buy-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const buildingId = btn.dataset.id;
+        buildings.buy(buildingId);
+        this.render();
+      });
+    });
+  }
+
+  // 渲染升级列表
+  renderUpgrades() {
+    if (!this.elements.upgradesList) return;
+
+    const upgradesInfo = upgrades.getAllUpgradesInfo();
+
+    if (upgradesInfo.length === 0) {
+      this.elements.upgradesList.innerHTML = '<div class="empty-message">购买建筑后解锁升级</div>';
+      return;
+    }
+
+    this.elements.upgradesList.innerHTML = upgradesInfo.map(upgrade => {
+      let statusClass = '';
+      let statusText = '';
+
+      if (upgrade.purchased) {
+        statusClass = 'purchased';
+        statusText = '已购买';
+      } else if (upgrade.locked) {
+        statusClass = 'locked';
+        statusText = `需要 ${upgrade.requiredCount} 个${upgrade.buildingName}`;
+      } else if (upgrade.affordable) {
+        statusClass = 'affordable';
+        statusText = '可购买';
+      } else {
+        statusClass = 'expensive';
+        statusText = '金币不足';
+      }
+
+      return `
+        <div class="upgrade-item ${statusClass}" data-id="${upgrade.id}">
+          <div class="upgrade-icon">${upgrade.buildingIcon}</div>
+          <div class="upgrade-info">
+            <div class="upgrade-header">
+              <span class="upgrade-name">${upgrade.name}</span>
+              <span class="upgrade-multiplier">x${upgrade.multiplier}</span>
+            </div>
+            <div class="upgrade-description">${upgrade.description}</div>
+            <div class="upgrade-status">${statusText}</div>
+          </div>
+          ${!upgrade.purchased ? `
+            <div class="upgrade-cost">
+              <button class="buy-btn ${upgrade.affordable ? '' : 'disabled'}" data-id="${upgrade.id}">
+                <span class="cost-amount">${upgrade.formattedCost}</span>
+                <span class="cost-label">金币</span>
+              </button>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }).join('');
+
+    // 绑定购买事件
+    this.elements.upgradesList.querySelectorAll('.buy-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const upgradeId = btn.dataset.id;
+        upgrades.buy(upgradeId);
+        this.render();
+      });
+    });
+  }
+
+  // 渲染成就列表
+  renderAchievements() {
+    if (!this.elements.achievementsList) return;
+
+    const achievementsInfo = achievements.getAllAchievementsInfo();
+    const unlockedCount = achievements.getUnlockedCount();
+    const totalCount = achievements.getTotalCount();
+    const totalBonus = achievements.getTotalBonus();
+
+    if (this.elements.achievementCount) {
+      this.elements.achievementCount.textContent = `${unlockedCount}/${totalCount}`;
+    }
+
+    if (this.elements.achievementBonus) {
+      this.elements.achievementBonus.textContent = `+${(totalBonus * 100).toFixed(0)}%`;
+    }
+
+    this.elements.achievementsList.innerHTML = achievementsInfo.map(achievement => `
+      <div class="achievement-item ${achievement.unlocked ? 'unlocked' : 'locked'}" data-id="${achievement.id}">
+        <div class="achievement-icon">${achievement.unlocked ? '🏆' : '🔒'}</div>
+        <div class="achievement-info">
+          <div class="achievement-header">
+            <span class="achievement-name">${achievement.name}</span>
+            <span class="achievement-reward">${achievement.formattedReward}</span>
+          </div>
+          <div class="achievement-description">${achievement.description}</div>
+          <div class="achievement-progress">
+            <div class="progress-bar">
+              <div class="progress-fill" style="width: ${achievement.progress.percentage}%"></div>
+            </div>
+            <span class="progress-text">${formatNumber(achievement.progress.current, this.useChineseNumbers)}/${formatNumber(achievement.progress.target, this.useChineseNumbers)}</span>
+          </div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  // 渲染统计面板
+  renderStats() {
+    if (this.elements.playTime) {
+      this.elements.playTime.textContent = formatPlayTime(game.getPlayTime());
+    }
+
+    if (this.elements.totalClicks) {
+      this.elements.totalClicks.textContent = formatNumber(game.stats.totalClicks, this.useChineseNumbers);
+    }
+
+    if (this.elements.totalGold) {
+      this.elements.totalGold.textContent = formatNumber(game.totalGold, this.useChineseNumbers);
+    }
+
+    if (this.elements.totalBuildings) {
+      this.elements.totalBuildings.textContent = game.getTotalBuildingCount();
+    }
+
+    if (this.elements.totalUpgrades) {
+      this.elements.totalUpgrades.textContent = game.stats.totalUpgradesPurchased;
+    }
+  }
+
+  // 显示成就通知
+  showAchievementNotification(achievement) {
+    const notification = this.elements.achievementNotification;
+    if (!notification) return;
+
+    notification.innerHTML = `
+      <div class="achievement-popup">
+        <div class="achievement-popup-icon">🏆</div>
+        <div class="achievement-popup-content">
+          <div class="achievement-popup-title">成就解锁！</div>
+          <div class="achievement-popup-name">${achievement.name}</div>
+          <div class="achievement-popup-desc">${achievement.description}</div>
+          <div class="achievement-popup-reward">+${(achievement.reward * 100).toFixed(0)}% 产出加成</div>
+        </div>
+      </div>
+    `;
+
+    notification.style.display = 'block';
+
+    // 3秒后隐藏
+    setTimeout(() => {
+      notification.style.display = 'none';
+    }, 3000);
+  }
+
+  // 显示临时消息
+  showTemporaryMessage(message) {
+    const msg = document.createElement('div');
+    msg.className = 'temp-message';
+    msg.textContent = message;
+    document.body.appendChild(msg);
+
+    setTimeout(() => {
+      msg.remove();
+    }, 2000);
+  }
+
+  // 渲染所有UI
+  render() {
+    this.updateStats();
+
+    switch (this.currentTab) {
+      case 'buildings':
+        this.renderBuildings();
+        break;
+      case 'upgrades':
+        this.renderUpgrades();
+        break;
+      case 'achievements':
+        this.renderAchievements();
+        break;
+      case 'stats':
+        this.renderStats();
+        break;
+    }
+
+    // 更新成就摘要
+    this.updateAchievementSummary();
+
+    // 检查成就通知
+    const newAchievements = achievements.checkAndUnlock();
+    if (newAchievements.length > 0) {
+      newAchievements.forEach(a => this.showAchievementNotification(a));
+    }
+  }
+
+  // 更新成就摘要
+  updateAchievementSummary() {
+    const unlockedCount = achievements.getUnlockedCount();
+    const totalCount = achievements.getTotalCount();
+    const totalBonus = achievements.getTotalBonus();
+
+    if (this.elements.achievementCount) {
+      this.elements.achievementCount.textContent = `${unlockedCount}/${totalCount}`;
+    }
+
+    if (this.elements.achievementBonus) {
+      this.elements.achievementBonus.textContent = `+${(totalBonus * 100).toFixed(0)}%`;
+    }
+  }
+}
+
+// 导出单例
+const ui = new UI();
+
+// === main.js ===
+// 游戏主循环
+
+class GameLoop {
+  constructor() {
+    this.tickInterval = null;
+    this.uiUpdateInterval = null;
+    this.running = false;
+  }
+
+  // 初始化游戏
+  init() {
+    console.log('放置挂机游戏初始化中...');
+
+    // 初始化存档系统（会自动加载存档）
+    save.init();
+
+    // 初始化UI
+    ui.init();
+
+    // 启动游戏循环
+    this.start();
+
+    console.log('游戏初始化完成！');
+    console.log('当前金币:', game.gold);
+    console.log('每秒产出:', game.productionPerSecond);
+  }
+
+  // 启动游戏循环
+  start() {
+    if (this.running) return;
+
+    this.running = true;
+
+    // 游戏逻辑tick（每秒）
+    this.tickInterval = setInterval(() => {
+      this.tick();
+    }, 1000 / CONFIG.settings.ticksPerSecond);
+
+    // UI更新（每秒更新多次以保持流畅）
+    this.uiUpdateInterval = setInterval(() => {
+      this.updateUI();
+    }, 100); // 100ms = 10fps UI更新
+
+    console.log('游戏循环已启动');
+  }
+
+  // 停止游戏循环
+  stop() {
+    if (!this.running) return;
+
+    this.running = false;
+
+    if (this.tickInterval) {
+      clearInterval(this.tickInterval);
+      this.tickInterval = null;
+    }
+
+    if (this.uiUpdateInterval) {
+      clearInterval(this.uiUpdateInterval);
+      this.uiUpdateInterval = null;
+    }
+
+    console.log('游戏循环已停止');
+  }
+
+  // 游戏tick
+  tick() {
+    // 更新游戏状态
+    const earned = game.tick();
+
+    // 检查成就
+    achievements.checkAndUnlock();
+  }
+
+  // 更新UI
+  updateUI() {
+    ui.updateStats();
+  }
+}
+
+// 导入CONFIG（用于tick间隔）
+
+// 创建游戏循环实例
+const gameLoop = new GameLoop();
+
+// 页面加载完成后初始化
+gameLoop.init();;;
+
+// 导出（可选，用于调试）
+
+
+</script>
+
+</body>
+</html>

@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MIMO 游戏合集</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #06060e;
+            --bg-secondary: #0d0d1a;
+            --bg-card: rgba(15, 15, 30, 0.7);
+            --bg-glass: rgba(20, 20, 45, 0.5);
+            --text-primary: #e8e8f0;
+            --text-secondary: #8888aa;
+            --text-muted: #555570;
+            --border: rgba(100, 100, 180, 0.12);
+            --border-hover: rgba(100, 100, 180, 0.3);
+            --accent: #ff6b4a;
+            --accent-glow: rgba(255, 107, 74, 0.4);
+            --accent2: #4aeaff;
+            --accent2-glow: rgba(74, 234, 255, 0.3);
+            --accent3: #b44aff;
+            --gold: #ffd700;
+            --shadow: rgba(0, 0, 0, 0.5);
+            --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            --noise-opacity: 0.03;
+            --hero-gradient: linear-gradient(135deg, #0a0020 0%, #1a0030 30%, #000020 60%, #0a0010 100%);
+            --grid-line: rgba(100, 100, 255, 0.04);
+        }
+
+        [data-theme="light"] {
+            --bg-primary: #f5f3f0;
+            --bg-secondary: #eae7e2;
+            --bg-card: rgba(255, 255, 255, 0.85);
+            --bg-glass: rgba(255, 255, 255, 0.6);
+            --text-primary: #1a1a2e;
+            --text-secondary: #666680;
+            --text-muted: #9999aa;
+            --border: rgba(0, 0, 40, 0.08);
+            --border-hover: rgba(0, 0, 40, 0.15);
+            --accent: #e8430a;
+            --accent-glow: rgba(232, 67, 10, 0.2);
+            --accent2: #0a8ac6;
+            --accent2-glow: rgba(10, 138, 198, 0.15);
+            --accent3: #7c2dc6;
+            --gold: #c8a000;
+            --shadow: rgba(0, 0, 0, 0.08);
+            --card-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+            --noise-opacity: 0.015;
+            --hero-gradient: linear-gradient(135deg, #f0e6d6 0%, #e8dcd0 30%, #f0e8e0 60%, #f5f0ea 100%);
+            --grid-line: rgba(0, 0, 40, 0.03);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: 'Noto Sans SC', sans-serif;
+            min-height: 100vh;
+            overflow-x: hidden;
+            transition: background 0.6s ease, color 0.4s ease;
+        }
+
+        /* ===== NOISE OVERLAY ===== */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            opacity: var(--noise-opacity);
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+            pointer-events: none;
+            z-index: 9999;
+        }
+
+        /* ===== HERO SECTION ===== */
+        .hero {
+            position: relative;
+            min-height: 40vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 60px 20px 40px;
+            background: var(--hero-gradient);
+            overflow: hidden;
+            transition: background 0.6s ease;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background:
+                repeating-linear-gradient(0deg, transparent, transparent 99px, var(--grid-line) 100px),
+                repeating-linear-gradient(90deg, transparent, transparent 99px, var(--grid-line) 100px);
+            animation: gridScroll 20s linear infinite;
+        }
+
+        @keyframes gridScroll {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(100px, 100px); }
+        }
+
+        .hero-orbs {
+            position: absolute;
+            inset: 0;
+            overflow: hidden;
+            pointer-events: none;
+        }
+
+        .orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(60px);
+            animation: orbFloat 8s ease-in-out infinite;
+        }
+
+        [data-theme="dark"] .orb { opacity: 0.3; }
+        [data-theme="light"] .orb { opacity: 0.12; }
+
+        .orb:nth-child(1) { width: 300px; height: 300px; background: var(--accent); top: -50px; left: -50px; animation-delay: 0s; }
+        .orb:nth-child(2) { width: 250px; height: 250px; background: var(--accent2); top: 50%; right: -80px; animation-delay: -3s; }
+        .orb:nth-child(3) { width: 200px; height: 200px; background: var(--accent3); bottom: -60px; left: 30%; animation-delay: -5s; }
+
+        @keyframes orbFloat {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            33% { transform: translate(30px, -20px) scale(1.1); }
+            66% { transform: translate(-20px, 15px) scale(0.95); }
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 2;
+            text-align: center;
+        }
+
+        .hero-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: clamp(2.5rem, 6vw, 4.5rem);
+            font-weight: 900;
+            letter-spacing: 8px;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 50%, var(--accent3) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-shadow: none;
+            animation: titleShimmer 4s ease-in-out infinite;
+            background-size: 200% 200%;
+        }
+
+        @keyframes titleShimmer {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+
+        .hero-subtitle {
+            font-size: 15px;
+            color: var(--text-secondary);
+            font-weight: 300;
+            letter-spacing: 3px;
+            margin-bottom: 6px;
+        }
+
+        .hero-count {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 18px;
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            background: var(--bg-glass);
+            backdrop-filter: blur(10px);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 13px;
+            color: var(--accent);
+            margin-top: 12px;
+        }
+
+        .hero-count .dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--accent);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(0.8); }
+        }
+
+        /* ===== NAV BAR ===== */
+        .nav-bar {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            padding: 12px 20px;
+            background: var(--bg-glass);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            transition: background 0.4s ease, border 0.4s ease;
+        }
+
+        .search-box {
+            position: relative;
+            flex: 0 1 280px;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 8px 14px 8px 36px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: var(--bg-card);
+            color: var(--text-primary);
+            font-size: 13px;
+            font-family: 'Noto Sans SC', sans-serif;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+
+        .search-box input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+
+        .search-box input::placeholder { color: var(--text-muted); }
+
+        .search-box .search-icon {
+            position: absolute;
+            left: 11px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 14px;
+            color: var(--text-muted);
+            pointer-events: none;
+        }
+
+        .theme-toggle {
+            width: 44px;
+            height: 26px;
+            border-radius: 13px;
+            border: 1px solid var(--border);
+            background: var(--bg-card);
+            cursor: pointer;
+            position: relative;
+            transition: all 0.4s ease;
+            flex-shrink: 0;
+        }
+
+        .theme-toggle::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            background: var(--accent);
+            transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+
+        [data-theme="light"] .theme-toggle::after {
+            left: 20px;
+            background: var(--accent2);
+        }
+
+        /* ===== CATEGORIES ===== */
+        .categories {
+            display: flex;
+            justify-content: center;
+            gap: 6px;
+            padding: 16px 20px 0;
+            flex-wrap: wrap;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .cat-btn {
+            padding: 5px 14px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 12px;
+            font-family: 'Noto Sans SC', sans-serif;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            white-space: nowrap;
+        }
+
+        .cat-btn:hover {
+            border-color: var(--border-hover);
+            color: var(--text-primary);
+            background: var(--bg-glass);
+        }
+
+        .cat-btn.active {
+            background: var(--accent);
+            color: #fff;
+            border-color: var(--accent);
+            box-shadow: 0 2px 10px var(--accent-glow);
+        }
+
+        /* ===== GAME GRID ===== */
+        .game-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
+            gap: 16px;
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 24px 24px 60px;
+        }
+
+        .game-card {
+            position: relative;
+            border-radius: 14px;
+            border: 1px solid var(--border);
+            background: var(--bg-card);
+            backdrop-filter: blur(10px);
+            overflow: hidden;
+            cursor: pointer;
+            transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: var(--card-shadow);
+            opacity: 0;
+            transform: translateY(20px);
+            animation: cardIn 0.5s ease forwards;
+        }
+
+        .game-card:hover {
+            transform: translateY(-6px) scale(1.02);
+            border-color: var(--border-hover);
+            box-shadow: 0 12px 40px var(--shadow);
+        }
+
+        .game-card:active {
+            transform: translateY(-2px) scale(0.98);
+        }
+
+        @keyframes cardIn {
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .card-visual {
+            height: 95px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            position: relative;
+            overflow: hidden;
+            transition: height 0.3s ease;
+        }
+
+        .card-visual::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            opacity: 0.08;
+            transition: opacity 0.3s ease;
+        }
+
+        .game-card:hover .card-visual::before {
+            opacity: 0.15;
+        }
+
+        [data-theme="light"] .card-visual::before {
+            opacity: 0.06;
+        }
+
+        [data-theme="light"] .game-card:hover .card-visual::before {
+            opacity: 0.1;
+        }
+
+        .card-visual::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 40px;
+            background: linear-gradient(transparent, var(--bg-card));
+        }
+
+        .card-emoji {
+            position: relative;
+            z-index: 1;
+            filter: drop-shadow(0 2px 8px rgba(0,0,0,0.3));
+            transition: transform 0.3s ease;
+        }
+
+        .game-card:hover .card-emoji {
+            transform: scale(1.15) rotate(-3deg);
+        }
+
+        .card-body {
+            padding: 10px 14px 14px;
+        }
+
+        .card-title {
+            font-size: 14px;
+            font-weight: 700;
+            margin-bottom: 3px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: var(--text-primary);
+        }
+
+        .card-meta {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .card-type {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .card-num {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 9px;
+            color: var(--text-muted);
+            opacity: 0.5;
+        }
+
+        .card-badge {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            padding: 2px 7px;
+            border-radius: 4px;
+            font-size: 9px;
+            font-weight: 700;
+            font-family: 'Orbitron', sans-serif;
+            letter-spacing: 1px;
+            z-index: 2;
+        }
+
+        .badge-new {
+            background: var(--accent);
+            color: #fff;
+            animation: badgePulse 2s ease-in-out infinite;
+        }
+
+        @keyframes badgePulse {
+            0%, 100% { box-shadow: 0 0 0 0 var(--accent-glow); }
+            50% { box-shadow: 0 0 0 6px transparent; }
+        }
+
+        /* ===== FOOTER ===== */
+        .footer {
+            text-align: center;
+            padding: 24px 20px;
+            color: var(--text-muted);
+            font-size: 11px;
+            border-top: 1px solid var(--border);
+            letter-spacing: 1px;
+        }
+
+        .footer a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        /* ===== EMPTY STATE ===== */
+        .empty-state {
+            text-align: center;
+            padding: 80px 20px;
+            color: var(--text-muted);
+            display: none;
+            grid-column: 1 / -1;
+        }
+
+        .empty-state .empty-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        .empty-state p {
+            font-size: 15px;
+        }
+
+        /* ===== STATS BAR ===== */
+        .stats-bar {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            padding: 16px 20px;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .stat-item span {
+            font-family: 'Orbitron', sans-serif;
+            color: var(--accent2);
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 768px) {
+            .hero { min-height: 30vh; padding: 40px 16px 30px; }
+            .game-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 16px 12px 40px; }
+            .card-visual { height: 75px; font-size: 32px; }
+            .categories { padding: 12px 12px 0; }
+            .stats-bar { gap: 15px; flex-wrap: wrap; }
+            .nav-bar { padding: 10px 12px; }
+        }
+
+        @media (max-width: 400px) {
+            .game-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+            .card-body { padding: 8px 10px 10px; }
+            .card-title { font-size: 12px; }
+        }
+
+        /* ===== SCROLLBAR ===== */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-primary); }
+        ::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-secondary); }
+    </style>
+</head>
+<body>
+
+    <!-- SERVER WARNING -->
+    <div id="serverWarning" style="display:none;position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,0.92);backdrop-filter:blur(20px);flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px">
+        <div style="font-size:60px;margin-bottom:20px">⚠️</div>
+        <h2 style="font-family:'Orbitron',sans-serif;font-size:24px;color:#ff6b4a;margin-bottom:16px;letter-spacing:2px">需要启动HTTP服务器</h2>
+        <p style="color:#aaa;font-size:14px;line-height:2;max-width:480px;margin-bottom:24px">
+            所有游戏使用 ES Modules，无法通过 file:// 协议运行。<br>
+            请按以下步骤启动本地服务器：
+        </p>
+        <div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:20px 28px;text-align:left;font-size:13px;color:#ccc;line-height:2.2;font-family:monospace;max-width:500px">
+            <div style="color:#888;margin-bottom:6px">方法一：双击运行</div>
+            <div style="color:#4aeaff">启动游戏服务器.bat</div>
+            <div style="color:#888;margin-top:12px;margin-bottom:6px">方法二：命令行</div>
+            <div>cd <span style="color:#ffd700">游戏目录</span></div>
+            <div>python -m http.server 8000</div>
+            <div style="color:#888;margin-top:12px;margin-bottom:6px">方法三：VS Code</div>
+            <div>安装 Live Server 插件，右键 index.html → Open with Live Server</div>
+        </div>
+        <p style="color:#666;font-size:12px;margin-top:20px">启动后访问 <span style="color:#4aeaff">http://localhost:8000</span></p>
+        <button onclick="document.getElementById('serverWarning').style.display='none'" style="margin-top:20px;padding:10px 28px;border-radius:8px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.05);color:#888;font-size:13px;cursor:pointer;font-family:'Noto Sans SC',sans-serif">我知道了，继续浏览</button>
+    </div>
+    
+
+    <!-- HERO -->
+    <section class="hero">
+        <div class="hero-orbs">
+            <div class="orb"></div>
+            <div class="orb"></div>
+            <div class="orb"></div>
+        </div>
+        <div class="hero-content">
+            <h1 class="hero-title">MIMO</h1>
+            <p class="hero-subtitle">GAME COLLECTION</p>
+            <div class="hero-count">
+                <div class="dot"></div>
+                <span id="heroTotal">50</span> GAMES READY
+            </div>
+        </div>
+    </section>
+
+    <!-- NAV -->
+    <nav class="nav-bar">
+        <div class="search-box">
+            <span class="search-icon">&#128269;</span>
+            <input type="text" id="searchInput" placeholder="搜索游戏名称或类型...">
+        </div>
+        <div class="theme-toggle" id="themeToggle" title="切换明暗主题"></div>
+    </nav>
+
+    <!-- CATEGORIES -->
+    <div class="categories" id="categories"></div>
+
+    <!-- STATS -->
+    <div class="stats-bar">
+        <div class="stat-item">显示 <span id="visibleCount">50</span> 款</div>
+        <div class="stat-item">分类 <span id="catCount">15</span> 种</div>
+        <div class="stat-item">全部免费 · 无需安装</div>
+    </div>
+
+    <!-- GRID -->
+    <div class="game-grid" id="gameGrid"></div>
+
+    <!-- FOOTER -->
+    <div class="footer">
+        MIMO GAME COLLECTION &nbsp;·&nbsp; HTML5 + ES Modules &nbsp;·&nbsp; 需要HTTP服务器运行
+    </div>
+
+    <script>
+    // ===== GAME DATA =====
+    const GAMES = [
+        { name:'泡泡堂', folder:'Paopao', type:'对战', emoji:'💣', cat:'经典', clr:'#e74c3c' },
+        { name:'末日幸存者', folder:'Survivors', type:'生存射击', emoji:'🧟', cat:'射击', clr:'#8b0000' },
+        { name:'弹幕风暴', folder:'BulletHell', type:'弹幕射击', emoji:'🔥', cat:'射击', clr:'#ff5722' },
+        { name:'贪吃蛇', folder:'Snake', type:'经典休闲', emoji:'🐍', cat:'经典', clr:'#4caf50' },
+        { name:'打砖块', folder:'Breakout', type:'经典街机', emoji:'🧱', cat:'经典', clr:'#ff9800' },
+        { name:'2048', folder:'Game2048', type:'数字益智', emoji:'🔢', cat:'益智', clr:'#f39c12' },
+        { name:'Flappy Bird', folder:'FlappyBird', type:'休闲飞行', emoji:'🐦', cat:'休闲', clr:'#ffd93d' },
+        { name:'俄罗斯方块', folder:'Tetris', type:'经典益智', emoji:'🟦', cat:'经典', clr:'#2196f3' },
+        { name:'扫雷', folder:'Minesweeper', type:'益智策略', emoji:'💣', cat:'益智', clr:'#607d8b' },
+        { name:'记忆翻牌', folder:'MemoryMatch', type:'记忆益智', emoji:'🃏', cat:'益智', clr:'#9c27b0' },
+        { name:'打地鼠', folder:'WhackAMole', type:'反应速度', emoji:'🔨', cat:'休闲', clr:'#795548' },
+        { name:'太空侵略者', folder:'SpaceInvaders', type:'射击经典', emoji:'👾', cat:'射击', clr:'#3f51b5' },
+        { name:'叠叠乐', folder:'StackTower', type:'反应精确', emoji:'🏗️', cat:'休闲', clr:'#00bcd4' },
+        { name:'弹球', folder:'Pinball', type:'物理街机', emoji:'🎰', cat:'经典', clr:'#e91e63' },
+        { name:'躲避球', folder:'Dodger', type:'生存躲避', emoji:'🏃', cat:'休闲', clr:'#ff5722' },
+        { name:'吃豆人', folder:'PacMan', type:'迷宫收集', emoji:'🟡', cat:'经典', clr:'#ffeb3b' },
+        { name:'数独', folder:'Sudoku', type:'数字益智', emoji:'9️⃣', cat:'益智', clr:'#26c6da' },
+        { name:'极速赛车', folder:'Racing', type:'纵版竞速', emoji:'🏎️', cat:'竞速', clr:'#f44336' },
+        { name:'物理沙盒', folder:'PhysicsSandbox', type:'物理模拟', emoji:'⚙️', cat:'模拟', clr:'#78909c' },
+        { name:'塔防策略', folder:'TowerDefense', type:'策略塔防', emoji:'🏰', cat:'策略', clr:'#4caf50' },
+        { name:'杀戮尖塔', folder:'DeckBuilder', type:'卡牌Roguelike', emoji:'🃏', cat:'卡牌', clr:'#9c27b0' },
+        { name:'合金弹头', folder:'MetalSlug', type:'横版射击', emoji:'🔫', cat:'射击', clr:'#d32f2f' },
+        { name:'节奏大师', folder:'RhythmGame', type:'音乐节奏', emoji:'🎵', cat:'音乐', clr:'#e040fb' },
+        { name:'国际象棋', folder:'Chess', type:'棋类AI', emoji:'♟️', cat:'棋牌', clr:'#5d4037' },
+        { name:'地牢RPG', folder:'DungeonRPG', type:'Roguelike', emoji:'🗡️', cat:'RPG', clr:'#37474f' },
+        { name:'城市建设', folder:'CityBuilder', type:'模拟经营', emoji:'🏙️', cat:'模拟', clr:'#1565c0' },
+        { name:'五子棋', folder:'Gomoku', type:'棋类AI', emoji:'⚫', cat:'棋牌', clr:'#212121' },
+        { name:'放置挂机', folder:'IdleClicker', type:'放置点击', emoji:'💰', cat:'休闲', clr:'#ffc107' },
+        { name:'三消宝石', folder:'Match3', type:'消除益智', emoji:'💎', cat:'益智', clr:'#e040fb' },
+        { name:'大富翁', folder:'Monopoly', type:'桌游策略', emoji:'🎲', cat:'棋牌', clr:'#ff6f00' },
+        { name:'餐厅经营', folder:'Tycoon', type:'模拟经营', emoji:'🍽️', cat:'模拟', clr:'#ff7043' },
+        { name:'文字冒险', folder:'TextAdventure', type:'叙事RPG', emoji:'📖', cat:'RPG', clr:'#5c6bc0' },
+        { name:'农场模拟', folder:'FarmSim', type:'模拟经营', emoji:'🌾', cat:'模拟', clr:'#66bb6a' },
+        { name:'弹幕天堂', folder:'BulletHeaven', type:'生存射击', emoji:'☀️', cat:'射击', clr:'#ff8f00' },
+        { name:'横版平台', folder:'Platformer', type:'动作跳跃', emoji:'🦘', cat:'动作', clr:'#26a69a' },
+        { name:'猜词', folder:'WordGuess', type:'文字益智', emoji:'📝', cat:'益智', clr:'#78909c' },
+        { name:'模拟飞行', folder:'FlightSim', type:'飞行模拟', emoji:'✈️', cat:'模拟', clr:'#42a5f5' },
+        { name:'泡泡龙', folder:'BubbleShooter', type:'射击消除', emoji:'🫧', cat:'益智', clr:'#ff7043', isNew:true },
+        { name:'迷宫逃脱', folder:'MazeEscape', type:'迷宫探索', emoji:'🏰', cat:'冒险', clr:'#2e7d32', isNew:true },
+        { name:'麻将连连看', folder:'Mahjong', type:'配对消除', emoji:'🀄', cat:'益智', clr:'#f9a825', isNew:true },
+        { name:'翻转棋', folder:'Reversi', type:'棋类AI', emoji:'⚪', cat:'棋牌', clr:'#37474f', isNew:true },
+        { name:'矿洞探险', folder:'Spelunky', type:'Roguelike跑酷', emoji:'⛏️', cat:'冒险', clr:'#795548', isNew:true },
+        { name:'迷你高尔夫', folder:'MiniGolf', type:'体育物理', emoji:'⛳', cat:'体育', clr:'#388e3c', isNew:true },
+        { name:'接金币', folder:'CoinCatcher', type:'休闲收集', emoji:'🪙', cat:'休闲', clr:'#ffb300', isNew:true },
+        { name:'骰子战棋', folder:'DiceWars', type:'战棋策略', emoji:'🎲', cat:'策略', clr:'#6d4c41', isNew:true },
+        { name:'生存岛屿', folder:'SurvivalIsland', type:'生存模拟', emoji:'🏝️', cat:'模拟', clr:'#00897b', isNew:true },
+        { name:'涂鸦跳跃', folder:'DoodleJump', type:'垂直跳跃', emoji:'🐸', cat:'动作', clr:'#7cb342', isNew:true },
+        { name:'卡牌战争', folder:'CardWar', type:'卡牌对战', emoji:'⚔️', cat:'卡牌', clr:'#7e57c2', isNew:true },
+        { name:'颜色排序', folder:'ColorSort', type:'益智排序', emoji:'🧪', cat:'益智', clr:'#ab47bc', isNew:true },
+        { name:'射箭大师', folder:'Archery', type:'射箭物理', emoji:'🏹', cat:'体育', clr:'#8d6e63', isNew:true }
+    ];
+
+    const CATS = ['全部','经典','益智','射击','休闲','棋牌','模拟','RPG','策略','冒险','动作','卡牌','竞速','音乐','体育'];
+    let activeCat = '全部';
+    let searchText = '';
+
+    // ===== THEME =====
+    const html = document.documentElement;
+    const themeBtn = document.getElementById('themeToggle');
+    const savedTheme = localStorage.getItem('mimo_theme') || 'dark';
+    html.setAttribute('data-theme', savedTheme);
+
+    themeBtn.addEventListener('click', () => {
+        const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        html.setAttribute('data-theme', next);
+        localStorage.setItem('mimo_theme', next);
+    });
+
+    // ===== RENDER CATEGORIES =====
+    function renderCats() {
+        const el = document.getElementById('categories');
+        el.innerHTML = '';
+        CATS.forEach(c => {
+            const btn = document.createElement('button');
+            btn.className = 'cat-btn' + (c === activeCat ? ' active' : '');
+            btn.textContent = c;
+            btn.onclick = () => { activeCat = c; renderCats(); renderGrid(); };
+            el.appendChild(btn);
+        });
+        document.getElementById('catCount').textContent = CATS.length - 1;
+    }
+
+    // ===== RENDER GRID =====
+    function renderGrid() {
+        const grid = document.getElementById('gameGrid');
+        grid.innerHTML = '';
+
+        const filtered = GAMES.filter(g => {
+            if (activeCat !== '全部' && g.cat !== activeCat) return false;
+            if (searchText) {
+                const q = searchText.toLowerCase();
+                if (!g.name.toLowerCase().includes(q) && !g.type.toLowerCase().includes(q) && !g.cat.toLowerCase().includes(q)) return false;
+            }
+            return true;
+        });
+
+        document.getElementById('visibleCount').textContent = filtered.length;
+        document.getElementById('heroTotal').textContent = filtered.length;
+
+        if (filtered.length === 0) {
+            grid.innerHTML = '<div class="empty-state" style="display:block"><div class="empty-icon">🔍</div><p>没有找到匹配的游戏</p></div>';
+            return;
+        }
+
+        filtered.forEach((g, i) => {
+            const card = document.createElement('div');
+            card.className = 'game-card';
+            card.style.animationDelay = `${Math.min(i * 0.03, 0.8)}s`;
+
+            const idx = GAMES.indexOf(g) + 1;
+            card.innerHTML = `
+                <div class="card-visual" style="--card-clr:${g.clr}">
+                    <span class="card-emoji">${g.emoji}</span>
+                    ${g.isNew ? '<span class="card-badge badge-new">NEW</span>' : ''}
+                </div>
+                <div class="card-body">
+                    <div class="card-title">${g.name}</div>
+                    <div class="card-meta">
+                        <span class="card-type">${g.type}</span>
+                        <span class="card-num">#${String(idx).padStart(2,'0')}</span>
+                    </div>
+                </div>
+            `;
+
+            // Set card visual background based on theme
+            const visual = card.querySelector('.card-visual');
+            visual.style.background = `linear-gradient(135deg, ${g.clr}15, ${g.clr}30)`;
+
+            card.onclick = () => { window.location.href = g.folder + '/index.html'; };
+            grid.appendChild(card);
+        });
+    }
+
+    // ===== SEARCH =====
+    document.getElementById('searchInput').addEventListener('input', e => {
+        searchText = e.target.value.trim();
+        renderGrid();
+    });
+
+    // ===== INIT =====
+    renderCats();
+    renderGrid();
+    </script>
+</body>
+</html>

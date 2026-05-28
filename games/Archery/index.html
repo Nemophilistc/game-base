@@ -1,0 +1,2875 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>射箭大师 - MIMO游戏合集</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0a0a1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+        }
+
+        #gameContainer {
+            position: relative;
+            width: 100%;
+            max-width: 1200px;
+            aspect-ratio: 12 / 7;
+            max-height: 100vh;
+        }
+
+        #gameCanvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            cursor: crosshair;
+            border-radius: 8px;
+            box-shadow: 0 0 40px rgba(255, 165, 0, 0.15), 0 0 80px rgba(0, 0, 0, 0.5);
+        }
+
+        .back-link {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: #888;
+            text-decoration: none;
+            font-size: 14px;
+            z-index: 10;
+            background: rgba(0,0,0,0.5);
+            padding: 5px 10px;
+            border-radius: 4px;
+            transition: color 0.3s;
+        }
+
+        .back-link:hover {
+            color: #FFD700;
+        }
+
+        /* Responsive scaling */
+        @media (max-width: 1200px) {
+            #gameContainer {
+                max-width: 100vw;
+                max-height: 100vh;
+                border-radius: 0;
+            }
+            #gameCanvas {
+                border-radius: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <a href="../index.html" class="back-link">← 返回游戏合集</a>
+        <canvas id="gameCanvas" width="1200" height="700"></canvas>
+    </div>
+
+    <script>
+// === ./config.js ===
+// config.js - Game configuration constants
+const CONFIG = {
+  CANVAS_WIDTH: 1200,
+  CANVAS_HEIGHT: 700,
+
+  // Bow position (bottom-left area)
+  BOW_X: 150,
+  BOW_Y: 500,
+
+  // Arrow physics
+  ARROW_GRAVITY: 0.35,
+  ARROW_MAX_POWER: 28,
+  ARROW_MIN_POWER: 4,
+  ARROW_LENGTH: 50,
+  ARROW_STICK_TIME: 2000, // ms before stuck arrows fade
+
+  // Wind
+  WIND_MAX_STRENGTH: 5,
+  WIND_CHANGE_INTERVAL: 5000, // ms
+
+  // Targets
+  TARGET_BASE_X: 950,
+  TARGET_Y_MIN: 200,
+  TARGET_Y_MAX: 550,
+  TARGET_RADIUS_BASE: 60,
+  TARGET_ZONE_COLORS: ['#FFD700', '#FF4444', '#4488FF', '#22CC22', '#FFFFFF'],
+  TARGET_ZONE_NAMES: ['10分', '8分', '6分', '4分', '2分'],
+  TARGET_ZONE_SCORES: [10, 8, 6, 4, 2],
+
+  // Moving target
+  MOVING_SPEED_MIN: 1,
+  MOVING_SPEED_MAX: 3,
+  MOVING_RANGE: 200,
+
+  // Balloon
+  BALLOON_COLORS: ['#FF4488', '#FF8844', '#FFDD44', '#44DDFF', '#DD44FF'],
+  BALLOON_RADIUS: 30,
+  BALLOON_BONUS: 15,
+  BALLOON_FLOAT_SPEED: 1.2,
+
+  // Apple
+  APPLE_RADIUS: 22,
+  APPLE_BONUS: 25,
+  APPLE_MISS_PENALTY: 5, // hit the dummy instead
+
+  // Dummy (person with apple on head)
+  DUMMY_X: 950,
+  DUMMY_Y: 480,
+
+  // Combo
+  COMBO_MULTIPLIERS: [1, 1.5, 2, 2.5, 3, 4, 5],
+  COMBO_BULLSEYE_THRESHOLD: 8, // score >= 8 counts for combo
+
+  // Game modes
+  MODES: {
+    CLASSIC: { name: '经典模式', arrows: 10, timeLimit: 0 },
+    TIME_ATTACK: { name: '限时挑战', arrows: Infinity, timeLimit: 60 },
+    CHALLENGE: { name: '挑战模式', arrows: 15, timeLimit: 0 },
+  },
+
+  // Levels
+  LEVEL_DISTANCE_INCREASE: 0.08, // scale factor per level
+  TARGETS_PER_LEVEL: 3,
+
+  // Colors
+  COLOR_BG_SKY: '#1a1a2e',
+  COLOR_BG_GROUND: '#2d1f0e',
+  COLOR_GRASS: '#1a3a1a',
+  COLOR_WOOD: '#8B6914',
+  COLOR_STRING: '#CCCCCC',
+  COLOR_ARROW_SHAFT: '#C4A35A',
+  COLOR_ARROW_TIP: '#888888',
+  COLOR_ARROW_FEATHER: '#CC3333',
+  COLOR_UI_BG: 'rgba(10, 10, 30, 0.85)',
+  COLOR_UI_BORDER: 'rgba(180, 140, 80, 0.6)',
+  COLOR_UI_TEXT: '#E8D5B0',
+  COLOR_UI_ACCENT: '#FF6644',
+  COLOR_UI_GOLD: '#FFD700',
+  COLOR_UI_COMBO: '#FF44FF',
+
+  // Challenge mode targets
+  CHALLENGE_TARGETS: [
+    { type: 'bullseye', description: '命中靶心', zone: 0, count: 1 },
+    { type: 'moving', description: '命中移动靶', count: 2 },
+    { type: 'balloon', description: '击破气球', count: 3 },
+    { type: 'bullseye', description: '连续3次8分以上', zone: 1, count: 3, consecutive: true },
+    { type: 'apple', description: '命中苹果', count: 1 },
+  ],
+};
+
+// === ./sound.js ===
+// sound.js - Web Audio API sound effects
+class SoundManager {
+  constructor() {
+    this.ctx = null;
+    this.enabled = true;
+    this.initialized = false;
+  }
+
+  init() {
+    if (this.initialized) return;
+    try {
+      this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      this.initialized = true;
+    } catch (e) {
+      this.enabled = false;
+    }
+  }
+
+  _ensureCtx() {
+    if (!this.initialized) this.init();
+    if (this.ctx && this.ctx.state === 'suspended') {
+      this.ctx.resume();
+    }
+    return this.ctx && this.enabled;
+  }
+
+  // Bow draw - creaking stretching sound
+  playDraw() {
+    if (!this._ensureCtx()) return;
+    const ctx = this.ctx;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const filter = ctx.createBiquadFilter();
+
+    filter.type = 'bandpass';
+    filter.frequency.value = 800;
+    filter.Q.value = 2;
+
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(120, ctx.currentTime);
+    osc.frequency.linearRampToValueAtTime(200, ctx.currentTime + 0.3);
+
+    gain.gain.setValueAtTime(0.06, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(0.02, ctx.currentTime + 0.3);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.35);
+  }
+
+  // Arrow release - twang
+  playRelease() {
+    if (!this._ensureCtx()) return;
+    const ctx = this.ctx;
+
+    // String twang
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(400, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(80, ctx.currentTime + 0.3);
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.35);
+
+    // Whoosh
+    const noise = this._createNoise(0.2);
+    const noiseGain = ctx.createGain();
+    const noiseFilter = ctx.createBiquadFilter();
+    noiseFilter.type = 'bandpass';
+    noiseFilter.frequency.value = 2000;
+    noiseGain.gain.setValueAtTime(0.08, ctx.currentTime);
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+    noise.connect(noiseFilter);
+    noiseFilter.connect(noiseGain);
+    noiseGain.connect(ctx.destination);
+    noise.start();
+    noise.stop(ctx.currentTime + 0.25);
+  }
+
+  // Arrow hitting wood/target
+  playHitWood() {
+    if (!this._ensureCtx()) return;
+    const ctx = this.ctx;
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(150, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(50, ctx.currentTime + 0.15);
+    gain.gain.setValueAtTime(0.12, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.2);
+
+    // Thud
+    const noise = this._createNoise(0.12);
+    const nGain = ctx.createGain();
+    const nFilter = ctx.createBiquadFilter();
+    nFilter.type = 'lowpass';
+    nFilter.frequency.value = 300;
+    nGain.gain.setValueAtTime(0.15, ctx.currentTime);
+    nGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+    noise.connect(nFilter);
+    nFilter.connect(nGain);
+    nGain.connect(ctx.destination);
+    noise.start();
+    noise.stop(ctx.currentTime + 0.15);
+  }
+
+  // Bullseye celebration
+  playBullseye() {
+    if (!this._ensureCtx()) return;
+    const ctx = this.ctx;
+
+    const notes = [523, 659, 784, 1047]; // C5, E5, G5, C6
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0, ctx.currentTime + i * 0.1);
+      gain.gain.linearRampToValueAtTime(0.12, ctx.currentTime + i * 0.1 + 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.1 + 0.4);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(ctx.currentTime + i * 0.1);
+      osc.stop(ctx.currentTime + i * 0.1 + 0.45);
+    });
+  }
+
+  // Balloon pop
+  playBalloonPop() {
+    if (!this._ensureCtx()) return;
+    const ctx = this.ctx;
+
+    const noise = this._createNoise(0.08);
+    const gain = ctx.createGain();
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'highpass';
+    filter.frequency.value = 1000;
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+    noise.start();
+    noise.stop(ctx.currentTime + 0.1);
+
+    // Pop tone
+    const osc = ctx.createOscillator();
+    const oGain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(600, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(100, ctx.currentTime + 0.1);
+    oGain.gain.setValueAtTime(0.15, ctx.currentTime);
+    oGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
+    osc.connect(oGain);
+    oGain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.15);
+  }
+
+  // Wind whoosh
+  playWindWhoosh() {
+    if (!this._ensureCtx()) return;
+    const ctx = this.ctx;
+    const noise = this._createNoise(1.5);
+    const gain = ctx.createGain();
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.value = 600;
+    filter.Q.value = 0.5;
+    gain.gain.setValueAtTime(0, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(0.04, ctx.currentTime + 0.3);
+    gain.gain.linearRampToValueAtTime(0.06, ctx.currentTime + 0.8);
+    gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 1.5);
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+    noise.start();
+    noise.stop(ctx.currentTime + 1.6);
+  }
+
+  // Miss - arrow thuds into ground
+  playMiss() {
+    if (!this._ensureCtx()) return;
+    const ctx = this.ctx;
+
+    const noise = this._createNoise(0.15);
+    const gain = ctx.createGain();
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = 200;
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+    noise.start();
+    noise.stop(ctx.currentTime + 0.2);
+
+    // Dull thud
+    const osc = ctx.createOscillator();
+    const oGain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(60, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(30, ctx.currentTime + 0.1);
+    oGain.gain.setValueAtTime(0.1, ctx.currentTime);
+    oGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
+    osc.connect(oGain);
+    oGain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.15);
+  }
+
+  // Combo sound
+  playCombo(level) {
+    if (!this._ensureCtx()) return;
+    const ctx = this.ctx;
+    const baseFreq = 440 + level * 100;
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(baseFreq, ctx.currentTime);
+    osc.frequency.linearRampToValueAtTime(baseFreq * 1.5, ctx.currentTime + 0.15);
+    gain.gain.setValueAtTime(0.1, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.25);
+  }
+
+  // Game over
+  playGameOver() {
+    if (!this._ensureCtx()) return;
+    const ctx = this.ctx;
+    const notes = [440, 392, 349, 330]; // descending
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0, ctx.currentTime + i * 0.2);
+      gain.gain.linearRampToValueAtTime(0.1, ctx.currentTime + i * 0.2 + 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.2 + 0.5);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(ctx.currentTime + i * 0.2);
+      osc.stop(ctx.currentTime + i * 0.2 + 0.55);
+    });
+  }
+
+  _createNoise(duration) {
+    const ctx = this.ctx;
+    const bufferSize = ctx.sampleRate * duration;
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    return source;
+  }
+
+  toggle() {
+    this.enabled = !this.enabled;
+    return this.enabled;
+  }
+}
+
+// === ./bow.js ===
+// bow.js - Bow aiming, power, arrow physics
+
+class Arrow {
+  constructor(x, y, vx, vy) {
+    this.x = x;
+    this.y = y;
+    this.vx = vx;
+    this.vy = vy;
+    this.rotation = Math.atan2(vy, vx);
+    this.alive = true;
+    this.stuck = false;
+    this.stuckTime = 0;
+    this.stuckTarget = null;
+    this.stuckOffsetX = 0;
+    this.stuckOffsetY = 0;
+    this.stuckZone = -1;
+    this.trail = [];
+    this.fadeAlpha = 1;
+    this.missed = false;
+    this.hitGroundY = 0;
+  }
+
+  update(dt, wind) {
+    if (this.stuck) {
+      this.stuckTime += dt;
+      if (this.stuckTime > CONFIG.ARROW_STICK_TIME) {
+        this.fadeAlpha -= 0.02;
+        if (this.fadeAlpha <= 0) this.alive = false;
+      }
+      // If stuck to a moving target, follow it
+      if (this.stuckTarget && this.stuckTarget.alive) {
+        this.x = this.stuckTarget.x + this.stuckOffsetX;
+        this.y = this.stuckTarget.y + this.stuckOffsetY;
+      }
+      return;
+    }
+
+    if (!this.alive) return;
+
+    // Store trail
+    this.trail.push({ x: this.x, y: this.y });
+    if (this.trail.length > 15) this.trail.shift();
+
+    // Apply wind
+    this.vx += wind.x * 0.02;
+    this.vy += wind.y * 0.005;
+
+    // Apply gravity
+    this.vy += CONFIG.ARROW_GRAVITY;
+
+    // Move
+    this.x += this.vx;
+    this.y += this.vy;
+
+    // Update rotation to follow velocity
+    this.rotation = Math.atan2(this.vy, this.vx);
+
+    // Check ground
+    if (this.y > CONFIG.CANVAS_HEIGHT - 60) {
+      this.missed = true;
+      this.hitGroundY = CONFIG.CANVAS_HEIGHT - 60;
+      this.y = this.hitGroundY;
+      this.stuck = true;
+      this.alive = true;
+    }
+
+    // Check out of bounds
+    if (this.x > CONFIG.CANVAS_WIDTH + 50 || this.x < -50 || this.y < -100) {
+      this.missed = true;
+      this.alive = false;
+    }
+  }
+
+  draw(ctx) {
+    if (!this.alive && !this.stuck) return;
+
+    ctx.save();
+    ctx.globalAlpha = this.fadeAlpha;
+
+    // Draw trail
+    if (this.trail.length > 1 && !this.stuck) {
+      for (let i = 1; i < this.trail.length; i++) {
+        const alpha = i / this.trail.length * 0.4;
+        ctx.strokeStyle = `rgba(255, 220, 150, ${alpha})`;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(this.trail[i - 1].x, this.trail[i - 1].y);
+        ctx.lineTo(this.trail[i].x, this.trail[i].y);
+        ctx.stroke();
+      }
+    }
+
+    // Draw arrow
+    ctx.translate(this.x, this.y);
+    ctx.rotate(this.rotation);
+
+    const len = CONFIG.ARROW_LENGTH;
+
+    // Shaft
+    ctx.strokeStyle = CONFIG.COLOR_ARROW_SHAFT;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(-len / 2, 0);
+    ctx.lineTo(len / 2, 0);
+    ctx.stroke();
+
+    // Tip (triangle)
+    ctx.fillStyle = CONFIG.COLOR_ARROW_TIP;
+    ctx.beginPath();
+    ctx.moveTo(len / 2 + 8, 0);
+    ctx.lineTo(len / 2 - 4, -4);
+    ctx.lineTo(len / 2 - 4, 4);
+    ctx.closePath();
+    ctx.fill();
+
+    // Feathers (fletching)
+    ctx.fillStyle = CONFIG.COLOR_ARROW_FEATHER;
+    // Top feather
+    ctx.beginPath();
+    ctx.moveTo(-len / 2, 0);
+    ctx.lineTo(-len / 2 - 12, -8);
+    ctx.lineTo(-len / 2 + 5, 0);
+    ctx.closePath();
+    ctx.fill();
+    // Bottom feather
+    ctx.beginPath();
+    ctx.moveTo(-len / 2, 0);
+    ctx.lineTo(-len / 2 - 12, 8);
+    ctx.lineTo(-len / 2 + 5, 0);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
+  }
+}
+
+class Bow {
+  constructor() {
+    this.x = CONFIG.BOW_X;
+    this.y = CONFIG.BOW_Y;
+    this.aiming = false;
+    this.pullBack = 0; // 0 to 1
+    this.aimAngle = -Math.PI / 4; // default aim angle
+    this.maxPull = 80;
+    this.arrows = [];
+    this.canShoot = true;
+    this.drawSoundPlaying = false;
+  }
+
+  startAim(mouseX, mouseY) {
+    this.aiming = true;
+    this.pullBack = 0;
+    this.updateAim(mouseX, mouseY);
+  }
+
+  updateAim(mouseX, mouseY) {
+    if (!this.aiming) return;
+
+    // Calculate pull back based on distance from bow
+    const dx = this.x - mouseX;
+    const dy = this.y - mouseY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    this.pullBack = Math.min(1, dist / this.maxPull);
+    this.aimAngle = Math.atan2(dy, dx);
+  }
+
+  release(mouseX, mouseY, wind, sound) {
+    if (!this.aiming || this.pullBack < 0.05) {
+      this.aiming = false;
+      return null;
+    }
+
+    this.updateAim(mouseX, mouseY);
+
+    const power = CONFIG.ARROW_MIN_POWER + this.pullBack * (CONFIG.ARROW_MAX_POWER - CONFIG.ARROW_MIN_POWER);
+    const angle = this.aimAngle;
+
+    const arrow = new Arrow(
+      this.x + Math.cos(angle) * 40,
+      this.y + Math.sin(angle) * 40,
+      Math.cos(angle) * power,
+      Math.sin(angle) * power
+    );
+
+    this.arrows.push(arrow);
+    this.aiming = false;
+    this.pullBack = 0;
+
+    if (sound) sound.playRelease();
+
+    return arrow;
+  }
+
+  getTrajectoryPreview(wind) {
+    if (!this.aiming || this.pullBack < 0.05) return [];
+
+    const power = CONFIG.ARROW_MIN_POWER + this.pullBack * (CONFIG.ARROW_MAX_POWER - CONFIG.ARROW_MIN_POWER);
+    const angle = this.aimAngle;
+    const points = [];
+
+    let px = this.x + Math.cos(angle) * 40;
+    let py = this.y + Math.sin(angle) * 40;
+    let vx = Math.cos(angle) * power;
+    let vy = Math.sin(angle) * power;
+
+    for (let i = 0; i < 60; i++) {
+      vx += wind.x * 0.02;
+      vy += wind.y * 0.005;
+      vy += CONFIG.ARROW_GRAVITY;
+      px += vx;
+      py += vy;
+      points.push({ x: px, y: py });
+      if (py > CONFIG.CANVAS_HEIGHT || px > CONFIG.CANVAS_WIDTH || px < 0) break;
+    }
+
+    return points;
+  }
+
+  updateArrows(dt, wind) {
+    for (const arrow of this.arrows) {
+      arrow.update(dt, wind);
+    }
+    // Clean up dead arrows after fade
+    this.arrows = this.arrows.filter(a => a.alive || a.stuck);
+  }
+
+  draw(ctx) {
+    // Draw stuck arrows
+    for (const arrow of this.arrows) {
+      if (arrow.stuck) arrow.draw(ctx);
+    }
+
+    // Draw flying arrows
+    for (const arrow of this.arrows) {
+      if (!arrow.stuck) arrow.draw(ctx);
+    }
+
+    // Draw bow
+    this._drawBow(ctx);
+
+    // Draw trajectory preview
+    if (this.aiming && this.pullBack > 0.05) {
+      this._drawTrajectoryPreview(ctx);
+    }
+  }
+
+  _drawBow(ctx) {
+    ctx.save();
+    ctx.translate(this.x, this.y);
+
+    const aimAngle = this.aiming ? this.aimAngle : -Math.PI / 4;
+
+    ctx.rotate(aimAngle);
+
+    // Bow limbs (arc)
+    const bowRadius = 50;
+    const bowThickness = 5;
+
+    ctx.strokeStyle = CONFIG.COLOR_WOOD;
+    ctx.lineWidth = bowThickness;
+    ctx.lineCap = 'round';
+
+    // Upper limb
+    ctx.beginPath();
+    ctx.arc(0, 0, bowRadius, -Math.PI * 0.35, -Math.PI * 0.02);
+    ctx.stroke();
+
+    // Lower limb
+    ctx.beginPath();
+    ctx.arc(0, 0, bowRadius, Math.PI * 0.02, Math.PI * 0.35);
+    ctx.stroke();
+
+    // Grip
+    ctx.fillStyle = '#6B4226';
+    ctx.fillRect(-4, -8, 8, 16);
+
+    // String
+    const pullDist = this.pullBack * 25;
+    ctx.strokeStyle = CONFIG.COLOR_STRING;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(-Math.PI * 0.35) * bowRadius, Math.sin(-Math.PI * 0.35) * bowRadius);
+    ctx.lineTo(-pullDist, 0);
+    ctx.lineTo(Math.cos(Math.PI * 0.35) * bowRadius, Math.sin(Math.PI * 0.35) * bowRadius);
+    ctx.stroke();
+
+    // Nocked arrow when aiming
+    if (this.aiming && this.pullBack > 0) {
+      ctx.fillStyle = CONFIG.COLOR_ARROW_SHAFT;
+      ctx.strokeStyle = CONFIG.COLOR_ARROW_TIP;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(-pullDist, 0);
+      ctx.lineTo(-pullDist - CONFIG.ARROW_LENGTH * 0.7, 0);
+      ctx.stroke();
+
+      // Arrow tip
+      ctx.fillStyle = CONFIG.COLOR_ARROW_TIP;
+      ctx.beginPath();
+      ctx.moveTo(-pullDist - CONFIG.ARROW_LENGTH * 0.7 - 6, 0);
+      ctx.lineTo(-pullDist - CONFIG.ARROW_LENGTH * 0.7 + 2, -3);
+      ctx.lineTo(-pullDist - CONFIG.ARROW_LENGTH * 0.7 + 2, 3);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    ctx.restore();
+  }
+
+  _drawTrajectoryPreview(ctx) {
+    const wind = this._currentWind || { x: 0, y: 0 };
+    const points = this.getTrajectoryPreview(wind);
+
+    for (let i = 0; i < points.length; i++) {
+      const alpha = 1 - i / points.length;
+      ctx.fillStyle = `rgba(255, 200, 100, ${alpha * 0.5})`;
+      ctx.beginPath();
+      ctx.arc(points[i].x, points[i].y, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  setCurrentWind(wind) {
+    this._currentWind = wind;
+  }
+
+  getActiveArrows() {
+    return this.arrows.filter(a => !a.stuck && a.alive);
+  }
+
+  getStuckArrows() {
+    return this.arrows.filter(a => a.stuck);
+  }
+
+  clearArrows() {
+    this.arrows = [];
+  }
+}
+
+// === ./targets.js ===
+// targets.js - Target types, movement, hit detection
+
+class Target {
+  constructor(x, y, radius, type = 'static') {
+    this.x = x;
+    this.y = y;
+    this.radius = radius;
+    this.type = type; // 'static', 'moving', 'wind', 'balloon', 'apple'
+    this.alive = true;
+    this.hit = false;
+    this.hitZone = -1;
+    this.hitScore = 0;
+    this.fadeAlpha = 1;
+    this.hitAnimation = 0;
+
+    // Moving target properties
+    this.baseX = x;
+    this.speed = CONFIG.MOVING_SPEED_MIN + Math.random() * (CONFIG.MOVING_SPEED_MAX - CONFIG.MOVING_SPEED_MIN);
+    this.direction = Math.random() > 0.5 ? 1 : -1;
+    this.moveRange = CONFIG.MOVING_RANGE;
+
+    // Balloon properties
+    this.balloonColor = CONFIG.BALLOON_COLORS[Math.floor(Math.random() * CONFIG.BALLOON_COLORS.length)];
+    this.bobOffset = Math.random() * Math.PI * 2;
+
+    // Apple properties
+    this.appleAngle = 0;
+    this.dummyHeadY = 0;
+  }
+
+  update(dt, wind) {
+    if (!this.alive) {
+      this.fadeAlpha -= 0.05;
+      return;
+    }
+
+    if (this.hit) {
+      this.hitAnimation += dt;
+      if (this.hitAnimation > 1000) {
+        this.alive = false;
+      }
+      return;
+    }
+
+    switch (this.type) {
+      case 'moving':
+        this.x += this.speed * this.direction;
+        if (this.x > this.baseX + this.moveRange / 2 || this.x < this.baseX - this.moveRange / 2) {
+          this.direction *= -1;
+        }
+        break;
+
+      case 'wind':
+        // Wind target sways more with wind
+        this.x = this.baseX + wind.x * 8;
+        this.y += Math.sin(Date.now() / 800) * 0.3;
+        break;
+
+      case 'balloon':
+        this.y -= CONFIG.BALLOON_FLOAT_SPEED * 0.3;
+        this.x += Math.sin(Date.now() / 1000 + this.bobOffset) * 0.5;
+        if (this.y < -50) this.alive = false;
+        break;
+
+      case 'apple':
+        // Apple sits on dummy's head - slight bob
+        this.x = this.baseX;
+        this.y = this.dummyHeadY - 25;
+        break;
+    }
+  }
+
+  checkHit(arrow) {
+    if (this.hit || !this.alive) return null;
+
+    const dx = arrow.x - this.x;
+    const dy = arrow.y - this.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    if (this.type === 'apple') {
+      // Apple is small, need precise hit
+      if (dist < CONFIG.APPLE_RADIUS) {
+        return { zone: 0, score: CONFIG.APPLE_BONUS, type: 'apple' };
+      }
+      // Check if hit the dummy (penalty)
+      const dummyDx = arrow.x - this.baseX;
+      const dummyDy = arrow.y - (this.dummyHeadY + 40);
+      const dummyDist = Math.sqrt(dummyDx * dummyDx + dummyDy * dummyDy);
+      if (dummyDist < 40) {
+        return { zone: -1, score: -CONFIG.APPLE_MISS_PENALTY, type: 'dummy' };
+      }
+      return null;
+    }
+
+    if (this.type === 'balloon') {
+      if (dist < CONFIG.BALLOON_RADIUS) {
+        return { zone: 0, score: CONFIG.BALLOON_BONUS, type: 'balloon' };
+      }
+      return null;
+    }
+
+    // Standard target (static, moving, wind)
+    if (dist < this.radius) {
+      // Determine zone (5 zones from center out)
+      const ratio = dist / this.radius;
+      let zone;
+      if (ratio < 0.2) zone = 0;       // Bullseye - 10 pts
+      else if (ratio < 0.4) zone = 1;   // 8 pts
+      else if (ratio < 0.6) zone = 2;   // 6 pts
+      else if (ratio < 0.8) zone = 3;   // 4 pts
+      else zone = 4;                     // 2 pts
+
+      return {
+        zone,
+        score: CONFIG.TARGET_ZONE_SCORES[zone],
+        type: this.type
+      };
+    }
+
+    return null;
+  }
+
+  onHit(arrow, hitResult) {
+    this.hit = true;
+    this.hitZone = hitResult.zone;
+    this.hitScore = hitResult.score;
+    this.hitAnimation = 0;
+
+    // Stick arrow to target
+    arrow.stuck = true;
+    arrow.stuckTarget = this;
+    arrow.stuckOffsetX = arrow.x - this.x;
+    arrow.stuckOffsetY = arrow.y - this.y;
+    arrow.stuckZone = hitResult.zone;
+  }
+
+  draw(ctx) {
+    if (!this.alive && this.fadeAlpha <= 0) return;
+
+    ctx.save();
+    ctx.globalAlpha = this.fadeAlpha;
+
+    if (this.hit) {
+      this._drawHitEffect(ctx);
+    } else {
+      switch (this.type) {
+        case 'static':
+        case 'moving':
+        case 'wind':
+          this._drawBullseye(ctx);
+          break;
+        case 'balloon':
+          this._drawBalloon(ctx);
+          break;
+        case 'apple':
+          this._drawDummy(ctx);
+          this._drawApple(ctx);
+          break;
+      }
+    }
+
+    ctx.restore();
+  }
+
+  _drawBullseye(ctx) {
+    const r = this.radius;
+    const zones = [
+      { radius: r, color: '#FFFFFF' },           // outermost - 2
+      { radius: r * 0.8, color: '#2255CC' },     // 4
+      { radius: r * 0.6, color: '#DD2222' },     // 6
+      { radius: r * 0.4, color: '#4488FF' },     // 8
+      { radius: r * 0.2, color: '#FFD700' },     // bullseye - 10
+    ];
+
+    // Shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.beginPath();
+    ctx.arc(this.x + 3, this.y + 3, r, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Board background
+    ctx.fillStyle = '#8B7355';
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, r + 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Draw zones from outside in
+    for (const zone of zones) {
+      ctx.fillStyle = zone.color;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, zone.radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Ring outlines
+    ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+    ctx.lineWidth = 1;
+    for (const zone of zones) {
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, zone.radius, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // Center dot
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, 3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Type indicator for moving/wind
+    if (this.type === 'moving') {
+      ctx.fillStyle = 'rgba(255,255,255,0.8)';
+      ctx.font = 'bold 12px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('>>', this.x, this.y - r - 8);
+    } else if (this.type === 'wind') {
+      ctx.fillStyle = 'rgba(100,200,255,0.8)';
+      ctx.font = 'bold 12px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('~', this.x, this.y - r - 8);
+    }
+  }
+
+  _drawBalloon(ctx) {
+    const r = CONFIG.BALLOON_RADIUS;
+
+    // String
+    ctx.strokeStyle = '#999';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(this.x, this.y + r);
+    ctx.quadraticCurveTo(this.x + 5, this.y + r + 15, this.x - 3, this.y + r + 25);
+    ctx.stroke();
+
+    // Balloon body
+    const gradient = ctx.createRadialGradient(
+      this.x - r * 0.3, this.y - r * 0.3, 0,
+      this.x, this.y, r
+    );
+    gradient.addColorStop(0, '#fff');
+    gradient.addColorStop(0.3, this.balloonColor);
+    gradient.addColorStop(1, this._darkenColor(this.balloonColor, 0.5));
+
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.ellipse(this.x, this.y, r * 0.85, r, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Knot
+    ctx.fillStyle = this._darkenColor(this.balloonColor, 0.7);
+    ctx.beginPath();
+    ctx.moveTo(this.x - 3, this.y + r);
+    ctx.lineTo(this.x, this.y + r + 5);
+    ctx.lineTo(this.x + 3, this.y + r);
+    ctx.closePath();
+    ctx.fill();
+
+    // Shine
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.beginPath();
+    ctx.ellipse(this.x - r * 0.25, this.y - r * 0.25, r * 0.15, r * 0.25, -0.3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Bonus label
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 11px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(`+${CONFIG.BALLOON_BONUS}`, this.x, this.y + 4);
+  }
+
+  _drawDummy(ctx) {
+    const x = this.baseX;
+    const headY = this.dummyHeadY;
+
+    // Body
+    ctx.fillStyle = '#8B6914';
+    ctx.fillRect(x - 15, headY + 20, 30, 50);
+
+    // Stick/stand
+    ctx.fillStyle = '#654321';
+    ctx.fillRect(x - 4, headY + 70, 8, 40);
+
+    // Cross bar
+    ctx.fillRect(x - 25, headY + 30, 50, 5);
+
+    // Head (circle)
+    ctx.fillStyle = '#D2B48C';
+    ctx.beginPath();
+    ctx.arc(x, headY, 18, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Face
+    ctx.fillStyle = '#333';
+    // Eyes
+    ctx.beginPath();
+    ctx.arc(x - 6, headY - 3, 2, 0, Math.PI * 2);
+    ctx.arc(x + 6, headY - 3, 2, 0, Math.PI * 2);
+    ctx.fill();
+    // Mouth (worried)
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(x, headY + 8, 5, Math.PI * 0.2, Math.PI * 0.8);
+    ctx.stroke();
+  }
+
+  _drawApple(ctx) {
+    const x = this.x;
+    const y = this.y;
+    const r = CONFIG.APPLE_RADIUS;
+
+    // Apple body
+    const gradient = ctx.createRadialGradient(x - 3, y - 3, 0, x, y, r);
+    gradient.addColorStop(0, '#FF3333');
+    gradient.addColorStop(1, '#CC0000');
+
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Stem
+    ctx.strokeStyle = '#654321';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x, y - r);
+    ctx.quadraticCurveTo(x + 3, y - r - 8, x + 1, y - r - 5);
+    ctx.stroke();
+
+    // Leaf
+    ctx.fillStyle = '#228B22';
+    ctx.beginPath();
+    ctx.ellipse(x + 5, y - r - 2, 6, 3, 0.3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Shine
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.beginPath();
+    ctx.ellipse(x - 5, y - 5, 4, 6, -0.3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Bonus label
+    ctx.fillStyle = '#FFD700';
+    ctx.font = 'bold 10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(`+${CONFIG.APPLE_BONUS}`, x, y + r + 14);
+  }
+
+  _drawHitEffect(ctx) {
+    const progress = this.hitAnimation / 1000;
+
+    if (this.type === 'balloon') {
+      // Balloon pop particles
+      for (let i = 0; i < 8; i++) {
+        const angle = (Math.PI * 2 / 8) * i;
+        const dist = progress * 40;
+        const px = this.x + Math.cos(angle) * dist;
+        const py = this.y + Math.sin(angle) * dist;
+        ctx.fillStyle = this.balloonColor;
+        ctx.globalAlpha = 1 - progress;
+        ctx.beginPath();
+        ctx.arc(px, py, 5 * (1 - progress), 0, Math.PI * 2);
+        ctx.fill();
+      }
+    } else {
+      // Target hit glow
+      ctx.globalAlpha = (1 - progress) * 0.5;
+      ctx.fillStyle = this.hitZone === 0 ? '#FFD700' : '#FF4444';
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.radius * (1 + progress * 0.5), 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  _darkenColor(hex, factor) {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgb(${Math.floor(r * factor)}, ${Math.floor(g * factor)}, ${Math.floor(b * factor)})`;
+  }
+}
+
+class TargetManager {
+  constructor() {
+    this.targets = [];
+    this.level = 1;
+    this.spawnTimer = 0;
+    this.spawnInterval = 2500;
+    this.mode = 'CLASSIC';
+    this.challengeIndex = 0;
+    this.challengeProgress = 0;
+    this.challengeConsecutive = 0;
+  }
+
+  setMode(mode) {
+    this.mode = mode;
+    this.targets = [];
+    this.spawnTimer = 0;
+    this.challengeIndex = 0;
+    this.challengeProgress = 0;
+    this.challengeConsecutive = 0;
+  }
+
+  setLevel(level) {
+    this.level = level;
+  }
+
+  update(dt, wind) {
+    this.spawnTimer += dt;
+
+    // Spawn new targets
+    const maxTargets = this.mode === 'TIME_ATTACK' ? 5 : 3;
+    const aliveTargets = this.targets.filter(t => t.alive && !t.hit).length;
+
+    if (aliveTargets < maxTargets && this.spawnTimer > this.spawnInterval) {
+      this.spawnTarget();
+      this.spawnTimer = 0;
+    }
+
+    // Update existing targets
+    for (const target of this.targets) {
+      target.update(dt, wind);
+    }
+
+    // Clean up dead targets
+    this.targets = this.targets.filter(t => t.alive || t.fadeAlpha > 0);
+  }
+
+  spawnTarget() {
+    const distScale = 1 + (this.level - 1) * CONFIG.LEVEL_DISTANCE_INCREASE;
+    const radius = CONFIG.TARGET_RADIUS_BASE / distScale;
+
+    // Random target type based on probabilities
+    const roll = Math.random();
+    let type;
+    if (this.mode === 'CHALLENGE') {
+      const challenge = CONFIG.CHALLENGE_TARGETS[this.challengeIndex % CONFIG.CHALLENGE_TARGETS.length];
+      type = challenge.type;
+    } else if (roll < 0.35) {
+      type = 'static';
+    } else if (roll < 0.55) {
+      type = 'moving';
+    } else if (roll < 0.70) {
+      type = 'wind';
+    } else if (roll < 0.88) {
+      type = 'balloon';
+    } else {
+      type = 'apple';
+    }
+
+    const baseX = CONFIG.TARGET_BASE_X - (this.level - 1) * 20;
+    const y = CONFIG.TARGET_Y_MIN + Math.random() * (CONFIG.TARGET_Y_MAX - CONFIG.TARGET_Y_MIN);
+
+    let target;
+    if (type === 'balloon') {
+      target = new Target(baseX + Math.random() * 100 - 50, y + 50, CONFIG.BALLOON_RADIUS, 'balloon');
+    } else if (type === 'apple') {
+      const dummyY = 350 + Math.random() * 100;
+      target = new Target(baseX, dummyY - 65, CONFIG.APPLE_RADIUS, 'apple');
+      target.dummyHeadY = dummyY - 40;
+    } else {
+      target = new Target(baseX, y, radius, type);
+    }
+
+    this.targets.push(target);
+  }
+
+  checkHits(arrow) {
+    const results = [];
+    for (const target of this.targets) {
+      const hit = target.checkHit(arrow);
+      if (hit) {
+        target.onHit(arrow, hit);
+        results.push({ target, hit });
+
+        // Update challenge progress
+        if (this.mode === 'CHALLENGE') {
+          this._updateChallenge(hit);
+        }
+      }
+    }
+    return results;
+  }
+
+  _updateChallenge(hit) {
+    const challenge = CONFIG.CHALLENGE_TARGETS[this.challengeIndex % CONFIG.CHALLENGE_TARGETS.length];
+
+    if (challenge.consecutive) {
+      // Consecutive challenge: track streak separately
+      if (hit.score >= CONFIG.COMBO_BULLSEYE_THRESHOLD) {
+        this.challengeConsecutive++;
+        if (this.challengeConsecutive >= challenge.count) {
+          // Challenge complete
+          this.challengeIndex++;
+          this.challengeProgress = 0;
+          this.challengeConsecutive = 0;
+        }
+      } else {
+        // Streak broken
+        this.challengeConsecutive = 0;
+      }
+    } else {
+      // Non-consecutive challenge: count individual hits
+      let counted = false;
+      if (challenge.type === 'bullseye' && hit.zone === 0) {
+        counted = true;
+      } else if (challenge.type === 'moving' && hit.type === 'moving') {
+        counted = true;
+      } else if (challenge.type === 'balloon' && hit.type === 'balloon') {
+        counted = true;
+      } else if (challenge.type === 'apple' && hit.type === 'apple') {
+        counted = true;
+      }
+
+      if (counted) {
+        this.challengeProgress++;
+        if (this.challengeProgress >= challenge.count) {
+          this.challengeIndex++;
+          this.challengeProgress = 0;
+          this.challengeConsecutive = 0;
+        }
+      }
+    }
+  }
+
+  draw(ctx) {
+    for (const target of this.targets) {
+      target.draw(ctx);
+    }
+  }
+
+  getCurrentChallenge() {
+    if (this.mode !== 'CHALLENGE') return null;
+    return CONFIG.CHALLENGE_TARGETS[this.challengeIndex % CONFIG.CHALLENGE_TARGETS.length];
+  }
+
+  getChallengeProgress() {
+    return this.challengeProgress;
+  }
+
+  reset() {
+    this.targets = [];
+    this.spawnTimer = 0;
+    this.challengeIndex = 0;
+    this.challengeProgress = 0;
+    this.challengeConsecutive = 0;
+  }
+}
+
+// === ./effects.js ===
+// effects.js - Visual effects: arrow trail, hit effects, bullseye celebration
+
+class Particle {
+  constructor(x, y, vx, vy, color, size, life) {
+    this.x = x;
+    this.y = y;
+    this.vx = vx;
+    this.vy = vy;
+    this.color = color;
+    this.size = size;
+    this.life = life;
+    this.maxLife = life;
+    this.alive = true;
+  }
+
+  update() {
+    this.x += this.vx;
+    this.y += this.vy;
+    this.vy += 0.05; // tiny gravity
+    this.life--;
+    if (this.life <= 0) this.alive = false;
+  }
+
+  draw(ctx) {
+    const alpha = this.life / this.maxLife;
+    ctx.fillStyle = this.color;
+    ctx.globalAlpha = alpha;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.size * alpha, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+}
+
+class EffectsManager {
+  constructor() {
+    this.particles = [];
+    this.floatingTexts = [];
+    this.screenShake = 0;
+    this.screenShakeX = 0;
+    this.screenShakeY = 0;
+    this.bullseyeFlash = 0;
+    this.windParticles = [];
+    this.celebrationParticles = [];
+  }
+
+  update() {
+    // Update particles
+    for (const p of this.particles) {
+      p.update();
+    }
+    this.particles = this.particles.filter(p => p.alive);
+
+    // Hard cap to prevent runaway particle accumulation
+    if (this.particles.length > 100) {
+      this.particles = this.particles.slice(-100);
+    }
+    if (this.celebrationParticles.length > 50) {
+      this.celebrationParticles = this.celebrationParticles.slice(-50);
+    }
+
+    // Update floating texts
+    for (const ft of this.floatingTexts) {
+      ft.y -= 1.5;
+      ft.life--;
+      ft.alpha = ft.life / ft.maxLife;
+    }
+    this.floatingTexts = this.floatingTexts.filter(ft => ft.life > 0);
+
+    // Cap floating texts
+    if (this.floatingTexts.length > 8) {
+      this.floatingTexts = this.floatingTexts.slice(-8);
+    }
+
+    // Update screen shake
+    if (this.screenShake > 0) {
+      this.screenShakeX = (Math.random() - 0.5) * this.screenShake * 2;
+      this.screenShakeY = (Math.random() - 0.5) * this.screenShake * 2;
+      this.screenShake *= 0.9;
+      if (this.screenShake < 0.5) {
+        this.screenShake = 0;
+        this.screenShakeX = 0;
+        this.screenShakeY = 0;
+      }
+    }
+
+    // Update bullseye flash
+    if (this.bullseyeFlash > 0) {
+      this.bullseyeFlash -= 0.05;
+    }
+
+    // Update wind particles
+    this._updateWindParticles();
+
+    // Update celebration particles
+    for (const p of this.celebrationParticles) {
+      p.update();
+      p.vy += 0.02; // lighter gravity for celebration
+    }
+    this.celebrationParticles = this.celebrationParticles.filter(p => p.alive);
+  }
+
+  // Hit effect - sparks at impact point
+  spawnHitEffect(x, y, zone) {
+    const colors = zone === 0
+      ? ['#FFD700', '#FFA500', '#FFFF00', '#fff']
+      : ['#FF4444', '#FF8844', '#FFAA44', '#fff'];
+
+    const count = zone === 0 ? 10 : 6;
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 1 + Math.random() * 3;
+      const color = colors[Math.floor(Math.random() * colors.length)];
+      this.particles.push(new Particle(
+        x, y,
+        Math.cos(angle) * speed,
+        Math.sin(angle) * speed,
+        color,
+        2 + Math.random() * 2,
+        20 + Math.random() * 20
+      ));
+    }
+
+    if (zone === 0) {
+      this.bullseyeFlash = 0.5;
+      this.screenShake = 4;
+    } else {
+      this.screenShake = 2;
+    }
+  }
+
+  // Balloon pop effect
+  spawnBalloonPop(x, y, color) {
+    for (let i = 0; i < 10; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 2 + Math.random() * 3;
+      this.particles.push(new Particle(
+        x, y,
+        Math.cos(angle) * speed,
+        Math.sin(angle) * speed,
+        color,
+        2 + Math.random() * 3,
+        15 + Math.random() * 15
+      ));
+    }
+    // Confetti
+    for (let i = 0; i < 5; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 1 + Math.random() * 2;
+      this.particles.push(new Particle(
+        x, y,
+        Math.cos(angle) * speed,
+        Math.sin(angle) * speed - 2,
+        ['#FF4488', '#FFDD44', '#44DDFF', '#DD44FF', '#44FF44'][Math.floor(Math.random() * 5)],
+        2 + Math.random() * 2,
+        30 + Math.random() * 20
+      ));
+    }
+    this.screenShake = 3;
+  }
+
+  // Apple hit effect
+  spawnAppleHit(x, y) {
+    // Red juice particles
+    for (let i = 0; i < 8; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 1 + Math.random() * 2;
+      this.particles.push(new Particle(
+        x, y,
+        Math.cos(angle) * speed,
+        Math.sin(angle) * speed,
+        '#CC0000',
+        2 + Math.random() * 2,
+        20 + Math.random() * 15
+      ));
+    }
+    this.screenShake = 3;
+  }
+
+  // Bullseye celebration (big)
+  spawnBullseyeCelebration(x, y) {
+    // Ring of golden particles
+    for (let i = 0; i < 16; i++) {
+      const angle = (Math.PI * 2 / 16) * i;
+      const speed = 2 + Math.random() * 2;
+      this.celebrationParticles.push(new Particle(
+        x, y,
+        Math.cos(angle) * speed,
+        Math.sin(angle) * speed,
+        ['#FFD700', '#FFA500', '#FFFF00', '#FFFFFF'][Math.floor(Math.random() * 4)],
+        2 + Math.random() * 3,
+        35 + Math.random() * 20
+      ));
+    }
+
+    // Star burst
+    for (let i = 0; i < 8; i++) {
+      const angle = (Math.PI * 2 / 8) * i;
+      for (let j = 1; j <= 2; j++) {
+        const speed = j * 3;
+        this.celebrationParticles.push(new Particle(
+          x, y,
+          Math.cos(angle) * speed,
+          Math.sin(angle) * speed,
+          '#FFD700',
+          3,
+          25 + j * 10
+        ));
+      }
+    }
+
+    this.bullseyeFlash = 0.5;
+    this.screenShake = 5;
+  }
+
+  // Floating score text
+  spawnScoreText(x, y, text, color = '#FFD700', size = 24) {
+    this.floatingTexts.push({
+      x, y,
+      text,
+      color,
+      size,
+      life: 45,
+      maxLife: 45,
+      alpha: 1
+    });
+  }
+
+  // Combo text
+  spawnComboText(x, y, combo) {
+    const colors = ['#FF44FF', '#FF44FF', '#FF88FF', '#FFAAFF', '#FFFFFF'];
+    const color = colors[Math.min(combo - 1, colors.length - 1)];
+    this.floatingTexts.push({
+      x, y: y - 30,
+      text: `${combo}连击! x${CONFIG.COMBO_MULTIPLIERS[Math.min(combo - 1, CONFIG.COMBO_MULTIPLIERS.length - 1)]}`,
+      color,
+      size: 28 + Math.min(combo, 5) * 2,
+      life: 50,
+      maxLife: 50,
+      alpha: 1
+    });
+  }
+
+  // Wind particles (ambient)
+  _updateWindParticles() {
+    // Spawn new wind particles occasionally
+    if (Math.random() < 0.03) {
+      this.windParticles.push({
+        x: Math.random() > 0.5 ? -10 : CONFIG.CANVAS_WIDTH + 10,
+        y: Math.random() * CONFIG.CANVAS_HEIGHT * 0.8,
+        size: 1 + Math.random() * 2,
+        life: 60 + Math.random() * 60,
+        maxLife: 120,
+        alpha: 0.2 + Math.random() * 0.3
+      });
+    }
+
+    for (const p of this.windParticles) {
+      p.x += p.life > p.maxLife / 2 ? 1 : -1;
+      p.y += Math.sin(p.x / 30) * 0.3;
+      p.life--;
+    }
+    this.windParticles = this.windParticles.filter(p => p.life > 0);
+
+    // Cap wind particles
+    if (this.windParticles.length > 30) {
+      this.windParticles = this.windParticles.slice(-30);
+    }
+  }
+
+  updateWindParticlesWithWind(wind) {
+    for (const p of this.windParticles) {
+      p.x += wind.x * 0.5;
+      p.y += wind.y * 0.1 + Math.sin(p.x / 40) * 0.2;
+    }
+  }
+
+  drawParticles(ctx) {
+    for (const p of this.particles) {
+      p.draw(ctx);
+    }
+    for (const p of this.celebrationParticles) {
+      p.draw(ctx);
+    }
+  }
+
+  drawWindParticles(ctx) {
+    ctx.save();
+    for (const p of this.windParticles) {
+      const alpha = (p.life / p.maxLife) * p.alpha;
+      ctx.fillStyle = `rgba(200, 220, 255, ${alpha})`;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  drawFloatingTexts(ctx) {
+    for (const ft of this.floatingTexts) {
+      ctx.save();
+      ctx.globalAlpha = ft.alpha;
+      ctx.fillStyle = ft.color;
+      ctx.font = `bold ${ft.size}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+      ctx.lineWidth = 3;
+      ctx.strokeText(ft.text, ft.x, ft.y);
+      ctx.fillText(ft.text, ft.x, ft.y);
+      ctx.restore();
+    }
+  }
+
+  drawBullseyeFlash(ctx) {
+    if (this.bullseyeFlash > 0) {
+      ctx.save();
+      ctx.globalAlpha = this.bullseyeFlash * 0.3;
+      ctx.fillStyle = '#FFD700';
+      ctx.fillRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
+      ctx.restore();
+    }
+  }
+
+  drawMissEffect(ctx) {
+    // Red flash for miss
+  }
+
+  clear() {
+    this.particles = [];
+    this.floatingTexts = [];
+    this.screenShake = 0;
+    this.bullseyeFlash = 0;
+    this.windParticles = [];
+    this.celebrationParticles = [];
+  }
+}
+
+// === ./ui.js ===
+// ui.js - UI overlays, HUD, menus
+
+class UI {
+  constructor(canvas) {
+    this.canvas = canvas;
+    this.showStart = true;
+    this.showGameOver = false;
+    this.showHelp = false;
+    this.selectedMode = 'CLASSIC';
+    this.gameActive = false;
+
+    // Score display
+    this.displayScore = 0;
+    this.targetScore = 0;
+
+    // Callbacks
+    this.onStart = null;
+    this.onRestart = null;
+    this.onModeSelect = null;
+
+    this._setupEventListeners();
+  }
+
+  _setupEventListeners() {
+    this.canvas.addEventListener('click', (e) => {
+      const rect = this.canvas.getBoundingClientRect();
+      const scaleX = this.canvas.width / rect.width;
+      const scaleY = this.canvas.height / rect.height;
+      const x = (e.clientX - rect.left) * scaleX;
+      const y = (e.clientY - rect.top) * scaleY;
+
+      if (this.showStart) {
+        this._handleStartClick(x, y);
+      } else if (this.showGameOver) {
+        this._handleGameOverClick(x, y);
+      }
+    });
+  }
+
+  _handleStartClick(x, y) {
+    // Mode buttons
+    const modes = ['CLASSIC', 'TIME_ATTACK', 'CHALLENGE'];
+    const modeY = 280;
+    for (let i = 0; i < modes.length; i++) {
+      const btnX = 400 + i * 140;
+      if (x > btnX && x < btnX + 130 && y > modeY && y < modeY + 45) {
+        this.selectedMode = modes[i];
+        if (this.onModeSelect) this.onModeSelect(modes[i]);
+        return;
+      }
+    }
+
+    // Start button
+    if (x > 450 && x < 750 && y > 370 && y < 430) {
+      this.showStart = false;
+      this.gameActive = true;
+      if (this.onStart) this.onStart(this.selectedMode);
+    }
+
+    // Help toggle
+    if (x > 520 && x < 680 && y > 445 && y < 475) {
+      this.showHelp = !this.showHelp;
+    }
+  }
+
+  _handleGameOverClick(x, y) {
+    // Restart button
+    if (x > 420 && x < 780 && y > 480 && y < 540) {
+      this.showGameOver = false;
+      this.gameActive = true;
+      if (this.onRestart) this.onRestart();
+    }
+
+    // Menu button
+    if (x > 420 && x < 780 && y > 555 && y < 615) {
+      this.showGameOver = false;
+      this.showStart = true;
+      this.gameActive = false;
+    }
+  }
+
+  updateScore(score) {
+    this.targetScore = score;
+  }
+
+  update() {
+    // Animate score counter
+    if (this.displayScore < this.targetScore) {
+      const diff = this.targetScore - this.displayScore;
+      this.displayScore += Math.ceil(diff * 0.1);
+      if (this.displayScore > this.targetScore) this.displayScore = this.targetScore;
+    }
+  }
+
+  drawStartScreen(ctx) {
+    if (!this.showStart) return;
+
+    // Full overlay
+    ctx.fillStyle = 'rgba(10, 8, 20, 0.92)';
+    ctx.fillRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
+
+    // Title
+    ctx.save();
+    ctx.fillStyle = '#FFD700';
+    ctx.font = 'bold 72px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.strokeStyle = 'rgba(255, 165, 0, 0.5)';
+    ctx.lineWidth = 4;
+    ctx.strokeText('射箭大师', 600, 160);
+    ctx.fillText('射箭大师', 600, 160);
+
+    // Subtitle
+    ctx.fillStyle = '#E8D5B0';
+    ctx.font = '24px sans-serif';
+    ctx.fillText('拉弓瞄准，射出完美一箭！', 600, 210);
+
+    // Mode selection buttons
+    const modes = [
+      { id: 'CLASSIC', name: '经典模式', desc: '10支箭' },
+      { id: 'TIME_ATTACK', name: '限时挑战', desc: '60秒' },
+      { id: 'CHALLENGE', name: '挑战模式', desc: '15支箭' },
+    ];
+
+    const modeY = 280;
+    modes.forEach((mode, i) => {
+      const btnX = 400 + i * 140;
+      const selected = this.selectedMode === mode.id;
+
+      // Button background
+      ctx.fillStyle = selected
+        ? 'rgba(180, 140, 60, 0.6)'
+        : 'rgba(60, 50, 40, 0.6)';
+      ctx.strokeStyle = selected ? '#FFD700' : 'rgba(180, 140, 80, 0.4)';
+      ctx.lineWidth = selected ? 2 : 1;
+      this._roundRect(ctx, btnX, modeY, 130, 45, 8);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = selected ? '#FFD700' : '#E8D5B0';
+      ctx.font = 'bold 18px sans-serif';
+      ctx.fillText(mode.name, btnX + 65, modeY + 20);
+
+      ctx.fillStyle = selected ? '#FFEEBB' : '#999';
+      ctx.font = '13px sans-serif';
+      ctx.fillText(mode.desc, btnX + 65, modeY + 38);
+    });
+
+    // Mode description
+    const modeInfo = CONFIG.MODES[this.selectedMode];
+    ctx.fillStyle = '#BBAA88';
+    ctx.font = '16px sans-serif';
+    ctx.fillText(`模式: ${modeInfo.name} | ${modeInfo.arrows === Infinity ? '无限箭矢' : modeInfo.arrows + '支箭'}${modeInfo.timeLimit ? ' | ' + modeInfo.timeLimit + '秒' : ''}`, 600, 345);
+
+    // Start button
+    const startHover = false;
+    ctx.fillStyle = startHover ? 'rgba(200, 80, 30, 0.8)' : 'rgba(180, 60, 20, 0.7)';
+    ctx.strokeStyle = '#FF6644';
+    ctx.lineWidth = 2;
+    this._roundRect(ctx, 450, 370, 300, 60, 12);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 28px sans-serif';
+    ctx.fillText('开始游戏', 600, 410);
+
+    // Help button
+    ctx.fillStyle = 'rgba(60, 50, 40, 0.5)';
+    ctx.strokeStyle = 'rgba(180, 140, 80, 0.3)';
+    ctx.lineWidth = 1;
+    this._roundRect(ctx, 520, 445, 160, 30, 6);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#BBAA88';
+    ctx.font = '14px sans-serif';
+    ctx.fillText('操作说明', 600, 464);
+
+    // Help box
+    if (this.showHelp) {
+      this._drawHelpBox(ctx);
+    }
+
+    // High scores
+    this._drawHighScores(ctx);
+
+    ctx.restore();
+  }
+
+  _drawHelpBox(ctx) {
+    const bx = 300, by = 490, bw = 600, bh = 180;
+
+    ctx.fillStyle = 'rgba(20, 15, 30, 0.95)';
+    ctx.strokeStyle = 'rgba(180, 140, 80, 0.5)';
+    ctx.lineWidth = 1;
+    this._roundRect(ctx, bx, by, bw, bh, 10);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#FFD700';
+    ctx.font = 'bold 16px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('操作说明', 600, by + 25);
+
+    ctx.fillStyle = '#E8D5B0';
+    ctx.font = '14px sans-serif';
+    ctx.textAlign = 'left';
+    const lines = [
+      '鼠标点击弓箭位置，向后拖动拉弓',
+      '拖动距离决定射箭力度，方向决定射箭角度',
+      '松开鼠标射出箭矢',
+      '风会影响箭矢飞行轨迹，注意风向指示器',
+      '靶心(金色)10分，连击可获得倍率加成',
+      '气球和苹果是高分目标，但更难命中',
+      '按 M 键切换音效开关',
+    ];
+    lines.forEach((line, i) => {
+      ctx.fillText('  ' + line, bx + 30, by + 50 + i * 18);
+    });
+  }
+
+  _drawHighScores(ctx) {
+    const scores = this._getHighScores();
+    if (!scores) return;
+
+    ctx.fillStyle = 'rgba(20, 15, 30, 0.8)';
+    ctx.strokeStyle = 'rgba(180, 140, 80, 0.3)';
+    ctx.lineWidth = 1;
+    this._roundRect(ctx, 20, 20, 200, 130, 8);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#FFD700';
+    ctx.font = 'bold 14px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('最高记录', 35, 42);
+
+    ctx.fillStyle = '#E8D5B0';
+    ctx.font = '13px sans-serif';
+    const modes = ['CLASSIC', 'TIME_ATTACK', 'CHALLENGE'];
+    const modeNames = ['经典', '限时', '挑战'];
+    modes.forEach((mode, i) => {
+      const s = scores[mode] || 0;
+      ctx.fillText(`${modeNames[i]}: ${s}分`, 35, 65 + i * 22);
+    });
+  }
+
+  drawHUD(ctx, state) {
+    if (this.showStart || this.showGameOver) return;
+
+    // Top HUD bar
+    ctx.fillStyle = 'rgba(10, 8, 20, 0.75)';
+    this._roundRect(ctx, 10, 10, CONFIG.CANVAS_WIDTH - 20, 60, 10);
+    ctx.fill();
+
+    ctx.strokeStyle = 'rgba(180, 140, 80, 0.4)';
+    ctx.lineWidth = 1;
+    this._roundRect(ctx, 10, 10, CONFIG.CANVAS_WIDTH - 20, 60, 10);
+    ctx.stroke();
+
+    // Score
+    ctx.fillStyle = '#FFD700';
+    ctx.font = 'bold 28px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(`${this.displayScore}`, 30, 50);
+
+    ctx.fillStyle = '#BBAA88';
+    ctx.font = '14px sans-serif';
+    ctx.fillText('得分', 30, 28);
+
+    // Mode-specific display
+    if (state.mode === 'TIME_ATTACK') {
+      // Timer
+      ctx.fillStyle = state.timeLeft < 10 ? '#FF4444' : '#E8D5B0';
+      ctx.font = 'bold 28px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(`${Math.ceil(state.timeLeft)}`, 300, 50);
+      ctx.fillStyle = '#BBAA88';
+      ctx.font = '14px sans-serif';
+      ctx.fillText('剩余时间', 300, 28);
+    } else {
+      // Arrow count
+      ctx.fillStyle = '#E8D5B0';
+      ctx.font = 'bold 24px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(`${state.arrowsLeft}`, 300, 50);
+      ctx.fillStyle = '#BBAA88';
+      ctx.font = '14px sans-serif';
+      ctx.fillText('剩余箭矢', 300, 28);
+
+      // Arrow quiver visualization
+      this._drawQuiver(ctx, 330, 25, state.arrowsLeft, state.totalArrows);
+    }
+
+    // Wind indicator
+    this._drawWindIndicator(ctx, 550, 40, state.wind);
+
+    // Combo
+    if (state.combo > 0) {
+      const comboColors = ['#FF44FF', '#FF44FF', '#FF88FF', '#FFAAFF', '#FFFFFF'];
+      const color = comboColors[Math.min(state.combo - 1, comboColors.length - 1)];
+      ctx.fillStyle = color;
+      ctx.font = `bold ${22 + state.combo}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText(`${state.combo}x连击`, 800, 48);
+
+      // Combo multiplier
+      const mult = CONFIG.COMBO_MULTIPLIERS[Math.min(state.combo - 1, CONFIG.COMBO_MULTIPLIERS.length - 1)];
+      ctx.fillStyle = '#FFD700';
+      ctx.font = 'bold 16px sans-serif';
+      ctx.fillText(`x${mult}`, 800, 65);
+    }
+
+    // High score
+    ctx.fillStyle = '#888';
+    ctx.font = '13px sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(`最高: ${state.highScore}`, CONFIG.CANVAS_WIDTH - 25, 30);
+
+    // Challenge mode objective
+    if (state.mode === 'CHALLENGE' && state.challenge) {
+      this._drawChallengeObjective(ctx, state.challenge, state.challengeProgress);
+    }
+
+    // Sound indicator
+    ctx.fillStyle = state.soundEnabled ? '#888' : '#FF4444';
+    ctx.font = '12px sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(state.soundEnabled ? '[M] 音效开' : '[M] 音效关', CONFIG.CANVAS_WIDTH - 25, 55);
+  }
+
+  _drawQuiver(ctx, x, y, current, total) {
+    const maxShow = Math.min(total, 10);
+    for (let i = 0; i < maxShow; i++) {
+      const filled = i < current;
+      ctx.fillStyle = filled ? '#C4A35A' : 'rgba(100, 80, 60, 0.3)';
+      ctx.fillRect(x + i * 12, y, 8, 30);
+      if (filled) {
+        // Feather
+        ctx.fillStyle = '#CC3333';
+        ctx.beginPath();
+        ctx.moveTo(x + i * 12, y);
+        ctx.lineTo(x + i * 12 - 3, y - 5);
+        ctx.lineTo(x + i * 12 + 4, y);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+  }
+
+  _drawWindIndicator(ctx, cx, cy, wind) {
+    const indicatorWidth = 160;
+    const indicatorHeight = 40;
+
+    // Background
+    ctx.fillStyle = 'rgba(30, 25, 40, 0.8)';
+    ctx.strokeStyle = 'rgba(100, 180, 255, 0.3)';
+    ctx.lineWidth = 1;
+    this._roundRect(ctx, cx - indicatorWidth / 2, cy - indicatorHeight / 2, indicatorWidth, indicatorHeight, 6);
+    ctx.fill();
+    ctx.stroke();
+
+    // Wind label
+    ctx.fillStyle = '#88BBDD';
+    ctx.font = '11px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('风力', cx, cy - 10);
+
+    // Wind arrow
+    const windStrength = Math.sqrt(wind.x * wind.x + wind.y * wind.y);
+    const normalizedStrength = windStrength / CONFIG.WIND_MAX_STRENGTH;
+
+    if (windStrength > 0.2) {
+      const arrowLen = normalizedStrength * 40;
+      const angle = Math.atan2(wind.y, wind.x);
+
+      ctx.save();
+      ctx.translate(cx, cy + 5);
+      ctx.rotate(angle);
+
+      // Arrow shaft
+      ctx.strokeStyle = `rgba(100, 200, 255, ${0.4 + normalizedStrength * 0.6})`;
+      ctx.lineWidth = 2 + normalizedStrength * 2;
+      ctx.beginPath();
+      ctx.moveTo(-arrowLen / 2, 0);
+      ctx.lineTo(arrowLen / 2, 0);
+      ctx.stroke();
+
+      // Arrow head
+      ctx.fillStyle = `rgba(100, 200, 255, ${0.4 + normalizedStrength * 0.6})`;
+      ctx.beginPath();
+      ctx.moveTo(arrowLen / 2 + 6, 0);
+      ctx.lineTo(arrowLen / 2 - 4, -5);
+      ctx.lineTo(arrowLen / 2 - 4, 5);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.restore();
+
+      // Strength text
+      ctx.fillStyle = '#AADDFF';
+      ctx.font = '10px sans-serif';
+      ctx.textAlign = 'center';
+      const strengthLabel = windStrength < 1.5 ? '微风' : windStrength < 3 ? '中风' : '强风';
+      ctx.fillText(strengthLabel, cx, cy + 16);
+    } else {
+      ctx.fillStyle = '#668888';
+      ctx.font = '12px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('无风', cx, cy + 8);
+    }
+  }
+
+  _drawChallengeObjective(ctx, challenge, progress) {
+    const bx = 900, by = 80, bw = 280, bh = 50;
+
+    ctx.fillStyle = 'rgba(10, 8, 20, 0.85)';
+    ctx.strokeStyle = 'rgba(255, 180, 60, 0.4)';
+    ctx.lineWidth = 1;
+    this._roundRect(ctx, bx, by, bw, bh, 8);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#FFD700';
+    ctx.font = 'bold 13px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('当前目标:', bx + 12, by + 20);
+
+    ctx.fillStyle = '#E8D5B0';
+    ctx.font = '14px sans-serif';
+    ctx.fillText(challenge.description, bx + 12, by + 40);
+
+    // Progress bar
+    const barX = bx + 150, barY = by + 12, barW = 115, barH = 12;
+    ctx.fillStyle = 'rgba(60, 50, 40, 0.6)';
+    this._roundRect(ctx, barX, barY, barW, barH, 4);
+    ctx.fill();
+
+    const fillW = (progress / challenge.count) * barW;
+    ctx.fillStyle = '#FF6644';
+    this._roundRect(ctx, barX, barY, fillW, barH, 4);
+    ctx.fill();
+
+    ctx.fillStyle = '#FFF';
+    ctx.font = 'bold 10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(`${progress}/${challenge.count}`, barX + barW / 2, barY + 10);
+  }
+
+  drawGameOver(ctx, stats) {
+    if (!this.showGameOver) return;
+
+    // Overlay
+    ctx.fillStyle = 'rgba(10, 8, 20, 0.92)';
+    ctx.fillRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
+
+    ctx.save();
+
+    // Title
+    ctx.fillStyle = stats.isNewHighScore ? '#FFD700' : '#E8D5B0';
+    ctx.font = 'bold 48px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(stats.isNewHighScore ? '新纪录!' : '游戏结束', 600, 130);
+
+    if (stats.isNewHighScore) {
+      ctx.fillStyle = '#FF6644';
+      ctx.font = '20px sans-serif';
+      ctx.fillText('恭喜打破最高记录！', 600, 165);
+    }
+
+    // Score box
+    const bx = 350, by = 185, bw = 500, bh = 270;
+    ctx.fillStyle = 'rgba(20, 15, 30, 0.9)';
+    ctx.strokeStyle = 'rgba(180, 140, 80, 0.5)';
+    ctx.lineWidth = 1;
+    this._roundRect(ctx, bx, by, bw, bh, 12);
+    ctx.fill();
+    ctx.stroke();
+
+    // Score breakdown
+    ctx.fillStyle = '#FFD700';
+    ctx.font = 'bold 36px sans-serif';
+    ctx.fillText(`${stats.totalScore}`, 600, by + 50);
+
+    ctx.fillStyle = '#BBAA88';
+    ctx.font = '16px sans-serif';
+    ctx.fillText('总分', 600, by + 72);
+
+    // Stats grid
+    const statsList = [
+      { label: '命中率', value: `${stats.hitRate}%` },
+      { label: '最高连击', value: `${stats.maxCombo}x` },
+      { label: '命中次数', value: `${stats.hits}/${stats.shots}` },
+      { label: '靶心命中', value: `${stats.bullseyes}次` },
+      { label: '气球击破', value: `${stats.balloons}个` },
+      { label: '苹果命中', value: `${stats.apples}个` },
+    ];
+
+    ctx.font = '15px sans-serif';
+    statsList.forEach((stat, i) => {
+      const col = i % 2;
+      const row = Math.floor(i / 2);
+      const sx = bx + 60 + col * 220;
+      const sy = by + 100 + row * 45;
+
+      ctx.fillStyle = '#999';
+      ctx.textAlign = 'left';
+      ctx.fillText(stat.label, sx, sy);
+
+      ctx.fillStyle = '#E8D5B0';
+      ctx.font = 'bold 18px sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText(stat.value, sx + 160, sy);
+      ctx.font = '15px sans-serif';
+    });
+
+    // Buttons
+    // Restart
+    ctx.fillStyle = 'rgba(180, 60, 20, 0.7)';
+    ctx.strokeStyle = '#FF6644';
+    ctx.lineWidth = 2;
+    this._roundRect(ctx, 420, 480, 360, 50, 10);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 22px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('再来一局', 600, 512);
+
+    // Menu
+    ctx.fillStyle = 'rgba(60, 50, 40, 0.6)';
+    ctx.strokeStyle = 'rgba(180, 140, 80, 0.4)';
+    ctx.lineWidth = 1;
+    this._roundRect(ctx, 420, 555, 360, 45, 10);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#BBAA88';
+    ctx.font = '18px sans-serif';
+    ctx.fillText('返回主菜单', 600, 582);
+
+    ctx.restore();
+  }
+
+  _getHighScores() {
+    try {
+      return JSON.parse(localStorage.getItem('archery_highscores') || '{}');
+    } catch {
+      return {};
+    }
+  }
+
+  _roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+  }
+}
+
+// === main.js ===
+// main.js - Main game loop and logic
+
+class ArcheryGame {
+  constructor() {
+    this.canvas = document.getElementById('gameCanvas');
+    this.ctx = this.canvas.getContext('2d');
+    this.canvas.width = CONFIG.CANVAS_WIDTH;
+    this.canvas.height = CONFIG.CANVAS_HEIGHT;
+
+    // Systems
+    this.sound = new SoundManager();
+    this.bow = new Bow();
+    this.targets = new TargetManager();
+    this.effects = new EffectsManager();
+    this.ui = new UI(this.canvas);
+
+    // Game state
+    this.mode = 'CLASSIC';
+    this.score = 0;
+    this.combo = 0;
+    this.maxCombo = 0;
+    this.arrowsLeft = 10;
+    this.totalArrows = 10;
+    this.timeLeft = 60;
+    this.shots = 0;
+    this.hits = 0;
+    this.bullseyes = 0;
+    this.balloons = 0;
+    this.apples = 0;
+    this.level = 1;
+    this.targetsHitForLevel = 0;
+    this.gameActive = false;
+    this.gameOver = false;
+    this.wind = { x: 0, y: 0 };
+    this.windTimer = 0;
+    this._endScheduled = false;
+    this.highScore = this._loadHighScore();
+
+    // Timing
+    this.lastTime = 0;
+    this.running = false;
+
+    // Mouse state
+    this.mouseX = 0;
+    this.mouseY = 0;
+
+    // Background elements
+    this.clouds = this._generateClouds();
+    this.trees = this._generateTrees();
+
+    this._setupCallbacks();
+    this._setupInput();
+
+    // Start animation loop (for menu)
+    this.running = true;
+    requestAnimationFrame((t) => this.loop(t));
+  }
+
+  _setupCallbacks() {
+    this.ui.onStart = (mode) => this.startGame(mode);
+    this.ui.onRestart = () => this.startGame(this.mode);
+    this.ui.onModeSelect = (mode) => {
+      this.mode = mode;
+    };
+  }
+
+  _setupInput() {
+    this.canvas.addEventListener('mousedown', (e) => {
+      if (!this.gameActive || this.gameOver) return;
+      const rect = this.canvas.getBoundingClientRect();
+      this.mouseX = (e.clientX - rect.left) * (this.canvas.width / rect.width);
+      this.mouseY = (e.clientY - rect.top) * (this.canvas.height / rect.height);
+      this.sound.init();
+      this.bow.startAim(this.mouseX, this.mouseY);
+      this.sound.playDraw();
+    });
+
+    this.canvas.addEventListener('mousemove', (e) => {
+      const rect = this.canvas.getBoundingClientRect();
+      this.mouseX = (e.clientX - rect.left) * (this.canvas.width / rect.width);
+      this.mouseY = (e.clientY - rect.top) * (this.canvas.height / rect.height);
+      if (this.bow.aiming) {
+        this.bow.updateAim(this.mouseX, this.mouseY);
+      }
+    });
+
+    this.canvas.addEventListener('mouseup', (e) => {
+      if (!this.gameActive || this.gameOver) return;
+      const rect = this.canvas.getBoundingClientRect();
+      this.mouseX = (e.clientX - rect.left) * (this.canvas.width / rect.width);
+      this.mouseY = (e.clientY - rect.top) * (this.canvas.height / rect.height);
+
+      if (this.bow.aiming) {
+        this._shootArrow();
+      }
+    });
+
+    // Touch support
+    this.canvas.addEventListener('touchstart', (e) => {
+      if (!this.gameActive || this.gameOver) return;
+      e.preventDefault();
+      const touch = e.touches[0];
+      const rect = this.canvas.getBoundingClientRect();
+      this.mouseX = (touch.clientX - rect.left) * (this.canvas.width / rect.width);
+      this.mouseY = (touch.clientY - rect.top) * (this.canvas.height / rect.height);
+      this.sound.init();
+      this.bow.startAim(this.mouseX, this.mouseY);
+      this.sound.playDraw();
+    });
+
+    this.canvas.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      const touch = e.touches[0];
+      const rect = this.canvas.getBoundingClientRect();
+      this.mouseX = (touch.clientX - rect.left) * (this.canvas.width / rect.width);
+      this.mouseY = (touch.clientY - rect.top) * (this.canvas.height / rect.height);
+      if (this.bow.aiming) {
+        this.bow.updateAim(this.mouseX, this.mouseY);
+      }
+    });
+
+    this.canvas.addEventListener('touchend', (e) => {
+      if (!this.gameActive || this.gameOver) return;
+      e.preventDefault();
+      if (this.bow.aiming) {
+        this._shootArrow();
+      }
+    });
+
+    // Keyboard
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'm' || e.key === 'M') {
+        const enabled = this.sound.toggle();
+        // Visual feedback could be added
+      }
+    });
+  }
+
+  _shootArrow() {
+    if (this.mode !== 'TIME_ATTACK' && this.arrowsLeft <= 0) return;
+
+    const arrow = this.bow.release(this.mouseX, this.mouseY, this.wind, this.sound);
+    if (!arrow) return;
+
+    this.shots++;
+    if (this.mode !== 'TIME_ATTACK') {
+      this.arrowsLeft--;
+    }
+
+    // Track arrow and check hits
+    this._pendingArrow = arrow;
+  }
+
+  startGame(mode) {
+    this.mode = mode;
+    this.score = 0;
+    this.combo = 0;
+    this.maxCombo = 0;
+    this.shots = 0;
+    this.hits = 0;
+    this.bullseyes = 0;
+    this.balloons = 0;
+    this.apples = 0;
+    this.level = 1;
+    this.targetsHitForLevel = 0;
+    this.gameActive = true;
+    this.gameOver = false;
+    this._endScheduled = false;
+    this._gameOverStats = null;
+
+    const modeConfig = CONFIG.MODES[mode];
+    this.arrowsLeft = modeConfig.arrows === Infinity ? 999 : modeConfig.arrows;
+    this.totalArrows = this.arrowsLeft;
+    this.timeLeft = modeConfig.timeLimit || 0;
+
+    this.targets.setMode(mode);
+    this.targets.setLevel(1);
+    this.targets.reset();
+    this.bow.clearArrows();
+    this.effects.clear();
+    this._generateWind();
+
+    this.ui.updateScore(0);
+    this.ui.displayScore = 0;
+
+    this.sound.init();
+  }
+
+  endGame() {
+    if (this.gameOver) return;
+    this.gameActive = false;
+    this.gameOver = true;
+
+    const hitRate = this.shots > 0 ? Math.round((this.hits / this.shots) * 100) : 0;
+    const isNewHighScore = this.score > this.highScore[this.mode];
+
+    if (isNewHighScore) {
+      this.highScore[this.mode] = this.score;
+      this._saveHighScore();
+    }
+
+    this.sound.playGameOver();
+
+    this.ui.showGameOver = true;
+    this.ui.gameActive = false;
+    this._gameOverStats = {
+      totalScore: this.score,
+      hitRate,
+      maxCombo: this.maxCombo,
+      hits: this.hits,
+      shots: this.shots,
+      bullseyes: this.bullseyes,
+      balloons: this.balloons,
+      apples: this.apples,
+      isNewHighScore
+    };
+  }
+
+  loop(time) {
+    if (!this.running) return;
+
+    const dt = this.lastTime ? Math.min(time - this.lastTime, 33) : 16;
+    this.lastTime = time;
+
+    this.update(dt);
+    this.render();
+
+    requestAnimationFrame((t) => this.loop(t));
+  }
+
+  update(dt) {
+    this.ui.update();
+
+    if (!this.gameActive || this.gameOver) {
+      this.effects.update();
+      return;
+    }
+
+    // Update timer
+    if (this.mode === 'TIME_ATTACK') {
+      this.timeLeft -= dt / 1000;
+      if (this.timeLeft <= 0) {
+        this.timeLeft = 0;
+        this.endGame();
+        return;
+      }
+    }
+
+    // Update wind
+    this.windTimer += dt;
+    if (this.windTimer > CONFIG.WIND_CHANGE_INTERVAL) {
+      this._generateWind();
+      this.windTimer = 0;
+      this.sound.playWindWhoosh();
+    }
+
+    // Wind interpolation for smooth changes
+    this._updateWind(dt);
+
+    // Set wind for bow trajectory preview
+    this.bow.setCurrentWind(this.wind);
+
+    // Update targets
+    this.targets.update(dt, this.wind);
+
+    // Update arrows
+    this.bow.updateArrows(dt, this.wind);
+
+    // Check hits for all flying arrows (includes _pendingArrow)
+    for (const arrow of this.bow.getActiveArrows()) {
+      if (arrow.stuck) continue;
+      const hits = this.targets.checkHits(arrow);
+      for (const { target, hit } of hits) {
+        this._onHit(target, hit);
+      }
+    }
+    this._pendingArrow = null;
+
+    // Check if arrow missed (stuck in ground)
+    for (const arrow of this.bow.arrows) {
+      if (arrow.stuck && arrow.missed && !arrow._missHandled) {
+        arrow._missHandled = true;
+        this._onMiss();
+      }
+    }
+
+    // Check end conditions
+    if (this.mode !== 'TIME_ATTACK' && !this._endScheduled) {
+      const activeArrows = this.bow.getActiveArrows();
+      if (this.arrowsLeft <= 0 && activeArrows.length === 0) {
+        // Wait for all arrows to land
+        const allStuck = this.bow.arrows.every(a => a.stuck || !a.alive);
+        if (allStuck) {
+          this._endScheduled = true;
+          setTimeout(() => {
+            if (this.gameActive && !this.gameOver) {
+              this.endGame();
+            }
+          }, 1000);
+        }
+      }
+    }
+
+    // Update effects
+    this.effects.update();
+    this.effects.updateWindParticlesWithWind(this.wind);
+
+    // Update UI score
+    this.ui.updateScore(this.score);
+  }
+
+  _onHit(target, hit) {
+    this.hits++;
+
+    // Combo tracking
+    if (hit.type === 'dummy') {
+      // Penalty hit - reset combo
+      this.combo = 0;
+    } else if (hit.score >= CONFIG.COMBO_BULLSEYE_THRESHOLD || hit.type === 'balloon' || hit.type === 'apple') {
+      this.combo++;
+      this.maxCombo = Math.max(this.maxCombo, this.combo);
+    } else {
+      this.combo = 0;
+    }
+
+    // Score with combo multiplier
+    const multiplier = CONFIG.COMBO_MULTIPLIERS[Math.min(this.combo - 1, CONFIG.COMBO_MULTIPLIERS.length - 1)];
+    const finalScore = Math.round(hit.score * multiplier);
+    this.score += finalScore;
+
+    // Track specific hits
+    if (hit.zone === 0 && (hit.type === 'static' || hit.type === 'moving' || hit.type === 'wind')) {
+      this.bullseyes++;
+    }
+    if (hit.type === 'balloon') this.balloons++;
+    if (hit.type === 'apple') this.apples++;
+
+    // Effects
+    if (hit.type === 'balloon') {
+      this.effects.spawnBalloonPop(target.x, target.y, target.balloonColor);
+      this.sound.playBalloonPop();
+    } else if (hit.type === 'apple') {
+      this.effects.spawnAppleHit(target.x, target.y);
+      this.sound.playBullseye();
+    } else if (hit.zone === 0) {
+      this.effects.spawnBullseyeCelebration(target.x, target.y);
+      this.sound.playBullseye();
+    } else {
+      this.effects.spawnHitEffect(target.x, target.y, hit.zone);
+      this.sound.playHitWood();
+    }
+
+    // Score text
+    const scoreColor = hit.zone === 0 ? '#FFD700' : hit.score > 5 ? '#FF6644' : '#E8D5B0';
+    const scoreText = hit.score > 0 ? `+${finalScore}` : `${finalScore}`;
+    this.effects.spawnScoreText(target.x, target.y - 30, scoreText, scoreColor, 28);
+
+    // Zone name
+    if (hit.type !== 'balloon' && hit.type !== 'apple' && hit.type !== 'dummy') {
+      this.effects.spawnScoreText(target.x, target.y - 55, CONFIG.TARGET_ZONE_NAMES[hit.zone], '#BBAA88', 16);
+    } else if (hit.type === 'balloon') {
+      this.effects.spawnScoreText(target.x, target.y - 30, '气球!', '#FF4488', 22);
+    } else if (hit.type === 'apple') {
+      this.effects.spawnScoreText(target.x, target.y - 30, '苹果!', '#FF3333', 22);
+    }
+
+    // Combo text
+    if (this.combo > 1) {
+      this.effects.spawnComboText(target.x, target.y - 80, this.combo);
+      this.sound.playCombo(this.combo);
+    }
+
+    // Level up
+    this.targetsHitForLevel++;
+    if (this.targetsHitForLevel >= CONFIG.TARGETS_PER_LEVEL) {
+      this.level++;
+      this.targetsHitForLevel = 0;
+      this.targets.setLevel(this.level);
+      this.effects.spawnScoreText(600, 300, `第 ${this.level} 级`, '#FFD700', 36);
+    }
+  }
+
+  _onMiss() {
+    if (!this.gameActive) return;
+    this.combo = 0;
+    this.sound.playMiss();
+    this.effects.spawnScoreText(this.mouseX, Math.min(this.mouseY + 20, CONFIG.CANVAS_HEIGHT - 80), '未命中', '#FF4444', 20);
+  }
+
+  _generateWind() {
+    const strength = Math.random() * CONFIG.WIND_MAX_STRENGTH;
+    const angle = Math.random() * Math.PI * 2;
+    this._targetWind = {
+      x: Math.cos(angle) * strength,
+      y: Math.sin(angle) * strength * 0.3
+    };
+  }
+
+  _updateWind(dt) {
+    if (!this._targetWind) return;
+    const lerp = 0.02;
+    this.wind.x += (this._targetWind.x - this.wind.x) * lerp;
+    this.wind.y += (this._targetWind.y - this.wind.y) * lerp;
+  }
+
+  render() {
+    const ctx = this.ctx;
+
+    // Clear entire canvas each frame to prevent visual accumulation
+    ctx.clearRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
+
+    ctx.save();
+
+    // Screen shake
+    if (this.effects.screenShake > 0) {
+      ctx.translate(this.effects.screenShakeX, this.effects.screenShakeY);
+    }
+
+    // Background
+    this._drawBackground(ctx);
+
+    // Wind particles
+    this.effects.drawWindParticles(ctx);
+
+    // Ground
+    this._drawGround(ctx);
+
+    // Targets
+    this.targets.draw(ctx);
+
+    // Bow and arrows
+    this.bow.draw(ctx);
+
+    // Effects
+    this.effects.drawParticles(ctx);
+    this.effects.drawFloatingTexts(ctx);
+    this.effects.drawBullseyeFlash(ctx);
+
+    ctx.restore();
+
+    // UI (not affected by screen shake)
+    this.ui.drawHUD(ctx, {
+      mode: this.mode,
+      timeLeft: this.timeLeft,
+      arrowsLeft: this.arrowsLeft,
+      totalArrows: this.totalArrows,
+      wind: this.wind,
+      combo: this.combo,
+      highScore: this.highScore[this.mode] || 0,
+      challenge: this.targets.getCurrentChallenge(),
+      challengeProgress: this.targets.getChallengeProgress(),
+      soundEnabled: this.sound.enabled
+    });
+
+    // Overlays
+    this.ui.drawStartScreen(ctx);
+    if (this._gameOverStats) {
+      this.ui.drawGameOver(ctx, this._gameOverStats);
+    }
+  }
+
+  _drawBackground(ctx) {
+    // Sky gradient
+    const skyGrad = ctx.createLinearGradient(0, 0, 0, CONFIG.CANVAS_HEIGHT * 0.7);
+    skyGrad.addColorStop(0, '#0a0a1e');
+    skyGrad.addColorStop(0.5, '#1a1a3e');
+    skyGrad.addColorStop(1, '#2a2a4e');
+    ctx.fillStyle = skyGrad;
+    ctx.fillRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT * 0.7);
+
+    // Stars
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+    for (let i = 0; i < 30; i++) {
+      const sx = (i * 137.5 + 50) % CONFIG.CANVAS_WIDTH;
+      const sy = (i * 73.7 + 20) % (CONFIG.CANVAS_HEIGHT * 0.4);
+      const size = 0.5 + (i % 3) * 0.5;
+      ctx.beginPath();
+      ctx.arc(sx, sy, size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Moon
+    ctx.fillStyle = '#FFE8C0';
+    ctx.beginPath();
+    ctx.arc(1050, 80, 35, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#0a0a1e';
+    ctx.beginPath();
+    ctx.arc(1040, 72, 30, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Distant mountains
+    ctx.fillStyle = '#1a1a2e';
+    ctx.beginPath();
+    ctx.moveTo(0, CONFIG.CANVAS_HEIGHT * 0.55);
+    for (let x = 0; x <= CONFIG.CANVAS_WIDTH; x += 50) {
+      const h = Math.sin(x / 200) * 40 + Math.sin(x / 80) * 20;
+      ctx.lineTo(x, CONFIG.CANVAS_HEIGHT * 0.55 - h - 20);
+    }
+    ctx.lineTo(CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT * 0.7);
+    ctx.lineTo(0, CONFIG.CANVAS_HEIGHT * 0.7);
+    ctx.closePath();
+    ctx.fill();
+
+    // Clouds
+    ctx.fillStyle = 'rgba(60, 60, 80, 0.3)';
+    for (const cloud of this.clouds) {
+      this._drawCloud(ctx, cloud.x, cloud.y, cloud.size);
+    }
+  }
+
+  _drawGround(ctx) {
+    const groundY = CONFIG.CANVAS_HEIGHT - 60;
+
+    // Ground gradient
+    const groundGrad = ctx.createLinearGradient(0, groundY, 0, CONFIG.CANVAS_HEIGHT);
+    groundGrad.addColorStop(0, '#2a3a1a');
+    groundGrad.addColorStop(0.3, '#1f2e12');
+    groundGrad.addColorStop(1, '#1a1a0e');
+    ctx.fillStyle = groundGrad;
+    ctx.fillRect(0, groundY, CONFIG.CANVAS_WIDTH, 60);
+
+    // Grass tufts
+    ctx.strokeStyle = '#3a5a2a';
+    ctx.lineWidth = 1.5;
+    for (let x = 0; x < CONFIG.CANVAS_WIDTH; x += 15) {
+      const h = 5 + Math.sin(x / 20) * 3;
+      ctx.beginPath();
+      ctx.moveTo(x, groundY);
+      ctx.lineTo(x + 3, groundY - h);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x + 5, groundY);
+      ctx.lineTo(x + 2, groundY - h + 2);
+      ctx.stroke();
+    }
+
+    // Shooting line
+    ctx.strokeStyle = 'rgba(255, 200, 100, 0.3)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([10, 10]);
+    ctx.beginPath();
+    ctx.moveTo(CONFIG.BOW_X + 60, groundY);
+    ctx.lineTo(CONFIG.BOW_X + 60, groundY + 60);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  _drawCloud(ctx, x, y, size) {
+    ctx.beginPath();
+    ctx.arc(x, y, size, 0, Math.PI * 2);
+    ctx.arc(x + size * 0.8, y - size * 0.3, size * 0.7, 0, Math.PI * 2);
+    ctx.arc(x + size * 1.5, y, size * 0.8, 0, Math.PI * 2);
+    ctx.arc(x + size * 0.5, y + size * 0.2, size * 0.6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  _generateClouds() {
+    const clouds = [];
+    for (let i = 0; i < 6; i++) {
+      clouds.push({
+        x: Math.random() * CONFIG.CANVAS_WIDTH,
+        y: 30 + Math.random() * 150,
+        size: 20 + Math.random() * 30,
+        speed: 0.1 + Math.random() * 0.2
+      });
+    }
+    return clouds;
+  }
+
+  _generateTrees() {
+    const trees = [];
+    for (let i = 0; i < 5; i++) {
+      trees.push({
+        x: 100 + Math.random() * (CONFIG.CANVAS_WIDTH - 200),
+        height: 40 + Math.random() * 30
+      });
+    }
+    return trees;
+  }
+
+  _loadHighScore() {
+    try {
+      return JSON.parse(localStorage.getItem('archery_highscores') || '{}');
+    } catch {
+      return {};
+    }
+  }
+
+  _saveHighScore() {
+    try {
+      localStorage.setItem('archery_highscores', JSON.stringify(this.highScore));
+    } catch (e) {
+      // localStorage not available
+    }
+  }
+}
+
+// Initialize game (prevent multiple instances)
+let gameInstance = null;
+window.startGame = function () {
+  if (gameInstance) return;
+  gameInstance = new ArcheryGame();
+};
+
+        
+        // Initialize when page loads
+        if (window.startGame) window.startGame();;;
+
+        // Also init on first user interaction for audio
+        let initialized = false;
+        const initOnInteraction = () => {
+            if (initialized) return;
+            initialized = true;
+            if (window.startGame) window.startGame();
+            document.removeEventListener('click', initOnInteraction);
+            document.removeEventListener('touchstart', initOnInteraction);
+        };
+        document.addEventListener('click', initOnInteraction);
+        document.addEventListener('touchstart', initOnInteraction);
+    
+</script>
+
+</body>
+</html>

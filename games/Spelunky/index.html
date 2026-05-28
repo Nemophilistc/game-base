@@ -1,0 +1,4314 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>矿洞探险 - Cave Explorer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #0a0503;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+            font-family: 'Microsoft YaHei', monospace;
+        }
+        #gameContainer {
+            position: relative;
+            border: 2px solid rgba(180,140,60,0.3);
+            border-radius: 4px;
+            box-shadow:
+                0 0 20px rgba(180,140,60,0.1),
+                0 0 60px rgba(10,5,2,0.8),
+                inset 0 0 20px rgba(10,5,2,0.5);
+        }
+        #gameCanvas {
+            display: block;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #d4a040;
+            font-size: 18px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        <div class="loading" id="loading">加载中...</div>
+    </div>
+    <script>
+// === ./config.js ===
+// config.js - Game constants and configuration
+const TILE = 32;
+const COLS = 40;
+const ROWS = 28;
+const WIDTH = COLS * TILE;
+const HEIGHT = ROWS * TILE;
+
+// Tile types
+const T = {
+    AIR: 0,
+    WALL: 1,
+    PLATFORM: 2,
+    LADDER: 3,
+    SPIKE: 4,
+    ARROW_TRAP: 5,
+    EXIT_DOOR: 6,
+    SHOP_FLOOR: 7,
+    SHOP_WALL: 8,
+    CRACKED_WALL: 9,
+    STONE: 10,
+    MOSS_WALL: 11,
+    DIRT: 12,
+};
+
+// Tile colors
+const TILE_COLORS = {
+    [T.WALL]: ['#5c3a1e', '#4a2e16', '#6b4423'],
+    [T.PLATFORM]: ['#8b6914', '#7a5c10', '#9c7a1a'],
+    [T.LADDER]: ['#8b7355', '#7a6345'],
+    [T.SPIKE]: ['#c0c0c0', '#a0a0a0'],
+    [T.ARROW_TRAP]: ['#6b5b3a', '#5a4a2a'],
+    [T.EXIT_DOOR]: ['#8b4513', '#a0522d'],
+    [T.SHOP_FLOOR]: ['#6b5b3a', '#7a6a4a'],
+    [T.SHOP_WALL]: ['#8b7355', '#7a6345'],
+    [T.CRACKED_WALL]: ['#5c3a1e', '#4a2e16'],
+    [T.STONE]: ['#696969', '#5a5a5a', '#787878'],
+    [T.MOSS_WALL]: ['#3a5c2a', '#2e4a22', '#4a6b35'],
+    [T.DIRT]: ['#6b4423', '#5a3618', '#7c5530'],
+};
+
+// Physics
+const GRAVITY = 0.45;
+const MAX_FALL_SPEED = 10;
+const PLAYER_SPEED = 2.8;
+const PLAYER_JUMP = -8.2;
+const PLAYER_WALL_JUMP_X = 5;
+const PLAYER_WALL_JUMP_Y = -7.5;
+const PLAYER_CLIMB_SPEED = 2.2;
+const FRICTION = 0.82;
+const AIR_FRICTION = 0.92;
+
+// Player
+const PLAYER_HP = 3;
+const START_ROPES = 4;
+const START_BOMBS = 4;
+const INVULN_TIME = 1500;
+const LEDGE_GRAB_TIME = 200;
+const ROPE_LENGTH = 8;
+const BOMB_FUSE = 2200;
+const BOMB_RADIUS = 2.5;
+const BOMB_POWER = 5;
+
+// Enemy configs
+const ENEMY_CFG = {
+    bat: { w: 24, h: 16, hp: 1, speed: 1.5, swoopSpeed: 4, damage: 1, score: 200 },
+    snake: { w: 28, h: 18, hp: 1, speed: 1, damage: 1, score: 300 },
+    spider: { w: 22, h: 20, hp: 2, speed: 1.5, dropSpeed: 5, damage: 1, score: 400 },
+    skeleton: { w: 22, h: 30, hp: 3, speed: 1.8, chaseSpeed: 2.5, damage: 1, score: 500 },
+};
+
+// Item values
+const ITEM_VALUES = {
+    gold_nugget: { value: 100, w: 10, h: 10 },
+    gold_bar: { value: 500, w: 16, h: 10 },
+    gem_ruby: { value: 800, w: 12, h: 12 },
+    gem_emerald: { value: 1200, w: 12, h: 12 },
+    gem_sapphire: { value: 2000, w: 12, h: 12 },
+    key: { value: 0, w: 14, h: 10 },
+    rope_pickup: { value: 0, w: 12, h: 14, ropeAmount: 2 },
+    bomb_pickup: { value: 0, w: 12, h: 14, bombAmount: 2 },
+    health: { value: 0, w: 14, h: 14, healAmount: 1 },
+    chest: { value: 1000, w: 20, h: 16 },
+};
+
+// Shop items
+const SHOP_ITEMS = [
+    { id: 'rope', name: '绳索 x2', cost: 500, type: 'rope', amount: 2 },
+    { id: 'bomb', name: '炸弹 x2', cost: 800, type: 'bomb', amount: 2 },
+    { id: 'health', name: '恢复生命', cost: 1000, type: 'health', amount: 1 },
+    { id: 'compass', name: '出口指南针', cost: 1500, type: 'compass', amount: 1 },
+    { id: 'gloves', name: '攀爬手套', cost: 2000, type: 'gloves', amount: 1 },
+    { id: 'shoes', name: '弹簧靴', cost: 2500, type: 'shoes', amount: 1 },
+];
+
+// Colors
+const COLORS = {
+    bg: '#1a0e05',
+    bgGrad1: '#1a0e05',
+    bgGrad2: '#0d0703',
+    wall: '#5c3a1e',
+    wallDark: '#3a2210',
+    wallLight: '#7a5230',
+    platform: '#8b6914',
+    platformTop: '#a07818',
+    ladder: '#8b7355',
+    spike: '#c0c0c0',
+    spikeTip: '#e0e0e0',
+    arrowTrap: '#6b5b3a',
+    arrow: '#888',
+    door: '#8b4513',
+    doorFrame: '#d4a040',
+    doorKnob: '#ffd700',
+    doorGlow: 'rgba(255,215,0,0.3)',
+    shopFloor: '#6b5b3a',
+    shopWall: '#8b7355',
+    gold: '#ffd700',
+    goldShine: '#fff8b0',
+    gemRuby: '#ff2244',
+    gemEmerald: '#22cc66',
+    gemSapphire: '#2266ff',
+    gemShine: '#ffffff',
+    key: '#ffd700',
+    keyShine: '#fff8b0',
+    ropeColor: '#c8a050',
+    ropePickup: '#c8a050',
+    bomb: '#555',
+    bombFuse: '#ff6600',
+    bombSpark: '#ffcc00',
+    health: '#ff4444',
+    healthCross: '#ffffff',
+    chest: '#8b6914',
+    chestBand: '#ffd700',
+    player: '#e8a040',
+    playerSkin: '#f0c878',
+    playerEye: '#222',
+    playerBandana: '#cc3333',
+    invuln: 'rgba(255,200,100,0.4)',
+    bat: '#553366',
+    batWing: '#442255',
+    snake: '#446633',
+    snakePattern: '#558844',
+    spider: '#222',
+    spiderEye: '#ff0000',
+    skeleton: '#ccccbb',
+    skeletonEye: '#ff4444',
+    shopkeeper: '#cc8844',
+    shopkeeperShotgun: '#666',
+    particle: '#ffcc44',
+    torchGlow: 'rgba(255,150,50,0.08)',
+    darkness: 'rgba(10,5,0,',
+    hudBg: 'rgba(15,8,3,0.85)',
+    hudBorder: 'rgba(180,140,60,0.4)',
+    hudText: '#e8c878',
+    hudValue: '#ffd700',
+    uiBg: 'rgba(15,8,3,0.92)',
+    uiBorder: 'rgba(180,140,60,0.5)',
+    uiAccent: '#d4a040',
+    uiDanger: '#cc3333',
+    uiSuccess: '#44aa44',
+    white: '#ffffff',
+    black: '#000000',
+};
+
+// === ./sound.js ===
+// sound.js - Web Audio API sound system
+let audioCtx = null;
+
+function getCtx() {
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    return audioCtx;
+}
+
+function resumeAudio() {
+    const ctx = getCtx();
+    if (ctx.state === 'suspended') ctx.resume();
+}
+
+function playTone(freq, duration, type = 'square', volume = 0.15, ramp = true) {
+    resumeAudio();
+    const ctx = getCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, ctx.currentTime);
+    gain.gain.setValueAtTime(volume, ctx.currentTime);
+    if (ramp) {
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+    }
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + duration);
+}
+
+function playNoise(duration, volume = 0.1) {
+    resumeAudio();
+    const ctx = getCtx();
+    const bufferSize = ctx.sampleRate * duration;
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+        data[i] = (Math.random() * 2 - 1) * Math.max(0, 1 - i / bufferSize);
+    }
+    const source = ctx.createBufferSource();
+    const gain = ctx.createGain();
+    source.buffer = buffer;
+    gain.gain.setValueAtTime(volume, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+    source.connect(gain);
+    gain.connect(ctx.destination);
+    source.start(ctx.currentTime);
+}
+
+const Sound = {
+    jump() {
+        playTone(300, 0.12, 'square', 0.1);
+        setTimeout(() => playTone(450, 0.1, 'square', 0.08), 40);
+    },
+
+    land() {
+        playNoise(0.06, 0.08);
+    },
+
+    collectGold() {
+        playTone(880, 0.08, 'square', 0.1);
+        setTimeout(() => playTone(1100, 0.12, 'square', 0.1), 60);
+    },
+
+    collectGem() {
+        playTone(660, 0.08, 'square', 0.1);
+        setTimeout(() => playTone(880, 0.08, 'square', 0.1), 50);
+        setTimeout(() => playTone(1320, 0.15, 'square', 0.1), 100);
+    },
+
+    collectKey() {
+        playTone(523, 0.1, 'triangle', 0.12);
+        setTimeout(() => playTone(659, 0.1, 'triangle', 0.12), 100);
+        setTimeout(() => playTone(784, 0.15, 'triangle', 0.12), 200);
+        setTimeout(() => playTone(1047, 0.2, 'triangle', 0.12), 300);
+    },
+
+    collectItem() {
+        playTone(600, 0.1, 'square', 0.08);
+        setTimeout(() => playTone(800, 0.12, 'square', 0.08), 60);
+    },
+
+    bombExplode() {
+        playNoise(0.5, 0.3);
+        playTone(80, 0.4, 'sawtooth', 0.2);
+        setTimeout(() => playTone(50, 0.3, 'sawtooth', 0.15), 50);
+    },
+
+    ropeThrow() {
+        playTone(200, 0.1, 'sawtooth', 0.06);
+        setTimeout(() => playTone(160, 0.15, 'sawtooth', 0.04), 50);
+    },
+
+    ropeExtend() {
+        playTone(120, 0.05, 'triangle', 0.04);
+    },
+
+    enemyDie() {
+        playTone(400, 0.08, 'square', 0.1);
+        setTimeout(() => playTone(200, 0.15, 'square', 0.08), 40);
+    },
+
+    playerHurt() {
+        playTone(200, 0.15, 'sawtooth', 0.15);
+        setTimeout(() => playTone(120, 0.2, 'sawtooth', 0.12), 60);
+    },
+
+    doorOpen() {
+        playTone(330, 0.15, 'triangle', 0.1);
+        setTimeout(() => playTone(440, 0.15, 'triangle', 0.1), 100);
+        setTimeout(() => playTone(660, 0.2, 'triangle', 0.12), 200);
+    },
+
+    shopBuy() {
+        playTone(523, 0.1, 'square', 0.08);
+        setTimeout(() => playTone(659, 0.1, 'square', 0.08), 80);
+        setTimeout(() => playTone(784, 0.15, 'square', 0.1), 160);
+    },
+
+    shopDeny() {
+        playTone(200, 0.2, 'square', 0.1);
+        setTimeout(() => playTone(150, 0.3, 'square', 0.1), 150);
+    },
+
+    whip() {
+        playNoise(0.08, 0.1);
+        playTone(800, 0.06, 'sawtooth', 0.06);
+    },
+
+    death() {
+        playTone(400, 0.15, 'sawtooth', 0.15);
+        setTimeout(() => playTone(300, 0.15, 'sawtooth', 0.12), 120);
+        setTimeout(() => playTone(200, 0.2, 'sawtooth', 0.1), 240);
+        setTimeout(() => playTone(100, 0.4, 'sawtooth', 0.08), 360);
+    },
+
+    levelComplete() {
+        const notes = [523, 659, 784, 1047, 784, 1047];
+        notes.forEach((f, i) => {
+            setTimeout(() => playTone(f, 0.15, 'triangle', 0.1), i * 100);
+        });
+    },
+
+    arrowShoot() {
+        playTone(300, 0.05, 'sawtooth', 0.1);
+        setTimeout(() => playTone(600, 0.1, 'sawtooth', 0.08), 30);
+    },
+
+    spikeHit() {
+        playNoise(0.15, 0.15);
+        playTone(100, 0.2, 'sawtooth', 0.1);
+    },
+
+    tick() {
+        playTone(1000, 0.03, 'square', 0.03);
+    },
+};
+
+// === ./level.js ===
+// level.js - Procedural level generation
+
+// Seeded random
+class RNG {
+    constructor(seed) { this.seed = seed; }
+    next() {
+        this.seed = (this.seed * 16807 + 0) % 2147483647;
+        return (this.seed - 1) / 2147483646;
+    }
+    int(min, max) { return Math.floor(this.next() * (max - min + 1)) + min; }
+    pick(arr) { return arr[this.int(0, arr.length - 1)]; }
+    chance(p) { return this.next() < p; }
+}
+
+
+class Level {
+    constructor(depth) {
+        this.depth = depth;
+        this.cols = COLS;
+        this.rows = ROWS;
+        this.tiles = [];
+        this.enemies = [];
+        this.items = [];
+        this.traps = [];
+        this.arrows = [];
+        this.shopItems = [];
+        this.playerStart = { x: 0, y: 0 };
+        this.exitDoor = { x: 0, y: 0 };
+        this.keyPos = { x: 0, y: 0 };
+        this.hasKey = false;
+        this.doorOpen = false;
+        this.torchPositions = [];
+        this.rooms = [];
+        this.generate();
+    }
+
+    generate() {
+        const rng = new RNG(Date.now() + this.depth * 7919);
+        const grid = Array.from({ length: this.rows }, () => Array(this.cols).fill(T.WALL));
+
+        // Generate rooms using BSP
+        const rooms = [];
+        this._bspSplit(rooms, rng, 1, 1, this.cols - 2, this.rows - 2, 0);
+        this.rooms = rooms;
+
+        // Carve rooms
+        for (const room of rooms) {
+            for (let y = room.y; y < room.y + room.h; y++) {
+                for (let x = room.x; x < room.x + room.w; x++) {
+                    if (y >= 0 && y < this.rows && x >= 0 && x < this.cols) {
+                        grid[y][x] = T.AIR;
+                    }
+                }
+            }
+        }
+
+        // Connect rooms with corridors
+        for (let i = 0; i < rooms.length - 1; i++) {
+            const a = rooms[i];
+            const b = rooms[i + 1];
+            const ax = Math.floor(a.x + a.w / 2);
+            const ay = Math.floor(a.y + a.h / 2);
+            const bx = Math.floor(b.x + b.w / 2);
+            const by = Math.floor(b.y + b.h / 2);
+            this._carveCorridor(grid, rng, ax, ay, bx, by);
+        }
+
+        // Add platforms in larger rooms
+        for (const room of rooms) {
+            if (room.w >= 6 && room.h >= 5 && rng.chance(0.6)) {
+                const py = room.y + Math.floor(room.h * 0.55);
+                const px1 = room.x + 1;
+                const px2 = room.x + room.w - 2;
+                const gap = rng.int(2, 4);
+                const mid = Math.floor((px1 + px2) / 2);
+                for (let x = px1; x <= px2; x++) {
+                    if (Math.abs(x - mid) > gap / 2 || rng.chance(0.3)) {
+                        if (grid[py][x] === T.AIR) grid[py][x] = T.PLATFORM;
+                    }
+                }
+            }
+        }
+
+        // Add ladders connecting vertically
+        for (let i = 0; i < rooms.length - 1; i++) {
+            const a = rooms[i];
+            const b = rooms[i + 1];
+            const ay2 = a.y + a.h - 1;
+            const by2 = b.y;
+            if (ay2 < by2 && rng.chance(0.5)) {
+                const lx = rng.int(a.x + 1, a.x + a.w - 2);
+                for (let y = ay2; y <= by2; y++) {
+                    if (y >= 0 && y < this.rows && lx >= 0 && lx < this.cols) {
+                        if (grid[y][lx] === T.WALL) grid[y][lx] = T.LADDER;
+                        else if (grid[y][lx] === T.AIR) grid[y][lx] = T.LADDER;
+                    }
+                }
+            }
+        }
+
+        // Place player start in top room
+        const topRoom = rooms.reduce((a, b) => a.y < b.y ? a : b);
+        this.playerStart = {
+            x: (topRoom.x + Math.floor(topRoom.w / 2)) * TILE + TILE / 2,
+            y: (topRoom.y + 1) * TILE
+        };
+
+        // Place exit in bottom room
+        const bottomRoom = rooms.reduce((a, b) => a.y > b.y ? a : b);
+        this.exitDoor = {
+            x: (bottomRoom.x + Math.floor(bottomRoom.w / 2)) * TILE,
+            y: (bottomRoom.y + bottomRoom.h - 2) * TILE
+        };
+        const ex = Math.floor(this.exitDoor.x / TILE);
+        const ey = Math.floor(this.exitDoor.y / TILE);
+        if (ey >= 0 && ey < this.rows && ex >= 0 && ex < this.cols) {
+            grid[ey][ex] = T.EXIT_DOOR;
+            grid[ey + 1][ex] = T.AIR;
+            // Place solid under door
+            if (ey + 2 < this.rows) grid[ey + 2][ex] = T.PLATFORM;
+        }
+
+        // Place key in a room far from exit
+        const farRooms = rooms.filter(r => {
+            const ry = r.y + r.h / 2;
+            return ry < this.rows * 0.6;
+        });
+        const keyRoom = farRooms.length > 0 ? rng.pick(farRooms) : rng.pick(rooms);
+        this.keyPos = {
+            x: (keyRoom.x + rng.int(1, keyRoom.w - 2)) * TILE + TILE / 2,
+            y: (keyRoom.y + rng.int(1, keyRoom.h - 2)) * TILE + TILE / 2
+        };
+
+        // Place enemies
+        const enemyRooms = rooms.filter(r => r !== topRoom);
+        for (const room of enemyRooms) {
+            const count = Math.min(3, 1 + Math.floor(this.depth * 0.3) + (rng.chance(0.3) ? 1 : 0));
+            for (let i = 0; i < count; i++) {
+                const types = ['bat', 'snake', 'spider', 'skeleton'];
+                const weights = [0.35, 0.3, 0.2, 0.15 + this.depth * 0.02];
+                let r = rng.next(), acc = 0, type = 'bat';
+                for (let j = 0; j < types.length; j++) {
+                    acc += weights[j];
+                    if (r < acc) { type = types[j]; break; }
+                }
+                const ex = (room.x + rng.int(1, room.w - 2)) * TILE;
+                const ey = (room.y + rng.int(1, room.h - 2)) * TILE;
+                this.enemies.push({ type, x: ex + TILE / 2, y: ey });
+            }
+        }
+
+        // Place items
+        for (const room of enemyRooms) {
+            // Gold
+            if (rng.chance(0.7)) {
+                const ix = (room.x + rng.int(1, room.w - 2)) * TILE + TILE / 2;
+                const iy = (room.y + room.h - 2) * TILE + TILE / 2;
+                const types = ['gold_nugget', 'gold_nugget', 'gold_nugget', 'gold_bar'];
+                this.items.push({ type: rng.pick(types), x: ix, y: iy });
+            }
+            // Gems
+            if (rng.chance(0.2 + this.depth * 0.03)) {
+                const ix = (room.x + rng.int(1, room.w - 2)) * TILE + TILE / 2;
+                const iy = (room.y + rng.int(1, room.h - 3)) * TILE + TILE / 2;
+                const gems = ['gem_ruby', 'gem_emerald', 'gem_sapphire'];
+                this.items.push({ type: rng.pick(gems), x: ix, y: iy });
+            }
+        }
+
+        // Place rope/bomb pickups
+        const supplyCount = 1 + Math.floor(rng.next() * 2);
+        for (let i = 0; i < supplyCount; i++) {
+            const room = rng.pick(rooms);
+            const ix = (room.x + rng.int(1, room.w - 2)) * TILE + TILE / 2;
+            const iy = (room.y + room.h - 2) * TILE + TILE / 2;
+            this.items.push({ type: rng.chance(0.5) ? 'rope_pickup' : 'bomb_pickup', x: ix, y: iy });
+        }
+
+        // Health pickup
+        if (rng.chance(0.3)) {
+            const room = rng.pick(rooms);
+            const ix = (room.x + rng.int(1, room.w - 2)) * TILE + TILE / 2;
+            const iy = (room.y + room.h - 2) * TILE + TILE / 2;
+            this.items.push({ type: 'health', x: ix, y: iy });
+        }
+
+        // Chest
+        if (rng.chance(0.15 + this.depth * 0.02)) {
+            const room = rng.pick(rooms);
+            const ix = (room.x + rng.int(1, room.w - 2)) * TILE + TILE / 2;
+            const iy = (room.y + room.h - 2) * TILE + TILE / 2;
+            this.items.push({ type: 'chest', x: ix, y: iy });
+        }
+
+        // Place traps
+        for (const room of rooms) {
+            // Spike pits
+            if (room.w >= 5 && rng.chance(0.25)) {
+                const sy = room.y + room.h - 1;
+                const sx = room.x + rng.int(1, room.w - 3);
+                const sw = rng.int(2, 3);
+                for (let x = sx; x < sx + sw && x < this.cols; x++) {
+                    if (grid[sy][x] === T.AIR) {
+                        grid[sy][x] = T.SPIKE;
+                    }
+                }
+            }
+            // Arrow traps
+            if (rng.chance(0.15 + this.depth * 0.02)) {
+                const side = rng.chance(0.5) ? 'left' : 'right';
+                const ay = room.y + rng.int(1, room.h - 2);
+                let ax;
+                if (side === 'left') {
+                    ax = room.x;
+                    while (ax < room.x + room.w - 1 && grid[ay][ax] !== T.WALL) ax++;
+                    if (ax > room.x) ax = room.x;
+                } else {
+                    ax = room.x + room.w - 1;
+                    while (ax > room.x && grid[ay][ax] !== T.WALL) ax--;
+                    if (ax < room.x + room.w - 1) ax = room.x + room.w - 1;
+                }
+                if (ax >= 0 && ax < this.cols && ay >= 0 && ay < this.rows) {
+                    grid[ay][ax] = T.ARROW_TRAP;
+                    this.traps.push({ type: 'arrow', x: ax * TILE, y: ay * TILE, dir: side === 'left' ? 1 : -1, fired: false });
+                }
+            }
+        }
+
+        // Place torches (decorative)
+        for (const room of rooms) {
+            if (rng.chance(0.5)) {
+                const tx = room.x + rng.int(0, room.w - 1);
+                const ty = room.y;
+                if (grid[ty][tx] === T.WALL) {
+                    this.torchPositions.push({ x: tx * TILE + TILE / 2, y: ty * TILE + TILE });
+                }
+            }
+        }
+
+        // Cracked walls (bombable)
+        for (let y = 0; y < this.rows; y++) {
+            for (let x = 0; x < this.cols; x++) {
+                if (grid[y][x] === T.WALL && rng.chance(0.04)) {
+                    // Check if wall has air on at least one side
+                    const hasAir = (
+                        (x > 0 && grid[y][x - 1] === T.AIR) ||
+                        (x < this.cols - 1 && grid[y][x + 1] === T.AIR) ||
+                        (y > 0 && grid[y - 1][x] === T.AIR) ||
+                        (y < this.rows - 1 && grid[y + 1][x] === T.AIR)
+                    );
+                    if (hasAir) grid[y][x] = T.CRACKED_WALL;
+                }
+            }
+        }
+
+        // Diversify wall types
+        for (let y = 0; y < this.rows; y++) {
+            for (let x = 0; x < this.cols; x++) {
+                if (grid[y][x] === T.WALL) {
+                    const r = rng.next();
+                    if (r < 0.1) grid[y][x] = T.STONE;
+                    else if (r < 0.18) grid[y][x] = T.MOSS_WALL;
+                    else if (r < 0.24) grid[y][x] = T.DIRT;
+                }
+            }
+        }
+
+        this.tiles = grid;
+    }
+
+    _bspSplit(rooms, rng, x, y, w, h, depth) {
+        const MIN_SIZE = 5;
+        const MAX_DEPTH = 5;
+
+        if (depth >= MAX_DEPTH || (w < MIN_SIZE * 2 && h < MIN_SIZE * 2)) {
+            const rw = rng.int(Math.min(w, MIN_SIZE + 2), w);
+            const rh = rng.int(Math.min(h, MIN_SIZE + 1), h);
+            const rx = x + rng.int(0, w - rw);
+            const ry = y + rng.int(0, h - rh);
+            rooms.push({ x: rx, y: ry, w: rw, h: rh });
+            return;
+        }
+
+        const splitH = h > w ? true : w > h ? false : rng.chance(0.5);
+
+        if (splitH && h >= MIN_SIZE * 2) {
+            const split = rng.int(MIN_SIZE, h - MIN_SIZE);
+            this._bspSplit(rooms, rng, x, y, w, split, depth + 1);
+            this._bspSplit(rooms, rng, x, y + split, w, h - split, depth + 1);
+        } else if (w >= MIN_SIZE * 2) {
+            const split = rng.int(MIN_SIZE, w - MIN_SIZE);
+            this._bspSplit(rooms, rng, x, y, split, h, depth + 1);
+            this._bspSplit(rooms, rng, x + split, y, w - split, h, depth + 1);
+        } else {
+            const rw = rng.int(Math.max(3, w - 2), w);
+            const rh = rng.int(Math.max(3, h - 2), h);
+            const rx = x + rng.int(0, Math.max(0, w - rw));
+            const ry = y + rng.int(0, Math.max(0, h - rh));
+            rooms.push({ x: rx, y: ry, w: rw, h: rh });
+        }
+    }
+
+    _carveCorridor(grid, rng, x1, y1, x2, y2) {
+        let cx = x1, cy = y1;
+        while (cx !== x2 || cy !== y2) {
+            if (cx >= 0 && cx < this.cols && cy >= 0 && cy < this.rows) {
+                grid[cy][cx] = T.AIR;
+                // Widen corridor sometimes
+                if (rng.chance(0.3) && cy + 1 < this.rows) grid[cy + 1][cx] = T.AIR;
+            }
+            if (rng.chance(0.5)) {
+                if (cx < x2) cx++;
+                else if (cx > x2) cx--;
+                else if (cy < y2) cy++;
+                else cy--;
+            } else {
+                if (cy < y2) cy++;
+                else if (cy > y2) cy--;
+                else if (cx < x2) cx++;
+                else cx--;
+            }
+        }
+    }
+
+    getTile(x, y) {
+        const col = Math.floor(x / TILE);
+        const row = Math.floor(y / TILE);
+        if (col < 0 || col >= this.cols || row < 0 || row >= this.rows) return T.WALL;
+        return this.tiles[row][col];
+    }
+
+    setTile(col, row, type) {
+        if (col >= 0 && col < this.cols && row >= 0 && row < this.rows) {
+            this.tiles[row][col] = type;
+        }
+    }
+
+    isSolid(col, row) {
+        if (col < 0 || col >= this.cols || row < 0 || row >= this.rows) return true;
+        const t = this.tiles[row][col];
+        return t === T.WALL || t === T.STONE || t === T.MOSS_WALL || t === T.DIRT ||
+               t === T.CRACKED_WALL || t === T.SHOP_WALL;
+    }
+
+    isPlatform(col, row) {
+        if (col < 0 || col >= this.cols || row < 0 || row >= this.rows) return false;
+        return this.tiles[row][col] === T.PLATFORM || this.tiles[row][col] === T.SHOP_FLOOR;
+    }
+
+    isLadder(col, row) {
+        if (col < 0 || col >= this.cols || row < 0 || row >= this.rows) return false;
+        return this.tiles[row][col] === T.LADDER;
+    }
+
+    isSpike(col, row) {
+        if (col < 0 || col >= this.cols || row < 0 || row >= this.rows) return false;
+        return this.tiles[row][col] === T.SPIKE;
+    }
+
+    isDoor(col, row) {
+        if (col < 0 || col >= this.cols || row < 0 || row >= this.rows) return false;
+        return this.tiles[row][col] === T.EXIT_DOOR;
+    }
+
+    isCracked(col, row) {
+        if (col < 0 || col >= this.cols || row < 0 || row >= this.rows) return false;
+        return this.tiles[row][col] === T.CRACKED_WALL;
+    }
+
+    destroyTile(col, row) {
+        if (col >= 0 && col < this.cols && row >= 0 && row < this.rows) {
+            const t = this.tiles[row][col];
+            if (t === T.CRACKED_WALL || t === T.DIRT || t === T.MOSS_WALL) {
+                this.tiles[row][col] = T.AIR;
+                return true;
+            }
+            if (t === T.WALL) {
+                this.tiles[row][col] = T.CRACKED_WALL;
+                return false;
+            }
+        }
+        return false;
+    }
+
+    destroyRadius(cx, cy, radius) {
+        const col = Math.floor(cx / TILE);
+        const row = Math.floor(cy / TILE);
+        const destroyed = [];
+        for (let dy = -radius; dy <= radius; dy++) {
+            for (let dx = -radius; dx <= radius; dx++) {
+                if (dx * dx + dy * dy <= radius * radius) {
+                    const c = col + dx;
+                    const r = row + dy;
+                    if (this.destroyTile(c, r)) {
+                        destroyed.push({ x: c * TILE + TILE / 2, y: r * TILE + TILE / 2 });
+                    }
+                }
+            }
+        }
+        return destroyed;
+    }
+
+    render(ctx, camX, camY, viewW, viewH) {
+        const startCol = Math.max(0, Math.floor(camX / TILE) - 1);
+        const endCol = Math.min(this.cols, Math.ceil((camX + viewW) / TILE) + 1);
+        const startRow = Math.max(0, Math.floor(camY / TILE) - 1);
+        const endRow = Math.min(this.rows, Math.ceil((camY + viewH) / TILE) + 1);
+
+        for (let row = startRow; row < endRow; row++) {
+            for (let col = startCol; col < endCol; col++) {
+                const t = this.tiles[row][col];
+                const x = col * TILE;
+                const y = row * TILE;
+
+                if (t === T.AIR) continue;
+
+                const colors = TILE_COLORS[t];
+                if (!colors) continue;
+
+                // Base fill
+                ctx.fillStyle = colors[0];
+                ctx.fillRect(x, y, TILE, TILE);
+
+                // Texture
+                if (t === T.WALL || t === T.STONE || t === T.DIRT || t === T.MOSS_WALL || t === T.CRACKED_WALL) {
+                    // Brick pattern
+                    ctx.fillStyle = colors[1] || colors[0];
+                    ctx.fillRect(x, y, TILE, 1);
+                    ctx.fillRect(x, y + TILE / 2, TILE, 1);
+                    if (row % 2 === 0) {
+                        ctx.fillRect(x + TILE / 2, y, 1, TILE / 2);
+                        ctx.fillRect(x, y + TILE / 2, 1, TILE / 2);
+                    } else {
+                        ctx.fillRect(x, y, 1, TILE / 2);
+                        ctx.fillRect(x + TILE / 2, y + TILE / 2, 1, TILE / 2);
+                    }
+                    // Random dots for texture
+                    if (colors[2]) {
+                        ctx.fillStyle = colors[2];
+                        const seed = (col * 31 + row * 17) % 7;
+                        if (seed < 2) {
+                            ctx.fillRect(x + 8 + seed * 3, y + 10, 3, 3);
+                        }
+                    }
+                    // Cracked wall cracks
+                    if (t === T.CRACKED_WALL) {
+                        ctx.strokeStyle = '#2a1a0a';
+                        ctx.lineWidth = 1;
+                        ctx.beginPath();
+                        ctx.moveTo(x + 5, y + 5);
+                        ctx.lineTo(x + 15, y + 18);
+                        ctx.lineTo(x + 25, y + 12);
+                        ctx.stroke();
+                        ctx.beginPath();
+                        ctx.moveTo(x + 20, y + 4);
+                        ctx.lineTo(x + 12, y + 20);
+                        ctx.lineTo(x + 22, y + 28);
+                        ctx.stroke();
+                    }
+                    // Moss overlay
+                    if (t === T.MOSS_WALL) {
+                        ctx.fillStyle = 'rgba(50,120,40,0.3)';
+                        ctx.fillRect(x, y + TILE - 6, TILE, 6);
+                    }
+                }
+
+                // Platform
+                if (t === T.PLATFORM || t === T.SHOP_FLOOR) {
+                    ctx.fillStyle = colors[1] || colors[0];
+                    ctx.fillRect(x, y, TILE, 3);
+                    // Support posts
+                    ctx.fillStyle = colors[0];
+                    ctx.fillRect(x + 4, y + 3, 3, TILE - 3);
+                    ctx.fillRect(x + TILE - 7, y + 3, 3, TILE - 3);
+                }
+
+                // Ladder
+                if (t === T.LADDER) {
+                    ctx.fillStyle = COLORS.bg || '#1a0e05';
+                    ctx.fillRect(x, y, TILE, TILE);
+                    ctx.fillStyle = colors[0];
+                    ctx.fillRect(x + 8, y, 4, TILE);
+                    ctx.fillRect(x + 20, y, 4, TILE);
+                    for (let ry = 4; ry < TILE; ry += 8) {
+                        ctx.fillRect(x + 8, y + ry, 16, 3);
+                    }
+                }
+
+                // Spikes
+                if (t === T.SPIKE) {
+                    ctx.fillStyle = COLORS.bg || '#1a0e05';
+                    ctx.fillRect(x, y, TILE, TILE);
+                    ctx.fillStyle = colors[0];
+                    for (let sx = 0; sx < TILE; sx += 8) {
+                        ctx.beginPath();
+                        ctx.moveTo(x + sx, y + TILE);
+                        ctx.lineTo(x + sx + 4, y + 8);
+                        ctx.lineTo(x + sx + 8, y + TILE);
+                        ctx.fill();
+                    }
+                    ctx.fillStyle = colors[1] || '#e0e0e0';
+                    for (let sx = 0; sx < TILE; sx += 8) {
+                        ctx.beginPath();
+                        ctx.moveTo(x + sx + 2, y + TILE - 4);
+                        ctx.lineTo(x + sx + 4, y + 10);
+                        ctx.lineTo(x + sx + 6, y + TILE - 4);
+                        ctx.fill();
+                    }
+                }
+
+                // Arrow trap
+                if (t === T.ARROW_TRAP) {
+                    ctx.fillStyle = colors[0];
+                    ctx.fillRect(x, y, TILE, TILE);
+                    ctx.fillStyle = colors[1];
+                    ctx.fillRect(x + 2, y + 2, TILE - 4, TILE - 4);
+                    // Small hole
+                    ctx.fillStyle = '#222';
+                    ctx.fillRect(x + 12, y + 12, 8, 8);
+                }
+
+                // Exit door
+                if (t === T.EXIT_DOOR) {
+                    ctx.fillStyle = COLORS.bg || '#1a0e05';
+                    ctx.fillRect(x, y, TILE, TILE);
+                    // Door frame
+                    ctx.fillStyle = COLORS.doorFrame;
+                    ctx.fillRect(x + 2, y, TILE - 4, TILE);
+                    // Door body
+                    ctx.fillStyle = this.doorOpen ? '#4a2a10' : COLORS.door;
+                    ctx.fillRect(x + 5, y + 3, TILE - 10, TILE - 3);
+                    // Planks
+                    ctx.strokeStyle = '#3a1a08';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(x + TILE / 2, y + 3);
+                    ctx.lineTo(x + TILE / 2, y + TILE);
+                    ctx.stroke();
+                    // Door knob
+                    ctx.fillStyle = COLORS.doorKnob;
+                    ctx.beginPath();
+                    ctx.arc(x + TILE / 2 + 6, y + TILE / 2 + 3, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                    // Glow when open
+                    if (this.doorOpen) {
+                        ctx.fillStyle = COLORS.doorGlow;
+                        ctx.fillRect(x - 4, y - 4, TILE + 8, TILE + 8);
+                    }
+                }
+
+                // Shop wall
+                if (t === T.SHOP_WALL) {
+                    ctx.fillStyle = colors[0];
+                    ctx.fillRect(x, y, TILE, TILE);
+                    ctx.fillStyle = colors[1];
+                    ctx.fillRect(x, y, TILE, 2);
+                    ctx.fillRect(x, y + TILE - 2, TILE, 2);
+                }
+            }
+        }
+
+        // Render torches
+        const time = Date.now() / 1000;
+        for (const torch of this.torchPositions) {
+            if (torch.x < camX - 50 || torch.x > camX + viewW + 50) continue;
+            if (torch.y < camY - 50 || torch.y > camY + viewH + 50) continue;
+
+            // Glow
+            const flicker = 0.8 + Math.sin(time * 8 + torch.x) * 0.2;
+            const grad = ctx.createRadialGradient(torch.x, torch.y, 0, torch.x, torch.y, 80 * flicker);
+            grad.addColorStop(0, 'rgba(255,150,50,0.12)');
+            grad.addColorStop(1, 'rgba(255,150,50,0)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(torch.x - 80, torch.y - 80, 160, 160);
+
+            // Flame
+            ctx.fillStyle = '#ff8800';
+            ctx.beginPath();
+            ctx.moveTo(torch.x - 4, torch.y);
+            ctx.quadraticCurveTo(torch.x, torch.y - 10 - Math.sin(time * 12) * 3, torch.x + 4, torch.y);
+            ctx.fill();
+            ctx.fillStyle = '#ffcc00';
+            ctx.beginPath();
+            ctx.moveTo(torch.x - 2, torch.y);
+            ctx.quadraticCurveTo(torch.x, torch.y - 6 - Math.sin(time * 15) * 2, torch.x + 2, torch.y);
+            ctx.fill();
+
+            // Bracket
+            ctx.fillStyle = '#666';
+            ctx.fillRect(torch.x - 1, torch.y, 2, 6);
+        }
+    }
+}
+
+// === ./player.js ===
+// player.js - Player movement, jumping, climbing, attacking
+
+class Player {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.vx = 0;
+        this.vy = 0;
+        this.w = 16;
+        this.h = 26;
+        this.hp = PLAYER_HP;
+        this.maxHp = PLAYER_HP;
+        this.ropes = START_ROPES;
+        this.bombs = START_BOMBS;
+        this.gold = 0;
+        this.hasKey = false;
+        this.facing = 1; // 1 = right, -1 = left
+        this.grounded = false;
+        this.onLadder = false;
+        this.climbing = false;
+        this.wallSliding = false;
+        this.ledgeGrabbing = false;
+        this.ledgeGrabTimer = 0;
+        this.invulnTimer = 0;
+        this.dead = false;
+        this.wasGrounded = false;
+        this.jumping = false;
+        this.walkFrame = 0;
+        this.walkTimer = 0;
+        this.whipping = false;
+        this.whipTimer = 0;
+        this.whipHit = false;
+        this.whipX = 0;
+        this.whipY = 0;
+        this.whipW = 0;
+        this.whipH = 0;
+
+        // Powerups
+        this.hasCompass = false;
+        this.hasGloves = false;
+        this.hasShoes = false;
+
+        // Active ropes and bombs
+        this.activeRopes = [];
+        this.activeBombs = [];
+
+        // Input state
+        this.input = {
+            left: false, right: false, up: false, down: false,
+            jump: false, jumpPressed: false,
+            action: false, actionPressed: false,
+            bomb: false, bombPressed: false,
+            rope: false, ropePressed: false,
+            whip: false, whipPressed: false,
+        };
+
+        // Coyote time
+        this.coyoteTime = 0;
+        this.coyoteMax = 80; // ms
+
+        // Jump buffer
+        this.jumpBuffer = 0;
+        this.jumpBufferMax = 100;
+
+        this._setupInput();
+    }
+
+    _setupInput() {
+        const keyMap = {
+            'ArrowLeft': 'left', 'KeyA': 'left',
+            'ArrowRight': 'right', 'KeyD': 'right',
+            'ArrowUp': 'up', 'KeyW': 'up',
+            'ArrowDown': 'down', 'KeyS': 'down',
+            'Space': 'jump',
+            'KeyX': 'action',
+            'KeyZ': 'bomb',
+            'KeyC': 'rope',
+            'ShiftLeft': 'whip', 'KeyV': 'whip',
+        };
+
+        window.addEventListener('keydown', (e) => {
+            const action = keyMap[e.code];
+            if (action) {
+                e.preventDefault();
+                if (!this.input[action]) {
+                    if (action === 'jump') this.input.jumpPressed = true;
+                    if (action === 'action') this.input.actionPressed = true;
+                    if (action === 'bomb') this.input.bombPressed = true;
+                    if (action === 'rope') this.input.ropePressed = true;
+                    if (action === 'whip') this.input.whipPressed = true;
+                }
+                this.input[action] = true;
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            const action = keyMap[e.code];
+            if (action) {
+                e.preventDefault();
+                this.input[action] = false;
+            }
+        });
+    }
+
+    update(dt, level, sounds) {
+        if (this.dead) return;
+
+        const dtScale = dt / 16.667;
+
+        // Invulnerability
+        if (this.invulnTimer > 0) this.invulnTimer -= dt;
+
+        // Coyote time
+        if (this.grounded) {
+            this.coyoteTime = this.coyoteMax;
+        } else if (this.coyoteTime > 0) {
+            this.coyoteTime -= dt;
+        }
+
+        // Jump buffer
+        if (this.input.jumpPressed) this.jumpBuffer = this.jumpBufferMax;
+        if (this.jumpBuffer > 0) this.jumpBuffer -= dt;
+
+        // Ledge grab timer
+        if (this.ledgeGrabbing) {
+            this.ledgeGrabTimer -= dt;
+            if (this.ledgeGrabTimer <= 0) this.ledgeGrabbing = false;
+        }
+
+        // Whip
+        if (this.whipping) {
+            this.whipTimer -= dt;
+            if (this.whipTimer <= 0) {
+                this.whipping = false;
+                this.whipHit = false;
+            } else if (!this.whipHit) {
+                this._updateWhipHitbox();
+                this.whipHit = true;
+            }
+        }
+
+        // Check ladder
+        const col = Math.floor((this.x) / TILE);
+        const row = Math.floor((this.y + this.h / 2) / TILE);
+        this.onLadder = level.isLadder(col, row) || level.isLadder(col, row - 1);
+
+        // Ladder climbing
+        if (this.onLadder && (this.input.up || this.input.down)) {
+            this.climbing = true;
+        }
+        if (this.climbing && !this.onLadder) {
+            this.climbing = false;
+        }
+
+        if (this.climbing) {
+            this.vy = 0;
+            this.vx = 0;
+            if (this.input.up) this.vy = -PLAYER_CLIMB_SPEED;
+            if (this.input.down) this.vy = PLAYER_CLIMB_SPEED;
+            if (this.input.left) { this.vx = -PLAYER_SPEED * 0.5; this.facing = -1; }
+            if (this.input.right) { this.vx = PLAYER_SPEED * 0.5; this.facing = 1; }
+            this.x += this.vx * dtScale;
+            this._resolveCollisionX(level);
+            this.y += this.vy * dtScale;
+            this._resolveCollisionY(level);
+
+            // Jump off ladder
+            if (this.jumpBuffer > 0) {
+                this.climbing = false;
+                this.vy = PLAYER_JUMP * 0.7;
+                this.jumpBuffer = 0;
+                Sound.jump();
+            }
+            this.grounded = false;
+            this._clearInputs();
+            return;
+        }
+
+        // Wall sliding
+        this.wallSliding = false;
+        if (!this.grounded && !this.climbing) {
+            const wallDir = this._checkWall(level);
+            if (wallDir !== 0 && this.vy > 0) {
+                if ((wallDir === 1 && this.input.right) || (wallDir === -1 && this.input.left)) {
+                    this.wallSliding = true;
+                    if (this.vy > 2) this.vy = 2;
+                }
+            }
+        }
+
+        // Ledge grabbing
+        if (!this.grounded && !this.climbing && !this.wallSliding && this.vy < 0) {
+            // Check if can grab ledge
+        }
+        if (!this.grounded && this.vy >= 0 && !this.climbing && this.ledgeGrabTimer <= 0) {
+            const grabCheck = this._checkLedgeGrab(level);
+            if (grabCheck) {
+                this.ledgeGrabbing = true;
+                this.ledgeGrabTimer = LEDGE_GRAB_TIME;
+                this.vx = 0;
+                this.vy = 0;
+                this.x = grabCheck.x;
+                this.y = grabCheck.y;
+            }
+        }
+
+        // Horizontal movement
+        if (!this.ledgeGrabbing) {
+            if (this.input.left) {
+                this.vx = -PLAYER_SPEED;
+                this.facing = -1;
+                this.walkTimer += dt;
+            } else if (this.input.right) {
+                this.vx = PLAYER_SPEED;
+                this.facing = 1;
+                this.walkTimer += dt;
+            } else {
+                this.vx *= this.grounded ? FRICTION : AIR_FRICTION;
+                if (Math.abs(this.vx) < 0.1) this.vx = 0;
+                this.walkTimer = 0;
+            }
+
+            // Walk animation
+            if (this.walkTimer > 100) {
+                this.walkFrame = (this.walkFrame + 1) % 4;
+                this.walkTimer = 0;
+            }
+
+            // Jumping
+            if (this.jumpBuffer > 0 && (this.coyoteTime > 0 || this.wallSliding)) {
+                if (this.wallSliding) {
+                    const wallDir = this._checkWall(level);
+                    this.vx = -wallDir * PLAYER_WALL_JUMP_X;
+                    this.facing = -wallDir;
+                    this.vy = PLAYER_WALL_JUMP_Y;
+                } else {
+                    let jumpForce = PLAYER_JUMP;
+                    if (this.hasShoes) jumpForce *= 1.15;
+                    this.vy = jumpForce;
+                }
+                this.grounded = false;
+                this.coyoteTime = 0;
+                this.jumpBuffer = 0;
+                Sound.jump();
+            }
+
+            // Variable jump height
+            if (!this.input.jump && this.vy < 0) {
+                this.vy *= 0.7;
+            }
+
+            // Gravity
+            if (!this.grounded) {
+                this.vy += GRAVITY * dtScale;
+                if (this.vy > MAX_FALL_SPEED) this.vy = MAX_FALL_SPEED;
+            }
+
+            // Move
+            this.x += this.vx * dtScale;
+            this._resolveCollisionX(level);
+            this.wasGrounded = this.grounded;
+            this.y += this.vy * dtScale;
+            this._resolveCollisionY(level);
+
+            // Landing
+            if (this.grounded && !this.wasGrounded && this.vy >= 0) {
+                if (sounds) Sound.land();
+            }
+        }
+
+        // Whip
+        if (this.whipPressed && !this.whipping) {
+            this.whipping = true;
+            this.whipTimer = 300;
+            this.whipHit = false;
+            Sound.whip();
+        }
+
+        // Throw rope
+        if (this.ropePressed && this.ropes > 0) {
+            this._throwRope();
+        }
+
+        // Place bomb
+        if (this.bombPressed && this.bombs > 0) {
+            this._placeBomb();
+        }
+
+        // Check spike death
+        this._checkSpikes(level);
+
+        // Update ropes
+        this.activeRopes = this.activeRopes.filter(r => {
+            r.timer -= dt;
+            return r.timer > 0 && !r.done;
+        });
+        for (const rope of this.activeRopes) {
+            if (!rope.extended) {
+                rope.extendTimer -= dt;
+                if (rope.extendTimer <= 0) {
+                    rope.extended = true;
+                    // Extend rope chain
+                    for (let i = 1; i < ROPE_LENGTH; i++) {
+                        rope.segments.push({
+                            x: rope.x,
+                            y: rope.startY - i * TILE,
+                            attached: true
+                        });
+                    }
+                }
+            }
+        }
+
+        // Update bombs
+        this.activeBombs = this.activeBombs.filter(b => !b.exploded);
+        for (const bomb of this.activeBombs) {
+            bomb.timer -= dt;
+            bomb.flicker = bomb.timer < 500;
+
+            // Bomb physics
+            bomb.vy += GRAVITY * dtScale;
+            if (bomb.vy > MAX_FALL_SPEED) bomb.vy = MAX_FALL_SPEED;
+            bomb.x += bomb.vx * dtScale;
+            bomb.y += bomb.vy * dtScale;
+
+            // Bomb collision with ground
+            const bCol = Math.floor(bomb.x / TILE);
+            const bRow = Math.floor((bomb.y + 6) / TILE);
+            if (level.isSolid(bCol, bRow)) {
+                bomb.y = bRow * TILE - 6;
+                bomb.vy = 0;
+                bomb.vx *= 0.8;
+                bomb.grounded = true;
+            }
+            // Stop horizontal
+            const bhCol = Math.floor((bomb.x + Math.sign(bomb.vx) * 6) / TILE);
+            const bhRow = Math.floor(bomb.y / TILE);
+            if (level.isSolid(bhCol, bhRow)) {
+                bomb.vx = 0;
+            }
+
+            if (bomb.timer <= 0) {
+                this._explodeBomb(bomb, level);
+            }
+        }
+
+        // Keep in bounds
+        if (this.x < this.w / 2) this.x = this.w / 2;
+        if (this.x > level.cols * TILE - this.w / 2) this.x = level.cols * TILE - this.w / 2;
+
+        this._clearInputs();
+    }
+
+    _clearInputs() {
+        this.input.jumpPressed = false;
+        this.input.actionPressed = false;
+        this.input.bombPressed = false;
+        this.input.ropePressed = false;
+        this.input.whipPressed = false;
+    }
+
+    _checkWall(level) {
+        const margin = 2;
+        // Check right
+        const rc = Math.floor((this.x + this.w / 2 + margin) / TILE);
+        const rrow1 = Math.floor(this.y / TILE);
+        const rrow2 = Math.floor((this.y + this.h - 2) / TILE);
+        if (level.isSolid(rc, rrow1) || level.isSolid(rc, rrow2)) return 1;
+        // Check left
+        const lc = Math.floor((this.x - this.w / 2 - margin) / TILE);
+        const lrow1 = Math.floor(this.y / TILE);
+        const lrow2 = Math.floor((this.y + this.h - 2) / TILE);
+        if (level.isSolid(lc, lrow1) || level.isSolid(lc, lrow2)) return -1;
+        return 0;
+    }
+
+    _checkLedgeGrab(level) {
+        // Check above and in front for a ledge
+        const checkDist = 6;
+        const frontX = this.x + this.facing * (this.w / 2 + checkDist);
+        const topY = this.y - 4;
+        const topCol = Math.floor(frontX / TILE);
+        const topRow = Math.floor(topY / TILE);
+        const belowRow = topRow + 1;
+
+        if (!level.isSolid(topCol, topRow) && level.isSolid(topCol, belowRow)) {
+            return {
+                x: topCol * TILE + TILE / 2 - this.facing * (this.w / 2),
+                y: topRow * TILE + TILE - this.h
+            };
+        }
+        return null;
+    }
+
+    _resolveCollisionX(level) {
+        const half = this.w / 2;
+        const top = Math.floor(this.y / TILE);
+        const bot = Math.floor((this.y + this.h - 1) / TILE);
+        const rows = [];
+        for (let r = top; r <= bot; r++) rows.push(r);
+
+        // Right
+        if (this.vx > 0) {
+            const col = Math.floor((this.x + half) / TILE);
+            for (const r of rows) {
+                if (level.isSolid(col, r)) {
+                    this.x = col * TILE - half;
+                    this.vx = 0;
+                    break;
+                }
+            }
+        }
+        // Left
+        if (this.vx < 0) {
+            const col = Math.floor((this.x - half) / TILE);
+            for (const r of rows) {
+                if (level.isSolid(col, r)) {
+                    this.x = (col + 1) * TILE + half;
+                    this.vx = 0;
+                    break;
+                }
+            }
+        }
+    }
+
+    _resolveCollisionY(level) {
+        const half = this.w / 2;
+        const left = Math.floor((this.x - half + 2) / TILE);
+        const right = Math.floor((this.x + half - 2) / TILE);
+        const cols = [];
+        for (let c = left; c <= right; c++) cols.push(c);
+
+        this.grounded = false;
+
+        // Falling down
+        if (this.vy >= 0) {
+            const row = Math.floor((this.y + this.h) / TILE);
+            for (const c of cols) {
+                if (level.isSolid(c, row) || (level.isPlatform(c, row) && this.y + this.h <= row * TILE + 4)) {
+                    this.y = row * TILE - this.h;
+                    this.vy = 0;
+                    this.grounded = true;
+                    break;
+                }
+            }
+        }
+        // Moving up
+        if (this.vy < 0) {
+            const row = Math.floor(this.y / TILE);
+            for (const c of cols) {
+                if (level.isSolid(c, row)) {
+                    this.y = (row + 1) * TILE;
+                    this.vy = 0;
+                    break;
+                }
+            }
+        }
+    }
+
+    _checkSpikes(level) {
+        const col = Math.floor(this.x / TILE);
+        const row = Math.floor((this.y + this.h - 1) / TILE);
+        if (level.isSpike(col, row)) {
+            this.takeDamage(99, level);
+            Sound.spikeHit();
+        }
+    }
+
+    _throwRope() {
+        this.ropes--;
+        Sound.ropeThrow();
+        const rope = {
+            x: this.x,
+            startY: this.y,
+            segments: [{ x: this.x, y: this.y, attached: true }],
+            timer: 15000,
+            extendTimer: ROPE_LENGTH * 80,
+            extended: false,
+            done: false
+        };
+        this.activeRopes.push(rope);
+    }
+
+    _placeBomb() {
+        this.bombs--;
+        const bomb = {
+            x: this.x,
+            y: this.y + this.h / 2,
+            vx: this.facing * 2,
+            vy: -2,
+            timer: BOMB_FUSE,
+            flicker: false,
+            grounded: false,
+            exploded: false,
+            radius: BOMB_RADIUS
+        };
+        this.activeBombs.push(bomb);
+    }
+
+    _explodeBomb(bomb, level) {
+        bomb.exploded = true;
+        Sound.bombExplode();
+        level.destroyRadius(bomb.x, bomb.y, Math.floor(bomb.radius));
+        // Return destroyed positions for effects
+        bomb.explosionX = bomb.x;
+        bomb.explosionY = bomb.y;
+    }
+
+    _updateWhipHitbox() {
+        const whipLen = 28;
+        const whipH = 8;
+        this.whipX = this.x + this.facing * (this.w / 2 + whipLen / 2);
+        this.whipY = this.y + this.h / 3;
+        this.whipW = whipLen;
+        this.whipH = whipH;
+    }
+
+    getWhipHitbox() {
+        if (!this.whipping || this.whipTimer < 200) return null;
+        return {
+            x: this.whipX - this.whipW / 2,
+            y: this.whipY - this.whipH / 2,
+            w: this.whipW,
+            h: this.whipH
+        };
+    }
+
+    takeDamage(amount, level) {
+        if (this.invulnTimer > 0 || this.dead) return;
+        this.hp -= amount;
+        this.invulnTimer = INVULN_TIME;
+        Sound.playerHurt();
+        if (this.hp <= 0) {
+            this.hp = 0;
+            this.dead = true;
+            Sound.death();
+        }
+    }
+
+    heal(amount) {
+        this.hp = Math.min(this.maxHp, this.hp + amount);
+    }
+
+    getHitbox() {
+        return {
+            x: this.x - this.w / 2,
+            y: this.y,
+            w: this.w,
+            h: this.h
+        };
+    }
+
+    render(ctx) {
+        if (this.dead) return;
+
+        const drawX = Math.round(this.x);
+        const drawY = Math.round(this.y);
+        const f = this.facing;
+
+        // Invulnerability flash
+        if (this.invulnTimer > 0 && Math.floor(this.invulnTimer / 80) % 2 === 0) {
+            ctx.globalAlpha = 0.5;
+        }
+
+        // Ledge grabbing pose
+        if (this.ledgeGrabbing) {
+            // Hanging from ledge
+            ctx.fillStyle = COLORS.playerSkin;
+            ctx.fillRect(drawX - 5 * f, drawY + 2, 10, 8); // Head
+            ctx.fillStyle = COLORS.player;
+            ctx.fillRect(drawX - 5, drawY + 10, 10, 14); // Body
+            // Arms up
+            ctx.fillStyle = COLORS.playerSkin;
+            ctx.fillRect(drawX - 3 * f - 1, drawY - 2, 6, 6);
+        }
+        // Climbing
+        else if (this.climbing) {
+            // Body
+            ctx.fillStyle = COLORS.player;
+            ctx.fillRect(drawX - 5, drawY + 6, 10, 18);
+            // Head
+            ctx.fillStyle = COLORS.playerSkin;
+            ctx.fillRect(drawX - 5, drawY, 10, 8);
+            // Bandana
+            ctx.fillStyle = COLORS.playerBandana;
+            ctx.fillRect(drawX - 6, drawY + 4, 12, 3);
+            // Eyes
+            ctx.fillStyle = COLORS.playerEye;
+            ctx.fillRect(drawX - 3, drawY + 3, 2, 2);
+            ctx.fillRect(drawX + 1, drawY + 3, 2, 2);
+            // Arms reaching
+            ctx.fillStyle = COLORS.playerSkin;
+            const armOff = Math.sin(Date.now() / 100) * 3;
+            ctx.fillRect(drawX - 7, drawY + 8 + armOff, 4, 3);
+            ctx.fillRect(drawX + 3, drawY + 8 - armOff, 4, 3);
+        }
+        // Normal rendering
+        else {
+            // Legs animation
+            const legOffset = this.grounded && Math.abs(this.vx) > 0.3 ? Math.sin(this.walkTimer / 60) * 3 : 0;
+
+            // Legs
+            ctx.fillStyle = COLORS.player;
+            ctx.fillRect(drawX - 5, drawY + 18, 4, 8 + legOffset);
+            ctx.fillRect(drawX + 1, drawY + 18, 4, 8 - legOffset);
+
+            // Body
+            ctx.fillStyle = COLORS.player;
+            ctx.fillRect(drawX - 6, drawY + 8, 12, 12);
+
+            // Head
+            ctx.fillStyle = COLORS.playerSkin;
+            ctx.fillRect(drawX - 6, drawY, 12, 10);
+
+            // Bandana
+            ctx.fillStyle = COLORS.playerBandana;
+            ctx.fillRect(drawX - 7, drawY + 5, 14, 3);
+            // Bandana tail
+            if (f === -1) {
+                ctx.fillRect(drawX + 5, drawY + 5, 5, 2);
+                ctx.fillRect(drawX + 8, drawY + 6, 4, 2);
+            } else {
+                ctx.fillRect(drawX - 10, drawY + 5, 5, 2);
+                ctx.fillRect(drawX - 12, drawY + 6, 4, 2);
+            }
+
+            // Eyes
+            ctx.fillStyle = COLORS.playerEye;
+            ctx.fillRect(drawX + f * 2 - 1, drawY + 3, 2, 3);
+            ctx.fillRect(drawX + f * 2 + 3, drawY + 3, 2, 3);
+
+            // Arms
+            ctx.fillStyle = COLORS.playerSkin;
+            if (this.whipping) {
+                // Extended arm with whip
+                ctx.fillRect(drawX + f * 6, drawY + 10, 8 * f, 3);
+            } else if (!this.grounded) {
+                // Jump pose
+                ctx.fillRect(drawX - 8, drawY + 8, 3, 6);
+                ctx.fillRect(drawX + 5, drawY + 8, 3, 6);
+            } else {
+                ctx.fillRect(drawX - 8, drawY + 10, 3, 5 + legOffset * 0.5);
+                ctx.fillRect(drawX + 5, drawY + 10, 3, 5 - legOffset * 0.5);
+            }
+
+            // Wall slide effect
+            if (this.wallSliding) {
+                ctx.fillStyle = 'rgba(200,200,200,0.3)';
+                ctx.fillRect(drawX - 8, drawY + 12, 2, 8);
+                ctx.fillRect(drawX + 6, drawY + 12, 2, 8);
+            }
+        }
+
+        // Whip rendering
+        if (this.whipping && this.whipTimer > 100) {
+            ctx.strokeStyle = COLORS.ropeColor;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(drawX + this.facing * 6, drawY + 12);
+            const whipExtent = 28;
+            ctx.lineTo(drawX + this.facing * (6 + whipExtent), drawY + 10);
+            ctx.stroke();
+            // Whip tip
+            ctx.fillStyle = COLORS.ropeColor;
+            ctx.fillRect(drawX + this.facing * (6 + whipExtent) - 2, drawY + 8, 4, 4);
+        }
+
+        ctx.globalAlpha = 1;
+
+        // Render active bombs
+        for (const bomb of this.activeBombs) {
+            const bx = Math.round(bomb.x);
+            const by = Math.round(bomb.y);
+            // Bomb body
+            ctx.fillStyle = bomb.flicker && Math.floor(Date.now() / 50) % 2 === 0 ? '#ff4444' : COLORS.bomb;
+            ctx.beginPath();
+            ctx.arc(bx, by, 6, 0, Math.PI * 2);
+            ctx.fill();
+            // Fuse
+            ctx.strokeStyle = COLORS.bombFuse;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(bx + 3, by - 5);
+            ctx.lineTo(bx + 5, by - 10);
+            ctx.stroke();
+            // Fuse spark
+            if (bomb.timer > 0) {
+                ctx.fillStyle = Math.floor(Date.now() / 40) % 2 === 0 ? COLORS.bombSpark : '#ff8800';
+                ctx.beginPath();
+                ctx.arc(bx + 5, by - 11, 2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        // Render active ropes
+        for (const rope of this.activeRopes) {
+            ctx.strokeStyle = COLORS.ropeColor;
+            ctx.lineWidth = 2;
+            if (rope.extended) {
+                for (let i = 0; i < rope.segments.length - 1; i++) {
+                    ctx.beginPath();
+                    ctx.moveTo(rope.segments[i].x, rope.segments[i].y);
+                    ctx.lineTo(rope.segments[i + 1].x, rope.segments[i + 1].y);
+                    ctx.stroke();
+                }
+                // Hook at top
+                const top = rope.segments[rope.segments.length - 1];
+                ctx.fillStyle = '#aaa';
+                ctx.beginPath();
+                ctx.arc(top.x, top.y, 3, 0, Math.PI * 2);
+                ctx.fill();
+                // Rungs
+                for (let i = 0; i < rope.segments.length - 1; i++) {
+                    const s = rope.segments[i];
+                    ctx.fillStyle = COLORS.ropeColor;
+                    ctx.fillRect(s.x - 5, s.y - 1, 10, 2);
+                }
+            } else {
+                // Flying rope
+                ctx.beginPath();
+                ctx.moveTo(rope.x, rope.startY);
+                ctx.lineTo(rope.x, rope.segments[0].y - 20);
+                ctx.stroke();
+            }
+        }
+    }
+}
+
+// === ./enemies.js ===
+// enemies.js - Bats, snakes, spiders, skeletons with AI
+
+class Enemy {
+    constructor(type, x, y) {
+        this.type = type;
+        this.x = x;
+        this.y = y;
+        this.vx = 0;
+        this.vy = 0;
+        const cfg = ENEMY_CFG[type];
+        this.w = cfg.w;
+        this.h = cfg.h;
+        this.hp = cfg.hp;
+        this.speed = cfg.speed;
+        this.damage = cfg.damage;
+        this.score = cfg.score;
+        this.dead = false;
+        this.facing = Math.random() < 0.5 ? 1 : -1;
+        this.state = 'idle';
+        this.stateTimer = 0;
+        this.animFrame = 0;
+        this.animTimer = 0;
+        this.originX = x;
+        this.originY = y;
+
+        // Bat specific
+        this.swooping = false;
+        this.swoopTarget = { x: 0, y: 0 };
+        this.wingAngle = 0;
+
+        // Spider specific
+        this.hangY = y;
+        this.dropY = y + 200;
+        this.dropping = false;
+        this.webLength = 0;
+
+        // Skeleton specific
+        this.chasing = false;
+        this.alertTimer = 0;
+
+        // Snake specific
+        this.patrolDir = this.facing;
+        this.hissTimer = 0;
+    }
+
+    update(dt, level, playerX, playerY) {
+        if (this.dead) return;
+
+        const dtScale = dt / 16.667;
+        this.animTimer += dt;
+        if (this.animTimer > 150) {
+            this.animFrame = (this.animFrame + 1) % 4;
+            this.animTimer = 0;
+        }
+        this.stateTimer += dt;
+
+        switch (this.type) {
+            case 'bat': this._updateBat(dt, dtScale, level, playerX, playerY); break;
+            case 'snake': this._updateSnake(dt, dtScale, level, playerX, playerY); break;
+            case 'spider': this._updateSpider(dt, dtScale, level, playerX, playerY); break;
+            case 'skeleton': this._updateSkeleton(dt, dtScale, level, playerX, playerY); break;
+        }
+    }
+
+    _updateBat(dt, dtScale, level, px, py) {
+        this.wingAngle += dt * 0.015;
+        const dist = Math.hypot(px - this.x, py - this.y);
+
+        if (this.state === 'idle') {
+            // Hover in a pattern
+            this.x = this.originX + Math.sin(Date.now() / 800) * 30;
+            this.y = this.originY + Math.cos(Date.now() / 600) * 15;
+            if (dist < 150) {
+                this.state = 'swoop';
+                this.swoopTarget = { x: px, y: py };
+                this.stateTimer = 0;
+            }
+        } else if (this.state === 'swoop') {
+            const dx = this.swoopTarget.x - this.x;
+            const dy = this.swoopTarget.y - this.y;
+            const len = Math.hypot(dx, dy);
+            if (len > 2) {
+                const cfg = ENEMY_CFG.bat;
+                this.x += (dx / len) * cfg.swoopSpeed * dtScale;
+                this.y += (dy / len) * cfg.swoopSpeed * dtScale;
+            }
+            this.facing = dx > 0 ? 1 : -1;
+            if (this.stateTimer > 2000 || len < 10) {
+                this.state = 'retreat';
+                this.stateTimer = 0;
+            }
+        } else if (this.state === 'retreat') {
+            const dx = this.originX - this.x;
+            const dy = this.originY - this.y;
+            const len = Math.hypot(dx, dy);
+            if (len > 5) {
+                this.x += (dx / len) * this.speed * dtScale;
+                this.y += (dy / len) * this.speed * dtScale;
+            }
+            if (this.stateTimer > 1500) {
+                this.state = 'idle';
+                this.stateTimer = 0;
+            }
+        }
+    }
+
+    _updateSnake(dt, dtScale, level, px, py) {
+        const dist = Math.hypot(px - this.x, py - this.y);
+
+        if (this.state === 'idle') {
+            // Patrol
+            this.vx = this.patrolDir * this.speed;
+            this.x += this.vx * dtScale;
+            this.facing = this.patrolDir;
+
+            // Check wall or edge
+            const frontCol = Math.floor((this.x + this.patrolDir * (this.w / 2 + 2)) / TILE);
+            const groundCol = Math.floor((this.x + this.patrolDir * (this.w / 2)) / TILE);
+            const groundRow = Math.floor((this.y + this.h + 2) / TILE);
+            const wallRow = Math.floor(this.y / TILE);
+
+            if (level.isSolid(frontCol, wallRow) || !level.isSolid(groundCol, groundRow)) {
+                this.patrolDir *= -1;
+                this.stateTimer = 0;
+            }
+
+            // Chase player if close
+            if (dist < 100) {
+                this.state = 'chase';
+                this.stateTimer = 0;
+            }
+
+            // Random pause
+            if (this.stateTimer > 3000 && Math.random() < 0.01) {
+                this.state = 'pause';
+                this.stateTimer = 0;
+            }
+        } else if (this.state === 'chase') {
+            const dx = px - this.x;
+            this.patrolDir = dx > 0 ? 1 : -1;
+            this.vx = this.patrolDir * this.speed * 1.5;
+            this.x += this.vx * dtScale;
+            this.facing = this.patrolDir;
+
+            const frontCol = Math.floor((this.x + this.patrolDir * (this.w / 2 + 2)) / TILE);
+            const wallRow = Math.floor(this.y / TILE);
+            if (level.isSolid(frontCol, wallRow)) {
+                this.x -= this.vx * dtScale;
+            }
+
+            if (dist > 180 || this.stateTimer > 4000) {
+                this.state = 'idle';
+                this.stateTimer = 0;
+            }
+        } else if (this.state === 'pause') {
+            if (this.stateTimer > 1500) {
+                this.state = 'idle';
+                this.stateTimer = 0;
+            }
+        }
+
+        // Gravity
+        const footCol = Math.floor(this.x / TILE);
+        const footRow = Math.floor((this.y + this.h + 1) / TILE);
+        if (!level.isSolid(footCol, footRow)) {
+            this.vy += GRAVITY * dtScale;
+            if (this.vy > 8) this.vy = 8;
+        } else {
+            this.vy = 0;
+            this.y = footRow * TILE - this.h;
+        }
+        this.y += this.vy * dtScale;
+    }
+
+    _updateSpider(dt, dtScale, level, px, py) {
+        const dist = Math.hypot(px - this.x, py - this.y);
+
+        if (this.state === 'idle') {
+            // Hang and sway
+            this.webLength = this.y - this.hangY;
+            this.x = this.originX + Math.sin(Date.now() / 1000) * 10;
+            if (dist < 120 && Math.abs(px - this.x) < 60) {
+                this.state = 'drop';
+                this.dropping = true;
+                this.stateTimer = 0;
+            }
+        } else if (this.state === 'drop') {
+            this.y += ENEMY_CFG.spider.dropSpeed * dtScale;
+            const row = Math.floor((this.y + this.h) / TILE);
+            const col = Math.floor(this.x / TILE);
+            if (level.isSolid(col, row) || this.stateTimer > 1500) {
+                this.dropping = false;
+                this.state = 'ground';
+                this.stateTimer = 0;
+            }
+        } else if (this.state === 'ground') {
+            // Chase on ground
+            const dx = px - this.x;
+            this.facing = dx > 0 ? 1 : -1;
+            this.x += this.facing * this.speed * dtScale;
+
+            const footCol = Math.floor(this.x / TILE);
+            const footRow = Math.floor((this.y + this.h + 1) / TILE);
+            if (!level.isSolid(footCol, footRow)) {
+                this.vy += GRAVITY * dtScale;
+            } else {
+                this.vy = 0;
+                this.y = footRow * TILE - this.h;
+            }
+            this.y += this.vy * dtScale;
+
+            const frontCol = Math.floor((this.x + this.facing * (this.w / 2 + 2)) / TILE);
+            const wallRow = Math.floor(this.y / TILE);
+            if (level.isSolid(frontCol, wallRow)) {
+                this.x -= this.facing * this.speed * dtScale;
+            }
+
+            if (this.stateTimer > 5000) {
+                this.state = 'climb';
+                this.stateTimer = 0;
+            }
+        } else if (this.state === 'climb') {
+            // Climb back up
+            this.y -= 1.5 * dtScale;
+            if (this.y <= this.originY) {
+                this.y = this.originY;
+                this.x = this.originX;
+                this.state = 'idle';
+                this.stateTimer = 0;
+            }
+        }
+    }
+
+    _updateSkeleton(dt, dtScale, level, px, py) {
+        const dist = Math.hypot(px - this.x, py - this.y);
+
+        if (this.state === 'idle') {
+            // Patrol
+            this.vx = this.patrolDir * this.speed;
+            this.x += this.vx * dtScale;
+            this.facing = this.patrolDir;
+
+            const frontCol = Math.floor((this.x + this.patrolDir * (this.w / 2 + 2)) / TILE);
+            const groundCol = Math.floor((this.x + this.patrolDir * (this.w / 2)) / TILE);
+            const groundRow = Math.floor((this.y + this.h + 2) / TILE);
+            const wallRow = Math.floor(this.y / TILE);
+
+            if (level.isSolid(frontCol, wallRow) || !level.isSolid(groundCol, groundRow)) {
+                this.patrolDir *= -1;
+            }
+
+            if (dist < 180) {
+                this.state = 'alert';
+                this.alertTimer = 0;
+                this.stateTimer = 0;
+            }
+        } else if (this.state === 'alert') {
+            // Brief alert pause
+            this.facing = px > this.x ? 1 : -1;
+            if (this.stateTimer > 500) {
+                this.state = 'chase';
+                this.chasing = true;
+                this.stateTimer = 0;
+            }
+        } else if (this.state === 'chase') {
+            const dx = px - this.x;
+            this.facing = dx > 0 ? 1 : -1;
+            this.vx = this.facing * ENEMY_CFG.skeleton.chaseSpeed;
+            this.x += this.vx * dtScale;
+
+            // Jump over obstacles
+            const frontCol = Math.floor((this.x + this.facing * (this.w / 2 + 4)) / TILE);
+            const wallRow = Math.floor((this.y + this.h / 2) / TILE);
+            const footRow = Math.floor((this.y + this.h + 1) / TILE);
+            const groundCol = Math.floor(this.x / TILE);
+
+            if (level.isSolid(frontCol, wallRow)) {
+                if (level.isSolid(groundCol, footRow)) {
+                    this.vy = -7;
+                }
+                this.x -= this.vx * dtScale;
+            }
+
+            // Gravity
+            if (!level.isSolid(groundCol, footRow)) {
+                this.vy += GRAVITY * dtScale;
+                if (this.vy > 8) this.vy = 8;
+            } else {
+                this.vy = 0;
+                this.y = footRow * TILE - this.h;
+            }
+            this.y += this.vy * dtScale;
+
+            if (dist > 250 || this.stateTimer > 6000) {
+                this.state = 'idle';
+                this.chasing = false;
+                this.stateTimer = 0;
+            }
+        }
+    }
+
+    takeDamage(amount) {
+        this.hp -= amount;
+        if (this.hp <= 0) {
+            this.dead = true;
+            Sound.enemyDie();
+            return true;
+        }
+        return false;
+    }
+
+    getHitbox() {
+        return {
+            x: this.x - this.w / 2,
+            y: this.y,
+            w: this.w,
+            h: this.h
+        };
+    }
+
+    render(ctx) {
+        if (this.dead) return;
+
+        const x = Math.round(this.x);
+        const y = Math.round(this.y);
+        const f = this.facing;
+
+        switch (this.type) {
+            case 'bat': this._renderBat(ctx, x, y, f); break;
+            case 'snake': this._renderSnake(ctx, x, y, f); break;
+            case 'spider': this._renderSpider(ctx, x, y, f); break;
+            case 'skeleton': this._renderSkeleton(ctx, x, y, f); break;
+        }
+    }
+
+    _renderBat(ctx, x, y, f) {
+        const wing = Math.sin(this.wingAngle) * 8;
+
+        // Wings
+        ctx.fillStyle = COLORS.batWing;
+        ctx.beginPath();
+        ctx.moveTo(x, y + 8);
+        ctx.quadraticCurveTo(x - 12 * f, y + 8 + wing, x - 16 * f, y + 2);
+        ctx.lineTo(x - 12 * f, y + 6);
+        ctx.quadraticCurveTo(x - 6 * f, y + 10 + wing * 0.5, x, y + 8);
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.moveTo(x, y + 8);
+        ctx.quadraticCurveTo(x + 12 * f, y + 8 - wing, x + 16 * f, y + 2);
+        ctx.lineTo(x + 12 * f, y + 6);
+        ctx.quadraticCurveTo(x + 6 * f, y + 10 - wing * 0.5, x, y + 8);
+        ctx.fill();
+
+        // Body
+        ctx.fillStyle = COLORS.bat;
+        ctx.beginPath();
+        ctx.ellipse(x, y + 8, 6, 5, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Eyes
+        ctx.fillStyle = '#ff4444';
+        ctx.fillRect(x + f * 2 - 1, y + 6, 2, 2);
+        ctx.fillRect(x + f * 2 + 2, y + 6, 2, 2);
+
+        // Ears
+        ctx.fillStyle = COLORS.bat;
+        ctx.beginPath();
+        ctx.moveTo(x - 4, y + 4);
+        ctx.lineTo(x - 6, y - 2);
+        ctx.lineTo(x - 2, y + 3);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(x + 4, y + 4);
+        ctx.lineTo(x + 6, y - 2);
+        ctx.lineTo(x + 2, y + 3);
+        ctx.fill();
+    }
+
+    _renderSnake(ctx, x, y, f) {
+        // Body segments
+        ctx.fillStyle = COLORS.snake;
+        for (let i = 0; i < 4; i++) {
+            const sx = x - f * i * 5 + Math.sin(Date.now() / 200 + i) * 2;
+            const sy = y + 12 + Math.cos(Date.now() / 300 + i * 0.8) * 1;
+            ctx.beginPath();
+            ctx.ellipse(sx, sy, i === 0 ? 6 : 4 - i * 0.5, 3, 0, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Head
+        ctx.fillStyle = COLORS.snakePattern;
+        ctx.beginPath();
+        ctx.ellipse(x + f * 4, y + 8, 7, 5, f * 0.2, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Pattern
+        ctx.fillStyle = COLORS.snake;
+        ctx.beginPath();
+        ctx.ellipse(x + f * 4, y + 10, 4, 2, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Eyes
+        ctx.fillStyle = '#ffff00';
+        ctx.fillRect(x + f * 6 - 1, y + 6, 2, 2);
+        ctx.fillRect(x + f * 6 + 2, y + 6, 2, 2);
+        // Slit pupils
+        ctx.fillStyle = '#000';
+        ctx.fillRect(x + f * 6, y + 6, 1, 2);
+        ctx.fillRect(x + f * 6 + 2, y + 6, 1, 2);
+
+        // Tongue
+        if (this.hissTimer > 0 || Math.random() < 0.005) {
+            ctx.strokeStyle = '#ff4444';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(x + f * 8, y + 8);
+            ctx.lineTo(x + f * 13, y + 7);
+            ctx.moveTo(x + f * 13, y + 7);
+            ctx.lineTo(x + f * 15, y + 5);
+            ctx.moveTo(x + f * 13, y + 7);
+            ctx.lineTo(x + f * 15, y + 9);
+            ctx.stroke();
+        }
+    }
+
+    _renderSpider(ctx, x, y, f) {
+        // Web line
+        if (this.state === 'idle' || this.state === 'drop') {
+            ctx.strokeStyle = 'rgba(200,200,200,0.4)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(this.originX, this.hangY);
+            ctx.lineTo(x, y);
+            ctx.stroke();
+        }
+
+        // Body
+        ctx.fillStyle = COLORS.spider;
+        ctx.beginPath();
+        ctx.ellipse(x, y + 8, 8, 6, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Abdomen
+        ctx.fillStyle = '#333';
+        ctx.beginPath();
+        ctx.ellipse(x - f * 6, y + 10, 5, 4, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Red pattern on abdomen
+        ctx.fillStyle = '#cc0000';
+        ctx.beginPath();
+        ctx.arc(x - f * 6, y + 10, 2, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Legs
+        ctx.strokeStyle = COLORS.spider;
+        ctx.lineWidth = 1.5;
+        const legAnim = Math.sin(Date.now() / 100) * 3;
+        for (let i = 0; i < 4; i++) {
+            const angle = (i - 1.5) * 0.4;
+            // Left legs
+            ctx.beginPath();
+            ctx.moveTo(x + Math.cos(angle + Math.PI) * 5, y + 8);
+            ctx.lineTo(x - 10 - i * 2, y + 2 + legAnim * (i % 2 === 0 ? 1 : -1));
+            ctx.stroke();
+            // Right legs
+            ctx.beginPath();
+            ctx.moveTo(x + Math.cos(angle) * 5, y + 8);
+            ctx.lineTo(x + 10 + i * 2, y + 2 - legAnim * (i % 2 === 0 ? 1 : -1));
+            ctx.stroke();
+        }
+
+        // Eyes (cluster)
+        ctx.fillStyle = COLORS.spiderEye;
+        for (let i = 0; i < 4; i++) {
+            const ex = x + f * (4 + (i % 2) * 3 - 1);
+            const ey = y + 5 + Math.floor(i / 2) * 3;
+            ctx.beginPath();
+            ctx.arc(ex, ey, 1.5, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+
+    _renderSkeleton(ctx, x, y, f) {
+        // Legs
+        ctx.fillStyle = COLORS.skeleton;
+        const legAnim = this.chasing ? Math.sin(Date.now() / 80) * 4 : 0;
+        ctx.fillRect(x - 4, y + 18, 3, 10 + legAnim);
+        ctx.fillRect(x + 1, y + 18, 3, 10 - legAnim);
+
+        // Ribcage
+        ctx.fillStyle = COLORS.skeleton;
+        ctx.fillRect(x - 6, y + 8, 12, 12);
+        // Ribs
+        ctx.strokeStyle = '#aaa';
+        ctx.lineWidth = 1;
+        for (let i = 0; i < 3; i++) {
+            ctx.beginPath();
+            ctx.moveTo(x - 5, y + 10 + i * 3);
+            ctx.lineTo(x + 5, y + 10 + i * 3);
+            ctx.stroke();
+        }
+
+        // Skull
+        ctx.fillStyle = COLORS.skeleton;
+        ctx.beginPath();
+        ctx.arc(x, y + 5, 7, 0, Math.PI * 2);
+        ctx.fill();
+        // Jaw
+        ctx.fillStyle = '#bbb';
+        ctx.fillRect(x - 4, y + 9, 8, 3);
+
+        // Eyes
+        ctx.fillStyle = this.chasing ? '#ff0000' : COLORS.skeletonEye;
+        ctx.fillRect(x + f * 2 - 2, y + 3, 3, 3);
+        ctx.fillRect(x + f * 2 + 2, y + 3, 3, 3);
+
+        // Nose
+        ctx.fillStyle = '#222';
+        ctx.fillRect(x - 1, y + 6, 2, 2);
+
+        // Arms
+        ctx.fillStyle = COLORS.skeleton;
+        const armAnim = this.chasing ? Math.sin(Date.now() / 100) * 5 : 0;
+        ctx.fillRect(x - 8, y + 8, 3, 10 + armAnim);
+        ctx.fillRect(x + 5, y + 8, 3, 10 - armAnim);
+
+        // Sword (when chasing)
+        if (this.chasing) {
+            ctx.fillStyle = '#aaa';
+            ctx.save();
+            ctx.translate(x + f * 8, y + 8);
+            ctx.rotate(f * -0.3);
+            ctx.fillRect(0, 0, f * 14, 2);
+            // Handle
+            ctx.fillStyle = '#654';
+            ctx.fillRect(0, -1, f * 4, 4);
+            ctx.restore();
+        }
+
+        // Alert indicator
+        if (this.state === 'alert') {
+            ctx.fillStyle = '#ff0000';
+            ctx.font = 'bold 12px monospace';
+            ctx.fillText('!', x - 3, y - 5);
+        }
+    }
+}
+
+class EnemyManager {
+    constructor() {
+        this.enemies = [];
+    }
+
+    clear() {
+        this.enemies = [];
+    }
+
+    spawnFromLevel(level) {
+        for (const e of level.enemies) {
+            this.enemies.push(new Enemy(e.type, e.x, e.y));
+        }
+    }
+
+    update(dt, level, playerX, playerY) {
+        for (const enemy of this.enemies) {
+            enemy.update(dt, level, playerX, playerY);
+        }
+        this.enemies = this.enemies.filter(e => !e.dead);
+    }
+
+    render(ctx) {
+        for (const enemy of this.enemies) {
+            enemy.render(ctx);
+        }
+    }
+}
+
+// === ./items.js ===
+// items.js - Gold, gems, ropes, bombs, shop items
+
+class Item {
+    constructor(type, x, y) {
+        this.type = type;
+        this.x = x;
+        this.y = y;
+        this.collected = false;
+        this.w = ITEM_VALUES[type]?.w || 12;
+        this.h = ITEM_VALUES[type]?.h || 12;
+        this.bobOffset = Math.random() * Math.PI * 2;
+        this.shimmer = 0;
+    }
+
+    update(dt) {
+        this.shimmer += dt * 0.005;
+    }
+
+    getHitbox() {
+        return {
+            x: this.x - this.w / 2,
+            y: this.y - this.h / 2,
+            w: this.w,
+            h: this.h
+        };
+    }
+
+    render(ctx) {
+        if (this.collected) return;
+
+        const bob = Math.sin(Date.now() / 500 + this.bobOffset) * 2;
+        const x = Math.round(this.x);
+        const y = Math.round(this.y + bob);
+
+        switch (this.type) {
+            case 'gold_nugget':
+                // Small gold nugget
+                ctx.fillStyle = COLORS.gold;
+                ctx.beginPath();
+                ctx.moveTo(x - 5, y + 3);
+                ctx.lineTo(x, y - 4);
+                ctx.lineTo(x + 5, y + 2);
+                ctx.lineTo(x + 3, y + 5);
+                ctx.lineTo(x - 3, y + 5);
+                ctx.closePath();
+                ctx.fill();
+                // Shine
+                if (Math.sin(this.shimmer * 3) > 0.5) {
+                    ctx.fillStyle = COLORS.goldShine;
+                    ctx.fillRect(x - 1, y - 2, 2, 2);
+                }
+                break;
+
+            case 'gold_bar':
+                // Gold bar
+                ctx.fillStyle = COLORS.gold;
+                ctx.beginPath();
+                ctx.moveTo(x - 8, y + 2);
+                ctx.lineTo(x - 5, y - 5);
+                ctx.lineTo(x + 5, y - 5);
+                ctx.lineTo(x + 8, y + 2);
+                ctx.lineTo(x + 8, y + 5);
+                ctx.lineTo(x - 8, y + 5);
+                ctx.closePath();
+                ctx.fill();
+                // Top face
+                ctx.fillStyle = COLORS.goldShine;
+                ctx.beginPath();
+                ctx.moveTo(x - 5, y - 5);
+                ctx.lineTo(x + 5, y - 5);
+                ctx.lineTo(x + 2, y - 2);
+                ctx.lineTo(x - 2, y - 2);
+                ctx.closePath();
+                ctx.fill();
+                // Shine
+                ctx.fillStyle = 'rgba(255,255,200,0.4)';
+                ctx.fillRect(x - 4, y - 3, 3, 2);
+                break;
+
+            case 'gem_ruby':
+                this._renderGem(ctx, x, y, COLORS.gemRuby);
+                break;
+            case 'gem_emerald':
+                this._renderGem(ctx, x, y, COLORS.gemEmerald);
+                break;
+            case 'gem_sapphire':
+                this._renderGem(ctx, x, y, COLORS.gemSapphire);
+                break;
+
+            case 'key':
+                // Key
+                ctx.fillStyle = COLORS.key;
+                // Ring
+                ctx.beginPath();
+                ctx.arc(x - 3, y - 2, 4, 0, Math.PI * 2);
+                ctx.fillStyle = COLORS.gold;
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(x - 3, y - 2, 2, 0, Math.PI * 2);
+                ctx.fillStyle = COLORS.bg;
+                ctx.fill();
+                // Shaft
+                ctx.fillStyle = COLORS.gold;
+                ctx.fillRect(x, y - 1, 8, 2);
+                // Teeth
+                ctx.fillRect(x + 6, y + 1, 2, 3);
+                ctx.fillRect(x + 3, y + 1, 2, 2);
+                // Shine
+                ctx.fillStyle = COLORS.keyShine;
+                ctx.fillRect(x - 4, y - 4, 2, 2);
+                break;
+
+            case 'rope_pickup':
+                // Coil of rope
+                ctx.fillStyle = COLORS.ropePickup;
+                ctx.beginPath();
+                ctx.arc(x, y, 6, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = COLORS.bg;
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.arc(x, y, 3, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(x, y, 5, -0.5, 1.5);
+                ctx.stroke();
+                // Label
+                ctx.fillStyle = COLORS.hudText;
+                ctx.font = 'bold 7px monospace';
+                ctx.fillText('R', x - 2, y + 3);
+                break;
+
+            case 'bomb_pickup':
+                // Bomb
+                ctx.fillStyle = COLORS.bomb;
+                ctx.beginPath();
+                ctx.arc(x, y + 1, 6, 0, Math.PI * 2);
+                ctx.fill();
+                // Fuse
+                ctx.strokeStyle = COLORS.bombFuse;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(x + 3, y - 4);
+                ctx.lineTo(x + 5, y - 8);
+                ctx.stroke();
+                // Label
+                ctx.fillStyle = COLORS.hudText;
+                ctx.font = 'bold 7px monospace';
+                ctx.fillText('B', x - 2, y + 4);
+                break;
+
+            case 'health':
+                // Heart
+                ctx.fillStyle = COLORS.health;
+                ctx.beginPath();
+                ctx.arc(x - 3, y - 2, 4, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(x + 3, y - 2, 4, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.moveTo(x - 7, y);
+                ctx.lineTo(x, y + 7);
+                ctx.lineTo(x + 7, y);
+                ctx.fill();
+                // Cross
+                ctx.fillStyle = COLORS.healthCross;
+                ctx.fillRect(x - 1, y - 3, 2, 6);
+                ctx.fillRect(x - 3, y - 1, 6, 2);
+                break;
+
+            case 'chest':
+                // Chest body
+                ctx.fillStyle = COLORS.chest;
+                ctx.fillRect(x - 10, y - 4, 20, 12);
+                // Lid
+                ctx.fillStyle = '#a07818';
+                ctx.fillRect(x - 10, y - 8, 20, 5);
+                // Bands
+                ctx.fillStyle = COLORS.chestBand;
+                ctx.fillRect(x - 10, y - 2, 20, 2);
+                ctx.fillRect(x - 1, y - 8, 2, 12);
+                // Lock
+                ctx.fillStyle = COLORS.gold;
+                ctx.beginPath();
+                ctx.arc(x, y + 1, 3, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#222';
+                ctx.fillRect(x - 1, y, 2, 2);
+                break;
+        }
+    }
+
+    _renderGem(ctx, x, y, color) {
+        // Diamond shape
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(x, y - 6);
+        ctx.lineTo(x + 6, y);
+        ctx.lineTo(x, y + 6);
+        ctx.lineTo(x - 6, y);
+        ctx.closePath();
+        ctx.fill();
+
+        // Facets
+        const darker = this._darkenColor(color, 0.7);
+        ctx.fillStyle = darker;
+        ctx.beginPath();
+        ctx.moveTo(x, y - 6);
+        ctx.lineTo(x, y);
+        ctx.lineTo(x - 6, y);
+        ctx.closePath();
+        ctx.fill();
+
+        // Shine
+        ctx.fillStyle = COLORS.gemShine;
+        ctx.globalAlpha = 0.4 + Math.sin(this.shimmer * 4) * 0.3;
+        ctx.beginPath();
+        ctx.moveTo(x - 2, y - 4);
+        ctx.lineTo(x, y - 2);
+        ctx.lineTo(x - 3, y - 1);
+        ctx.closePath();
+        ctx.fill();
+        ctx.globalAlpha = 1;
+
+        // Sparkle
+        if (Math.sin(this.shimmer * 2) > 0.8) {
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(x - 1, y - 5, 1, 1);
+        }
+    }
+
+    _darkenColor(hex, factor) {
+        const r = parseInt(hex.slice(1, 3), 16);
+        const g = parseInt(hex.slice(3, 5), 16);
+        const b = parseInt(hex.slice(5, 7), 16);
+        return `rgb(${Math.floor(r * factor)},${Math.floor(g * factor)},${Math.floor(b * factor)})`;
+    }
+}
+
+class ItemManager {
+    constructor() {
+        this.items = [];
+        this.floatingTexts = [];
+    }
+
+    clear() {
+        this.items = [];
+        this.floatingTexts = [];
+    }
+
+    spawnFromLevel(level) {
+        for (const i of level.items) {
+            this.items.push(new Item(i.type, i.x, i.y));
+        }
+        // Add key
+        this.items.push(new Item('key', level.keyPos.x, level.keyPos.y));
+    }
+
+    update(dt) {
+        for (const item of this.items) {
+            item.update(dt);
+        }
+        this.items = this.items.filter(i => !i.collected);
+
+        // Update floating texts
+        for (const ft of this.floatingTexts) {
+            ft.y -= dt * 0.03;
+            ft.life -= dt;
+            ft.alpha = Math.max(0, ft.life / ft.maxLife);
+        }
+        this.floatingTexts = this.floatingTexts.filter(ft => ft.life > 0);
+    }
+
+    addFloatingText(x, y, text, color = COLORS.hudValue) {
+        this.floatingTexts.push({
+            x, y, text, color,
+            life: 1200,
+            maxLife: 1200,
+            alpha: 1
+        });
+    }
+
+    render(ctx) {
+        for (const item of this.items) {
+            item.render(ctx);
+        }
+
+        // Render floating texts
+        for (const ft of this.floatingTexts) {
+            ctx.globalAlpha = ft.alpha;
+            ctx.fillStyle = ft.color;
+            ctx.font = 'bold 10px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText(ft.text, Math.round(ft.x), Math.round(ft.y));
+            ctx.textAlign = 'left';
+            ctx.globalAlpha = 1;
+        }
+    }
+}
+
+class Shop {
+    constructor(level, rng) {
+        this.items = [];
+        this.active = false;
+        this.shopkeeper = null;
+        this._generateShopItems(rng);
+    }
+
+    _generateShopItems(rng) {
+        // Pick 3-4 random shop items
+        const shuffled = [...SHOP_ITEMS].sort(() => rng.next() - 0.5);
+        const count = 3 + (rng.next() > 0.5 ? 1 : 0);
+        this.items = shuffled.slice(0, count).map((item, i) => ({
+            ...item,
+            x: 0,
+            y: 0,
+            purchased: false,
+            index: i
+        }));
+    }
+
+    placeInRoom(room, tileSize) {
+        const startX = (room.x + 1) * tileSize;
+        const baseY = (room.y + room.h - 2) * tileSize;
+        for (let i = 0; i < this.items.length; i++) {
+            this.items[i].x = startX + i * tileSize * 2.5 + tileSize;
+            this.items[i].y = baseY;
+        }
+        this.shopkeeper = {
+            x: startX + this.items.length * tileSize * 2.5 + tileSize,
+            y: baseY,
+            facing: -1,
+            state: 'idle'
+        };
+    }
+
+    render(ctx) {
+        // Shop sign
+        if (this.items.length > 0) {
+            const signX = this.items[0].x - TILE;
+            const signY = this.items[0].y - TILE * 2.5;
+
+            ctx.fillStyle = '#4a3520';
+            ctx.fillRect(signX - 30, signY, 60, 16);
+            ctx.strokeStyle = COLORS.uiAccent;
+            ctx.lineWidth = 1;
+            ctx.strokeRect(signX - 30, signY, 60, 16);
+            ctx.fillStyle = COLORS.gold;
+            ctx.font = 'bold 10px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('商店', signX, signY + 12);
+            ctx.textAlign = 'left';
+        }
+
+        // Render shop items with price tags
+        for (const item of this.items) {
+            if (item.purchased) continue;
+
+            const x = Math.round(item.x);
+            const y = Math.round(item.y);
+
+            // Item display
+            ctx.fillStyle = 'rgba(180,140,60,0.15)';
+            ctx.fillRect(x - 14, y - 10, 28, 20);
+
+            // Item icon
+            this._renderShopItem(ctx, item, x, y);
+
+            // Price tag
+            ctx.fillStyle = COLORS.hudBg;
+            ctx.fillRect(x - 16, y + 12, 32, 12);
+            ctx.strokeStyle = COLORS.uiAccent;
+            ctx.lineWidth = 0.5;
+            ctx.strokeRect(x - 16, y + 12, 32, 12);
+            ctx.fillStyle = COLORS.gold;
+            ctx.font = '8px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText(`$${item.cost}`, x, y + 21);
+            ctx.textAlign = 'left';
+        }
+
+        // Shopkeeper
+        if (this.shopkeeper) {
+            const sx = Math.round(this.shopkeeper.x);
+            const sy = Math.round(this.shopkeeper.y);
+
+            // Body
+            ctx.fillStyle = COLORS.shopkeeper;
+            ctx.fillRect(sx - 6, sy + 6, 12, 14);
+            // Head
+            ctx.fillStyle = COLORS.playerSkin;
+            ctx.fillRect(sx - 5, sy - 2, 10, 10);
+            // Hat
+            ctx.fillStyle = '#654';
+            ctx.fillRect(sx - 6, sy - 4, 12, 4);
+            ctx.fillRect(sx - 4, sy - 8, 8, 5);
+            // Eyes
+            ctx.fillStyle = '#222';
+            ctx.fillRect(sx + this.shopkeeper.facing * 2 - 1, sy + 2, 2, 2);
+            ctx.fillRect(sx + this.shopkeeper.facing * 2 + 2, sy + 2, 2, 2);
+            // Shotgun
+            ctx.fillStyle = COLORS.shopkeeperShotgun;
+            ctx.fillRect(sx + this.shopkeeper.facing * 6, sy + 8, this.shopkeeper.facing * 12, 3);
+        }
+    }
+
+    _renderShopItem(ctx, item, x, y) {
+        switch (item.type) {
+            case 'rope':
+                ctx.fillStyle = COLORS.ropePickup;
+                ctx.beginPath();
+                ctx.arc(x, y, 5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = COLORS.hudText;
+                ctx.font = 'bold 8px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('R', x, y + 3);
+                ctx.textAlign = 'left';
+                break;
+            case 'bomb':
+                ctx.fillStyle = COLORS.bomb;
+                ctx.beginPath();
+                ctx.arc(x, y, 5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = COLORS.hudText;
+                ctx.font = 'bold 8px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('B', x, y + 3);
+                ctx.textAlign = 'left';
+                break;
+            case 'health':
+                ctx.fillStyle = COLORS.health;
+                ctx.beginPath();
+                ctx.arc(x - 2, y - 1, 3, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(x + 2, y - 1, 3, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.moveTo(x - 5, y);
+                ctx.lineTo(x, y + 5);
+                ctx.lineTo(x + 5, y);
+                ctx.fill();
+                break;
+            case 'compass':
+                ctx.fillStyle = '#888';
+                ctx.beginPath();
+                ctx.arc(x, y, 5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#cc3333';
+                ctx.beginPath();
+                ctx.moveTo(x, y - 3);
+                ctx.lineTo(x + 1, y);
+                ctx.lineTo(x, y + 3);
+                ctx.lineTo(x - 1, y);
+                ctx.closePath();
+                ctx.fill();
+                break;
+            case 'gloves':
+                ctx.fillStyle = '#8b6914';
+                ctx.fillRect(x - 5, y - 4, 10, 8);
+                ctx.fillStyle = '#a07818';
+                ctx.fillRect(x - 3, y - 6, 6, 3);
+                break;
+            case 'shoes':
+                ctx.fillStyle = '#cc3333';
+                ctx.fillRect(x - 5, y - 3, 10, 7);
+                ctx.fillStyle = '#aa2222';
+                ctx.fillRect(x - 6, y + 2, 12, 3);
+                break;
+        }
+    }
+
+    tryBuy(item, player) {
+        if (item.purchased) {
+            Sound.shopDeny();
+            return false;
+        }
+        if (player.gold < item.cost) {
+            Sound.shopDeny();
+            return false;
+        }
+
+        player.gold -= item.cost;
+        item.purchased = true;
+        Sound.shopBuy();
+
+        switch (item.type) {
+            case 'rope': player.ropes += item.amount; break;
+            case 'bomb': player.bombs += item.amount; break;
+            case 'health': player.heal(item.amount); break;
+            case 'compass': player.hasCompass = true; break;
+            case 'gloves': player.hasGloves = true; break;
+            case 'shoes': player.hasShoes = true; break;
+        }
+        return true;
+    }
+}
+
+// === ./effects.js ===
+// effects.js - Particles, screen shake, visual effects
+
+class Particle {
+    constructor(x, y, vx, vy, color, size, life, gravity = true) {
+        this.x = x;
+        this.y = y;
+        this.vx = vx;
+        this.vy = vy;
+        this.color = color;
+        this.size = size;
+        this.life = life;
+        this.maxLife = life;
+        this.gravity = gravity;
+        this.dead = false;
+        this.rotation = Math.random() * Math.PI * 2;
+        this.rotSpeed = (Math.random() - 0.5) * 0.2;
+    }
+
+    update(dt) {
+        const dtScale = dt / 16.667;
+        this.x += this.vx * dtScale;
+        this.y += this.vy * dtScale;
+        if (this.gravity) this.vy += 0.15 * dtScale;
+        this.life -= dt;
+        this.rotation += this.rotSpeed * dtScale;
+        if (this.life <= 0) this.dead = true;
+    }
+
+    render(ctx) {
+        const alpha = Math.max(0, this.life / this.maxLife);
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = this.color;
+
+        const s = this.size * (0.5 + alpha * 0.5);
+        ctx.save();
+        ctx.translate(Math.round(this.x), Math.round(this.y));
+        ctx.rotate(this.rotation);
+        ctx.fillRect(-s / 2, -s / 2, s, s);
+        ctx.restore();
+
+        ctx.globalAlpha = 1;
+    }
+}
+
+class Effects {
+    constructor() {
+        this.particles = [];
+        this.shakeX = 0;
+        this.shakeY = 0;
+        this.shakeIntensity = 0;
+        this.shakeDuration = 0;
+        this.flashAlpha = 0;
+        this.flashColor = '#fff';
+        this.dustParticles = [];
+    }
+
+    update(dt) {
+        for (const p of this.particles) {
+            p.update(dt);
+        }
+        this.particles = this.particles.filter(p => !p.dead);
+
+        // Screen shake
+        if (this.shakeDuration > 0) {
+            this.shakeDuration -= dt;
+            const intensity = this.shakeIntensity * (this.shakeDuration / 500);
+            this.shakeX = (Math.random() - 0.5) * intensity * 2;
+            this.shakeY = (Math.random() - 0.5) * intensity * 2;
+        } else {
+            this.shakeX = 0;
+            this.shakeY = 0;
+        }
+
+        // Flash
+        if (this.flashAlpha > 0) {
+            this.flashAlpha -= dt * 0.003;
+        }
+    }
+
+    getShakeOffset() {
+        return { x: this.shakeX, y: this.shakeY };
+    }
+
+    // Explosion effect
+    explosion(x, y, intensity = 1) {
+        const count = Math.floor(20 * intensity);
+        for (let i = 0; i < count; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 1 + Math.random() * 4 * intensity;
+            const colors = ['#ff4400', '#ff8800', '#ffcc00', '#ff6600', '#cc3300'];
+            this.particles.push(new Particle(
+                x + (Math.random() - 0.5) * 10,
+                y + (Math.random() - 0.5) * 10,
+                Math.cos(angle) * speed,
+                Math.sin(angle) * speed,
+                colors[Math.floor(Math.random() * colors.length)],
+                3 + Math.random() * 4,
+                300 + Math.random() * 400
+            ));
+        }
+        // Debris
+        for (let i = 0; i < Math.floor(8 * intensity); i++) {
+            const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI;
+            const speed = 2 + Math.random() * 3;
+            this.particles.push(new Particle(
+                x, y,
+                Math.cos(angle) * speed,
+                Math.sin(angle) * speed,
+                '#5c3a1e',
+                2 + Math.random() * 3,
+                500 + Math.random() * 500
+            ));
+        }
+        // Smoke
+        for (let i = 0; i < Math.floor(10 * intensity); i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 0.3 + Math.random() * 1.5;
+            this.particles.push(new Particle(
+                x + (Math.random() - 0.5) * 16,
+                y + (Math.random() - 0.5) * 16,
+                Math.cos(angle) * speed,
+                Math.sin(angle) * speed - 0.5,
+                `rgba(100,80,60,${0.3 + Math.random() * 0.3})`,
+                6 + Math.random() * 8,
+                400 + Math.random() * 300,
+                false
+            ));
+        }
+
+        this.shake(8 * intensity, 300 * intensity);
+        this.flash('#ff6600', 0.3 * intensity);
+    }
+
+    // Gold collect effect
+    goldCollect(x, y) {
+        for (let i = 0; i < 8; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 1 + Math.random() * 2;
+            this.particles.push(new Particle(
+                x, y,
+                Math.cos(angle) * speed,
+                Math.sin(angle) * speed - 1,
+                COLORS.gold,
+                2 + Math.random() * 2,
+                300 + Math.random() * 200
+            ));
+        }
+    }
+
+    // Gem collect effect
+    gemCollect(x, y, color) {
+        for (let i = 0; i < 12; i++) {
+            const angle = (i / 12) * Math.PI * 2;
+            const speed = 1.5 + Math.random();
+            this.particles.push(new Particle(
+                x, y,
+                Math.cos(angle) * speed,
+                Math.sin(angle) * speed,
+                i % 2 === 0 ? color : COLORS.gemShine,
+                2 + Math.random() * 2,
+                400 + Math.random() * 200
+            ));
+        }
+    }
+
+    // Enemy death effect
+    enemyDeath(x, y, color) {
+        for (let i = 0; i < 15; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 1 + Math.random() * 3;
+            this.particles.push(new Particle(
+                x, y,
+                Math.cos(angle) * speed,
+                Math.sin(angle) * speed - 1,
+                color,
+                2 + Math.random() * 3,
+                300 + Math.random() * 300
+            ));
+        }
+        this.shake(3, 150);
+    }
+
+    // Player hurt effect
+    playerHurt(x, y) {
+        for (let i = 0; i < 10; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 1 + Math.random() * 2;
+            this.particles.push(new Particle(
+                x, y,
+                Math.cos(angle) * speed,
+                Math.sin(angle) * speed,
+                '#ff4444',
+                2 + Math.random() * 2,
+                300 + Math.random() * 200
+            ));
+        }
+        this.flash('#ff0000', 0.3);
+        this.shake(5, 200);
+    }
+
+    // Rope throw dust
+    ropeThrowDust(x, y) {
+        for (let i = 0; i < 4; i++) {
+            this.particles.push(new Particle(
+                x + (Math.random() - 0.5) * 8,
+                y,
+                (Math.random() - 0.5) * 2,
+                -Math.random() * 1.5,
+                '#c8a050',
+                2 + Math.random() * 2,
+                200 + Math.random() * 150
+            ));
+        }
+    }
+
+    // Landing dust
+    landingDust(x, y) {
+        for (let i = 0; i < 5; i++) {
+            const dir = i < 2.5 ? -1 : 1;
+            this.particles.push(new Particle(
+                x + (Math.random() - 0.5) * 10,
+                y,
+                dir * (0.5 + Math.random()),
+                -Math.random() * 0.5,
+                'rgba(150,120,80,0.5)',
+                2 + Math.random() * 2,
+                200 + Math.random() * 100,
+                false
+            ));
+        }
+    }
+
+    // Walk dust
+    walkDust(x, y, dir) {
+        if (Math.random() > 0.3) return;
+        this.particles.push(new Particle(
+            x, y,
+            -dir * (0.3 + Math.random() * 0.5),
+            -Math.random() * 0.3,
+            'rgba(120,100,70,0.3)',
+            1.5 + Math.random(),
+            150 + Math.random() * 100,
+            false
+        ));
+    }
+
+    // Whip trail
+    whipTrail(x, y) {
+        this.particles.push(new Particle(
+            x + (Math.random() - 0.5) * 6,
+            y + (Math.random() - 0.5) * 6,
+            (Math.random() - 0.5) * 0.5,
+            (Math.random() - 0.5) * 0.5,
+            'rgba(200,160,80,0.5)',
+            2,
+            100,
+            false
+        ));
+    }
+
+    // Key collect sparkle
+    keyCollect(x, y) {
+        for (let i = 0; i < 20; i++) {
+            const angle = (i / 20) * Math.PI * 2;
+            const speed = 1.5 + Math.random() * 2;
+            this.particles.push(new Particle(
+                x, y,
+                Math.cos(angle) * speed,
+                Math.sin(angle) * speed,
+                i % 3 === 0 ? COLORS.gold : i % 3 === 1 ? COLORS.goldShine : '#fff',
+                2 + Math.random() * 3,
+                500 + Math.random() * 300
+            ));
+        }
+        this.flash(COLORS.gold, 0.2);
+    }
+
+    // Door open effect
+    doorOpen(x, y) {
+        for (let i = 0; i < 25; i++) {
+            const angle = (i / 25) * Math.PI * 2;
+            const speed = 1 + Math.random() * 3;
+            this.particles.push(new Particle(
+                x, y,
+                Math.cos(angle) * speed,
+                Math.sin(angle) * speed - 1,
+                COLORS.gold,
+                3 + Math.random() * 3,
+                600 + Math.random() * 400
+            ));
+        }
+    }
+
+    // Level complete effect
+    levelComplete(x, y) {
+        for (let i = 0; i < 40; i++) {
+            const angle = (i / 40) * Math.PI * 2;
+            const speed = 2 + Math.random() * 4;
+            const colors = ['#ffd700', '#ff8800', '#ffcc00', '#fff'];
+            this.particles.push(new Particle(
+                x, y,
+                Math.cos(angle) * speed,
+                Math.sin(angle) * speed - 2,
+                colors[i % colors.length],
+                3 + Math.random() * 4,
+                800 + Math.random() * 400
+            ));
+        }
+        this.flash(COLORS.gold, 0.4);
+    }
+
+    shake(intensity, duration) {
+        this.shakeIntensity = Math.max(this.shakeIntensity, intensity);
+        this.shakeDuration = Math.max(this.shakeDuration, duration);
+    }
+
+    flash(color, alpha) {
+        this.flashColor = color;
+        this.flashAlpha = Math.max(this.flashAlpha, alpha);
+    }
+
+    renderFlash(ctx, w, h) {
+        if (this.flashAlpha > 0) {
+            ctx.globalAlpha = Math.min(1, this.flashAlpha);
+            ctx.fillStyle = this.flashColor;
+            ctx.fillRect(0, 0, w, h);
+            ctx.globalAlpha = 1;
+        }
+    }
+
+    renderParticles(ctx) {
+        for (const p of this.particles) {
+            p.render(ctx);
+        }
+    }
+}
+
+// === ./ui.js ===
+// ui.js - UI overlays and HUD
+
+class UI {
+    constructor(canvas) {
+        this.canvas = canvas;
+        this.overlay = 'start'; // 'start', 'gameover', 'shop', 'none'
+        this.selectedShopItem = 0;
+        this.transitionAlpha = 0;
+        this.transitionDir = 0; // 1 = fading in, -1 = fading out
+        this.transitionCallback = null;
+        this.shopItems = [];
+        this.shopPlayer = null;
+        this.shopMessage = '';
+        this.shopMessageTimer = 0;
+        this.deathStats = null;
+        this.levelStartTimer = 0;
+        this.levelStartText = '';
+        this.compassAngle = 0;
+        this.tutorialText = '';
+        this.tutorialTimer = 0;
+    }
+
+    showStart() {
+        this.overlay = 'start';
+    }
+
+    showGameOver(stats) {
+        this.overlay = 'gameover';
+        this.deathStats = stats;
+    }
+
+    showShop(items, player) {
+        this.overlay = 'shop';
+        this.shopItems = items;
+        this.shopPlayer = player;
+        this.selectedShopItem = 0;
+    }
+
+    hideShop() {
+        this.overlay = 'none';
+    }
+
+    hide() {
+        this.overlay = 'none';
+    }
+
+    showLevelStart(text) {
+        this.levelStartText = text;
+        this.levelStartTimer = 2000;
+    }
+
+    showTutorial(text) {
+        this.tutorialText = text;
+        this.tutorialTimer = 3000;
+    }
+
+    update(dt) {
+        if (this.levelStartTimer > 0) this.levelStartTimer -= dt;
+        if (this.tutorialTimer > 0) this.tutorialTimer -= dt;
+        if (this.shopMessageTimer > 0) this.shopMessageTimer -= dt;
+        if (this.transitionDir !== 0) {
+            this.transitionAlpha += this.transitionDir * dt * 0.003;
+            if (this.transitionAlpha >= 1 && this.transitionDir === 1) {
+                this.transitionAlpha = 1;
+                if (this.transitionCallback) {
+                    this.transitionCallback();
+                    this.transitionCallback = null;
+                }
+                this.transitionDir = -1;
+            }
+            if (this.transitionAlpha <= 0 && this.transitionDir === -1) {
+                this.transitionAlpha = 0;
+                this.transitionDir = 0;
+            }
+        }
+    }
+
+    transition(callback) {
+        this.transitionDir = 1;
+        this.transitionAlpha = 0;
+        this.transitionCallback = callback;
+    }
+
+    renderHUD(ctx, player, level, timeBonus, viewW, viewH) {
+        const pad = 8;
+        const barH = 36;
+
+        // HUD background
+        ctx.fillStyle = COLORS.hudBg;
+        ctx.fillRect(0, 0, viewW, barH);
+        ctx.strokeStyle = COLORS.hudBorder;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(0, barH);
+        ctx.lineTo(viewW, barH);
+        ctx.stroke();
+
+        ctx.font = 'bold 11px monospace';
+
+        // HP
+        const hpX = pad;
+        for (let i = 0; i < player.maxHp; i++) {
+            const hx = hpX + i * 16;
+            ctx.fillStyle = i < player.hp ? '#cc3333' : '#331111';
+            ctx.beginPath();
+            ctx.arc(hx + 5, 12, 4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(hx + 11, 12, 4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(hx + 1, 14);
+            ctx.lineTo(hx + 8, 22);
+            ctx.lineTo(hx + 15, 14);
+            ctx.fill();
+        }
+
+        // Gold/Score
+        const scoreX = hpX + player.maxHp * 16 + 20;
+        ctx.fillStyle = COLORS.gold;
+        ctx.fillRect(scoreX, 10, 8, 8);
+        ctx.fillStyle = COLORS.hudText;
+        ctx.fillText(`${player.gold}`, scoreX + 12, 18);
+
+        // Ropes
+        const ropeX = scoreX + 80;
+        ctx.fillStyle = COLORS.ropePickup;
+        ctx.beginPath();
+        ctx.arc(ropeX + 5, 14, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = COLORS.hudText;
+        ctx.fillText(`${player.ropes}`, ropeX + 12, 18);
+
+        // Bombs
+        const bombX = ropeX + 40;
+        ctx.fillStyle = COLORS.bomb;
+        ctx.beginPath();
+        ctx.arc(bombX + 5, 14, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = COLORS.hudText;
+        ctx.fillText(`${player.bombs}`, bombX + 12, 18);
+
+        // Key indicator
+        if (player.hasKey) {
+            const keyX = bombX + 40;
+            ctx.fillStyle = COLORS.gold;
+            ctx.beginPath();
+            ctx.arc(keyX + 4, 12, 3, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = COLORS.bg;
+            ctx.beginPath();
+            ctx.arc(keyX + 4, 12, 1.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = COLORS.gold;
+            ctx.fillRect(keyX + 6, 11, 6, 2);
+            ctx.fillRect(keyX + 10, 13, 2, 2);
+        }
+
+        // Level depth
+        ctx.fillStyle = COLORS.uiAccent;
+        ctx.textAlign = 'right';
+        ctx.fillText(`深度 ${level.depth}`, viewW - pad, 14);
+
+        // Time bonus
+        if (timeBonus > 0) {
+            ctx.fillStyle = COLORS.hudText;
+            ctx.fillText(`时间奖励: ${timeBonus}`, viewW - pad, 28);
+        }
+        ctx.textAlign = 'left';
+
+        // Compass indicator (if player has compass)
+        if (player.hasCompass) {
+            this._renderCompass(ctx, player, level, viewW, viewH);
+        }
+
+        // Level start text
+        if (this.levelStartTimer > 0) {
+            const alpha = Math.min(1, this.levelStartTimer / 300);
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = COLORS.uiAccent;
+            ctx.font = 'bold 24px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText(this.levelStartText, viewW / 2, viewH / 2);
+            ctx.textAlign = 'left';
+            ctx.globalAlpha = 1;
+        }
+
+        // Tutorial text
+        if (this.tutorialTimer > 0) {
+            const alpha = Math.min(1, this.tutorialTimer / 500);
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = 'rgba(15,8,3,0.85)';
+            const tw = ctx.measureText(this.tutorialText).width + 20;
+            ctx.fillRect(viewW / 2 - tw / 2, viewH - 60, tw, 24);
+            ctx.strokeStyle = COLORS.uiAccent;
+            ctx.lineWidth = 1;
+            ctx.strokeRect(viewW / 2 - tw / 2, viewH - 60, tw, 24);
+            ctx.fillStyle = COLORS.hudText;
+            ctx.font = '11px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText(this.tutorialText, viewW / 2, viewH - 44);
+            ctx.textAlign = 'left';
+            ctx.globalAlpha = 1;
+        }
+    }
+
+    _renderCompass(ctx, player, level, viewW, viewH) {
+        const doorX = level.exitDoor.x;
+        const doorY = level.exitDoor.y;
+        const dx = doorX - player.x;
+        const dy = doorY - player.y;
+        const angle = Math.atan2(dy, dx);
+        const dist = Math.hypot(dx, dy);
+
+        const cx = viewW - 40;
+        const cy = viewH - 40;
+        const r = 12;
+
+        ctx.fillStyle = 'rgba(15,8,3,0.7)';
+        ctx.beginPath();
+        ctx.arc(cx, cy, r + 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = COLORS.uiAccent;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r + 4, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Arrow
+        ctx.fillStyle = level.doorOpen ? COLORS.uiSuccess : COLORS.gold;
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(angle);
+        ctx.beginPath();
+        ctx.moveTo(r, 0);
+        ctx.lineTo(-4, -4);
+        ctx.lineTo(-2, 0);
+        ctx.lineTo(-4, 4);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+
+        // Distance
+        ctx.fillStyle = COLORS.hudText;
+        ctx.font = '8px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(`${Math.floor(dist / TILE)}`, cx, cy + r + 12);
+        ctx.textAlign = 'left';
+    }
+
+    renderStartOverlay(ctx, viewW, viewH) {
+        // Background
+        ctx.fillStyle = 'rgba(10,5,2,0.95)';
+        ctx.fillRect(0, 0, viewW, viewH);
+
+        // Title
+        const titleY = viewH * 0.25;
+        ctx.fillStyle = COLORS.gold;
+        ctx.font = 'bold 42px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('矿洞探险', viewW / 2, titleY);
+
+        // Subtitle
+        ctx.fillStyle = COLORS.uiAccent;
+        ctx.font = '16px monospace';
+        ctx.fillText('CAVE EXPLORER', viewW / 2, titleY + 30);
+
+        // Decorative line
+        ctx.strokeStyle = COLORS.uiAccent;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(viewW / 2 - 120, titleY + 42);
+        ctx.lineTo(viewW / 2 + 120, titleY + 42);
+        ctx.stroke();
+
+        // Character preview
+        const charY = titleY + 70;
+        ctx.fillStyle = COLORS.playerBandana;
+        ctx.fillRect(viewW / 2 - 8, charY, 16, 4);
+        ctx.fillStyle = COLORS.playerSkin;
+        ctx.fillRect(viewW / 2 - 7, charY + 4, 14, 10);
+        ctx.fillStyle = COLORS.player;
+        ctx.fillRect(viewW / 2 - 7, charY + 14, 14, 16);
+        ctx.fillStyle = COLORS.playerEye;
+        ctx.fillRect(viewW / 2 + 1, charY + 7, 2, 3);
+        ctx.fillRect(viewW / 2 + 4, charY + 7, 2, 3);
+
+        // Start button
+        const btnY = titleY + 140;
+        const btnW = 180;
+        const btnH = 40;
+        const pulse = 0.8 + Math.sin(Date.now() / 400) * 0.2;
+        ctx.fillStyle = `rgba(180,140,60,${0.15 * pulse})`;
+        ctx.fillRect(viewW / 2 - btnW / 2, btnY, btnW, btnH);
+        ctx.strokeStyle = COLORS.uiAccent;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(viewW / 2 - btnW / 2, btnY, btnW, btnH);
+        ctx.fillStyle = COLORS.gold;
+        ctx.font = 'bold 18px monospace';
+        ctx.fillText('点击或按 SPACE 开始', viewW / 2, btnY + 26);
+
+        // Help box
+        const helpY = btnY + 60;
+        ctx.fillStyle = 'rgba(30,20,10,0.8)';
+        ctx.fillRect(viewW / 2 - 200, helpY, 400, 160);
+        ctx.strokeStyle = COLORS.hudBorder;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(viewW / 2 - 200, helpY, 400, 160);
+
+        ctx.fillStyle = COLORS.uiAccent;
+        ctx.font = 'bold 13px monospace';
+        ctx.fillText('操作说明', viewW / 2, helpY + 20);
+
+        ctx.fillStyle = COLORS.hudText;
+        ctx.font = '11px monospace';
+        const helpLines = [
+            'A/D 或 方向键 - 移动',
+            'W/上键 - 攀爬梯子',
+            'SPACE - 跳跃 (墙壁可蹬墙跳)',
+            'SHIFT/V - 鞭子攻击',
+            'Z - 放置炸弹',
+            'C - 投掷绳索',
+            '找到钥匙 → 到达出口 → 进入下一层',
+            '收集黄金和宝石！死亡即永久失败！',
+        ];
+        for (let i = 0; i < helpLines.length; i++) {
+            ctx.fillText(helpLines[i], viewW / 2, helpY + 38 + i * 15);
+        }
+
+        ctx.textAlign = 'left';
+    }
+
+    renderGameOver(ctx, viewW, viewH) {
+        // Background
+        ctx.fillStyle = 'rgba(10,5,2,0.92)';
+        ctx.fillRect(0, 0, viewW, viewH);
+
+        const centerY = viewH * 0.3;
+
+        // Title
+        ctx.fillStyle = COLORS.uiDanger;
+        ctx.font = 'bold 36px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('探险结束', viewW / 2, centerY);
+
+        // Stats
+        if (this.deathStats) {
+            ctx.fillStyle = COLORS.hudText;
+            ctx.font = '16px monospace';
+            const stats = [
+                `到达深度: ${this.deathStats.depth}`,
+                `收集黄金: ${this.deathStats.gold}`,
+                `消灭敌人: ${this.deathStats.kills}`,
+            ];
+            for (let i = 0; i < stats.length; i++) {
+                ctx.fillText(stats[i], viewW / 2, centerY + 50 + i * 28);
+            }
+
+            // High score
+            ctx.fillStyle = COLORS.gold;
+            ctx.font = 'bold 14px monospace';
+            ctx.fillText(`最高纪录: ${this.deathStats.highScore}`, viewW / 2, centerY + 140);
+        }
+
+        // Restart button
+        const btnY = centerY + 170;
+        const pulse = 0.8 + Math.sin(Date.now() / 400) * 0.2;
+        ctx.fillStyle = `rgba(180,140,60,${0.15 * pulse})`;
+        ctx.fillRect(viewW / 2 - 120, btnY, 240, 36);
+        ctx.strokeStyle = COLORS.uiAccent;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(viewW / 2 - 120, btnY, 240, 36);
+        ctx.fillStyle = COLORS.gold;
+        ctx.font = 'bold 14px monospace';
+        ctx.fillText('点击或按 SPACE 重新开始', viewW / 2, btnY + 24);
+
+        ctx.textAlign = 'left';
+    }
+
+    renderShopOverlay(ctx, viewW, viewH) {
+        // Semi-transparent background
+        ctx.fillStyle = 'rgba(10,5,2,0.85)';
+        ctx.fillRect(0, 0, viewW, viewH);
+
+        const panelW = 400;
+        const panelH = 320;
+        const panelX = (viewW - panelW) / 2;
+        const panelY = (viewH - panelH) / 2;
+
+        // Panel
+        ctx.fillStyle = COLORS.uiBg;
+        ctx.fillRect(panelX, panelY, panelW, panelH);
+        ctx.strokeStyle = COLORS.uiBorder;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(panelX, panelY, panelW, panelH);
+
+        // Title
+        ctx.fillStyle = COLORS.gold;
+        ctx.font = 'bold 20px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('商店', viewW / 2, panelY + 30);
+
+        // Gold display
+        ctx.fillStyle = COLORS.hudText;
+        ctx.font = '14px monospace';
+        ctx.fillText(`持有黄金: ${this.shopPlayer?.gold || 0}`, viewW / 2, panelY + 52);
+
+        // Shop items
+        if (this.shopItems) {
+            for (let i = 0; i < this.shopItems.length; i++) {
+                const item = this.shopItems[i];
+                const iy = panelY + 70 + i * 42;
+                const selected = i === this.selectedShopItem;
+                const purchased = item.purchased;
+
+                // Item row
+                ctx.fillStyle = selected ? 'rgba(180,140,60,0.15)' : 'rgba(40,25,10,0.5)';
+                ctx.fillRect(panelX + 10, iy, panelW - 20, 36);
+                if (selected) {
+                    ctx.strokeStyle = COLORS.uiAccent;
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(panelX + 10, iy, panelW - 20, 36);
+                }
+
+                // Item name
+                ctx.fillStyle = purchased ? '#555' : COLORS.hudText;
+                ctx.font = '13px monospace';
+                ctx.textAlign = 'left';
+                ctx.fillText(item.name, panelX + 20, iy + 22);
+
+                // Cost
+                ctx.fillStyle = purchased ? '#555' : COLORS.gold;
+                ctx.textAlign = 'right';
+                ctx.fillText(purchased ? '已购' : `$${item.cost}`, panelX + panelW - 20, iy + 22);
+                ctx.textAlign = 'left';
+            }
+        }
+
+        // Shop message
+        if (this.shopMessageTimer > 0) {
+            ctx.fillStyle = COLORS.uiDanger;
+            ctx.font = '12px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText(this.shopMessage, viewW / 2, panelY + panelH - 30);
+            ctx.textAlign = 'left';
+        }
+
+        // Instructions
+        ctx.fillStyle = COLORS.hudText;
+        ctx.font = '11px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('上下键选择  SPACE购买  ESC离开', viewW / 2, panelY + panelH - 12);
+        ctx.textAlign = 'left';
+    }
+
+    renderTransition(ctx, viewW, viewH) {
+        if (this.transitionAlpha > 0) {
+            ctx.globalAlpha = Math.min(1, this.transitionAlpha);
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, viewW, viewH);
+            ctx.globalAlpha = 1;
+        }
+    }
+}
+
+// === main.js ===
+// main.js - Game loop, camera, collision, initialization
+
+class Game {
+    constructor() {
+        this.canvas = document.getElementById('gameCanvas');
+        this.ctx = this.canvas.getContext('2d');
+        this.viewW = this.canvas.width;
+        this.viewH = this.canvas.height;
+
+        // Disable image smoothing for crisp pixels
+        this.ctx.imageSmoothingEnabled = false;
+
+        this.state = 'start'; // 'start', 'playing', 'shop', 'gameover'
+        this.level = null;
+        this.player = null;
+        this.enemyMgr = new EnemyManager();
+        this.itemMgr = new ItemManager();
+        this.effects = new Effects();
+        this.ui = new UI(this.canvas);
+        this.shop = null;
+
+        // Camera
+        this.camX = 0;
+        this.camY = 0;
+        this.camTargetX = 0;
+        this.camTargetY = 0;
+
+        // Game stats
+        this.depth = 1;
+        this.totalGold = 0;
+        this.totalKills = 0;
+        this.timeBonus = 0;
+        this.levelTime = 0;
+        this.maxLevelTime = 60000; // 60 seconds for time bonus
+
+        // High score
+        this.highScore = parseInt(localStorage.getItem('spelunky_highscore') || '0');
+
+        // Darkness overlay canvas
+        this.darkCanvas = document.createElement('canvas');
+        this.darkCanvas.width = this.viewW;
+        this.darkCanvas.height = this.viewH;
+        this.darkCtx = this.darkCanvas.getContext('2d');
+
+        // Previous grounded state for landing detection
+        this.wasGrounded = false;
+
+        // Keys for shop/start
+        this._shopKeyHandler = null;
+        this._startKeyHandler = null;
+
+        // Animation frame
+        this.lastTime = 0;
+        this.running = false;
+
+        this.ui.showStart();
+        this._setupStartInput();
+        this._loop = this._loop.bind(this);
+    }
+
+    _setupStartInput() {
+        const keyHandler = (e) => {
+            if (e.code === 'Space' && this.state === 'start') {
+                e.preventDefault();
+                window.removeEventListener('keydown', keyHandler);
+                this.canvas.removeEventListener('click', clickHandler);
+                Sound.jump();
+                this.ui.transition(() => {
+                    this.startGame();
+                });
+            }
+        };
+        const clickHandler = (e) => {
+            if (this.state === 'start') {
+                e.preventDefault();
+                window.removeEventListener('keydown', keyHandler);
+                this.canvas.removeEventListener('click', clickHandler);
+                Sound.jump();
+                this.ui.transition(() => {
+                    this.startGame();
+                });
+            }
+        };
+        window.addEventListener('keydown', keyHandler);
+        this.canvas.addEventListener('click', clickHandler);
+    }
+
+    _setupGameOverInput() {
+        const keyHandler = (e) => {
+            if (e.code === 'Space' && this.state === 'gameover') {
+                e.preventDefault();
+                window.removeEventListener('keydown', keyHandler);
+                this.canvas.removeEventListener('click', clickHandler);
+                Sound.jump();
+                this.ui.transition(() => {
+                    this.startGame();
+                });
+            }
+        };
+        const clickHandler = (e) => {
+            if (this.state === 'gameover') {
+                e.preventDefault();
+                window.removeEventListener('keydown', keyHandler);
+                this.canvas.removeEventListener('click', clickHandler);
+                Sound.jump();
+                this.ui.transition(() => {
+                    this.startGame();
+                });
+            }
+        };
+        window.addEventListener('keydown', keyHandler);
+        this.canvas.addEventListener('click', clickHandler);
+    }
+
+    _setupShopInput() {
+        if (this._shopKeyHandler) {
+            window.removeEventListener('keydown', this._shopKeyHandler);
+        }
+        this._shopKeyHandler = (e) => {
+            if (this.state !== 'shop') return;
+            e.preventDefault();
+
+            if (e.code === 'ArrowUp' || e.code === 'KeyW') {
+                this.ui.selectedShopItem = Math.max(0, this.ui.selectedShopItem - 1);
+                Sound.tick();
+            } else if (e.code === 'ArrowDown' || e.code === 'KeyS') {
+                this.ui.selectedShopItem = Math.min(this.shop.items.length - 1, this.ui.selectedShopItem + 1);
+                Sound.tick();
+            } else if (e.code === 'Space' || e.code === 'KeyX') {
+                const item = this.shop.items[this.ui.selectedShopItem];
+                if (item) {
+                    const bought = this.shop.tryBuy(item, this.player);
+                    if (!bought) {
+                        this.ui.shopMessage = '金币不足！';
+                        this.ui.shopMessageTimer = 1500;
+                    }
+                }
+            } else if (e.code === 'Escape' || e.code === 'KeyZ') {
+                this.closeShop();
+            }
+        };
+        window.addEventListener('keydown', this._shopKeyHandler);
+    }
+
+    startGame() {
+        this.state = 'playing';
+        this.depth = 1;
+        this.totalGold = 0;
+        this.totalKills = 0;
+        this.timeBonus = 0;
+        this.ui.hide();
+        this._generateLevel();
+    }
+
+    _generateLevel() {
+        this.level = new Level(this.depth);
+        this.player = new Player(this.level.playerStart.x, this.level.playerStart.y);
+        this.enemyMgr.clear();
+        this.enemyMgr.spawnFromLevel(this.level);
+        this.itemMgr.clear();
+        this.itemMgr.spawnFromLevel(this.level);
+        this.shop = null;
+
+        // Create shop if it's every 3rd level
+        if (this.depth % 3 === 0 && this.level.rooms && this.level.rooms.length > 2) {
+            const rng = new RNG(Date.now() + this.depth * 1337);
+            this.shop = new Shop(this.level, rng);
+            // Place shop in a mid-level room (not the first or last)
+            const shopRoomIdx = Math.floor(this.level.rooms.length / 2);
+            const shopRoom = this.level.rooms[shopRoomIdx];
+            this.shop.placeInRoom(shopRoom, TILE);
+
+            // Mark shop floor and walls in tiles
+            for (let x = shopRoom.x; x < shopRoom.x + shopRoom.w; x++) {
+                if (shopRoom.y + shopRoom.h - 1 < this.level.rows) {
+                    this.level.tiles[shopRoom.y + shopRoom.h - 1][x] = T.SHOP_FLOOR;
+                }
+            }
+        }
+
+        this.effects = new Effects();
+        this.levelTime = 0;
+        this.timeBonus = 0;
+
+        // Center camera immediately
+        this.camX = this.player.x - this.viewW / 2;
+        this.camY = this.player.y - this.viewH / 2;
+        this._clampCamera();
+
+        this.ui.showLevelStart(`深度 ${this.depth}`);
+
+        if (this.depth === 1) {
+            this.ui.showTutorial('方向键移动 | SPACE跳跃 | SHIFT攻击 | Z炸弹 | C绳索');
+        }
+    }
+
+    _loop(time) {
+        if (!this.running) return;
+
+        const dt = Math.min(time - this.lastTime, 50); // Cap at 50ms
+        this.lastTime = time;
+
+        this.update(dt);
+        this.render();
+
+        requestAnimationFrame(this._loop);
+    }
+
+    start() {
+        this.running = true;
+        this.lastTime = performance.now();
+        requestAnimationFrame(this._loop);
+    }
+
+    update(dt) {
+        this.ui.update(dt);
+
+        if (this.state !== 'playing') return;
+
+        this.levelTime += dt;
+
+        // Update player
+        const prevHp = this.player.hp;
+        const prevGold = this.player.gold;
+        const prevHasKey = this.player.hasKey;
+        const prevRopes = this.player.ropes;
+        const prevBombs = this.player.bombs;
+        const wantAction = this.player.input.actionPressed;
+
+        this.player.update(dt, this.level, Sound);
+
+        // Check bomb explosions for effects
+        for (const bomb of this.player.activeBombs) {
+            if (bomb.exploded && bomb.explosionX !== undefined) {
+                this.effects.explosion(bomb.explosionX, bomb.explosionY, 1.5);
+                // Check if explosion hits enemies
+                for (const enemy of this.enemyMgr.enemies) {
+                    const dist = Math.hypot(enemy.x - bomb.explosionX, enemy.y - bomb.explosionY);
+                    if (dist < BOMB_RADIUS * TILE) {
+                        enemy.takeDamage(99);
+                        this.totalKills++;
+                        this.effects.enemyDeath(enemy.x, enemy.y, COLORS[enemy.type] || '#888');
+                        this.player.gold += enemy.score;
+                        this.itemMgr.addFloatingText(enemy.x, enemy.y - 10, `+${enemy.score}`);
+                    }
+                }
+                bomb.explosionX = undefined; // Prevent re-triggering
+            }
+        }
+
+        // Landing dust
+        if (this.player.grounded && !this.wasGrounded) {
+            this.effects.landingDust(this.player.x, this.player.y + this.player.h);
+        }
+        this.wasGrounded = this.player.grounded;
+
+        // Walk dust
+        if (this.player.grounded && Math.abs(this.player.vx) > 0.5) {
+            this.effects.walkDust(
+                this.player.x - this.player.facing * 5,
+                this.player.y + this.player.h,
+                this.player.facing
+            );
+        }
+
+        // Player hurt effect
+        if (this.player.hp < prevHp && !this.player.dead) {
+            this.effects.playerHurt(this.player.x, this.player.y + this.player.h / 2);
+        }
+
+        // Player death
+        if (this.player.dead) {
+            this.effects.explosion(this.player.x, this.player.y + this.player.h / 2, 2);
+            this._gameOver();
+            return;
+        }
+
+        // Update enemies
+        this.enemyMgr.update(dt, this.level, this.player.x, this.player.y);
+
+        // Enemy-player collision
+        for (const enemy of this.enemyMgr.enemies) {
+            if (enemy.dead) continue;
+            const ehb = enemy.getHitbox();
+            const phb = this.player.getHitbox();
+            if (this._boxOverlap(ehb, phb)) {
+                // Check if player is stomping (falling on top)
+                if (this.player.vy > 0 && this.player.y + this.player.h < enemy.y + enemy.h * 0.5) {
+                    enemy.takeDamage(1);
+                    this.player.vy = -6; // Bounce
+                    this.totalKills++;
+                    this.effects.enemyDeath(enemy.x, enemy.y + enemy.h / 2, COLORS[enemy.type] || '#888');
+                    this.player.gold += enemy.score;
+                    this.itemMgr.addFloatingText(enemy.x, enemy.y - 10, `+${enemy.score}`);
+                } else {
+                    this.player.takeDamage(enemy.damage, this.level);
+                }
+            }
+
+            // Whip hit
+            const whipBox = this.player.getWhipHitbox();
+            if (whipBox && !enemy.dead) {
+                if (this._boxOverlap(whipBox, ehb)) {
+                    enemy.takeDamage(1);
+                    this.totalKills++;
+                    this.effects.enemyDeath(enemy.x, enemy.y + enemy.h / 2, COLORS[enemy.type] || '#888');
+                    this.player.gold += enemy.score;
+                    this.itemMgr.addFloatingText(enemy.x, enemy.y - 10, `+${enemy.score}`);
+                    Sound.enemyDie();
+                }
+            }
+        }
+
+        // Update items
+        this.itemMgr.update(dt);
+
+        // Item collection
+        for (const item of this.itemMgr.items) {
+            if (item.collected) continue;
+            const ihb = item.getHitbox();
+            const phb = this.player.getHitbox();
+            if (this._boxOverlap(ihb, phb)) {
+                item.collected = true;
+                this._collectItem(item);
+            }
+        }
+
+        // Arrow traps
+        this._updateArrowTraps(dt);
+
+        // Shop interaction (press X near shopkeeper)
+        if (this.shop && this.shop.shopkeeper && wantAction) {
+            const sx = this.shop.shopkeeper.x;
+            const sy = this.shop.shopkeeper.y;
+            const dist = Math.hypot(this.player.x - sx, this.player.y - sy);
+            if (dist < TILE * 2) {
+                this.openShop();
+            }
+        }
+
+        // Door interaction
+        const doorCol = Math.floor(this.level.exitDoor.x / TILE);
+        const doorRow = Math.floor(this.level.exitDoor.y / TILE);
+        const playerCol = Math.floor(this.player.x / TILE);
+        const playerRow = Math.floor((this.player.y + this.player.h / 2) / TILE);
+
+        if (Math.abs(playerCol - doorCol) <= 1 && Math.abs(playerRow - doorRow) <= 1) {
+            if (this.player.hasKey && !this.level.doorOpen) {
+                this.level.doorOpen = true;
+                Sound.doorOpen();
+                this.effects.doorOpen(this.level.exitDoor.x + TILE / 2, this.level.exitDoor.y + TILE / 2);
+            }
+            if (this.level.doorOpen) {
+                // Enter door
+                if (Math.abs(this.player.x - (doorCol * TILE + TILE / 2)) < TILE * 0.7 &&
+                    Math.abs(this.player.y - (doorRow * TILE)) < TILE) {
+                    this._nextLevel();
+                }
+            }
+        }
+
+        // Effects
+        this.effects.update(dt);
+
+        // Camera
+        this._updateCamera(dt);
+    }
+
+    _collectItem(item) {
+        const cfg = ITEM_VALUES[item.type];
+        if (!cfg) return;
+
+        switch (item.type) {
+            case 'gold_nugget':
+            case 'gold_bar':
+                this.player.gold += cfg.value;
+                Sound.collectGold();
+                this.effects.goldCollect(item.x, item.y);
+                this.itemMgr.addFloatingText(item.x, item.y - 10, `+${cfg.value}`);
+                break;
+            case 'gem_ruby':
+            case 'gem_emerald':
+            case 'gem_sapphire':
+                this.player.gold += cfg.value;
+                Sound.collectGem();
+                const gemColor = item.type === 'gem_ruby' ? COLORS.gemRuby :
+                    item.type === 'gem_emerald' ? COLORS.gemEmerald : COLORS.gemSapphire;
+                this.effects.gemCollect(item.x, item.y, gemColor);
+                this.itemMgr.addFloatingText(item.x, item.y - 10, `+${cfg.value}`);
+                break;
+            case 'key':
+                this.player.hasKey = true;
+                Sound.collectKey();
+                this.effects.keyCollect(item.x, item.y);
+                this.itemMgr.addFloatingText(item.x, item.y - 15, '钥匙!', COLORS.gold);
+                break;
+            case 'rope_pickup':
+                this.player.ropes += cfg.ropeAmount;
+                Sound.collectItem();
+                this.itemMgr.addFloatingText(item.x, item.y - 10, `+${cfg.ropeAmount}绳索`);
+                break;
+            case 'bomb_pickup':
+                this.player.bombs += cfg.bombAmount;
+                Sound.collectItem();
+                this.itemMgr.addFloatingText(item.x, item.y - 10, `+${cfg.bombAmount}炸弹`);
+                break;
+            case 'health':
+                if (this.player.hp < this.player.maxHp) {
+                    this.player.heal(cfg.healAmount);
+                    Sound.collectItem();
+                    this.itemMgr.addFloatingText(item.x, item.y - 10, '+1生命', COLORS.uiSuccess);
+                } else {
+                    item.collected = false; // Don't consume if full HP
+                }
+                break;
+            case 'chest':
+                this.player.gold += cfg.value;
+                Sound.collectGold();
+                this.effects.goldCollect(item.x, item.y);
+                this.itemMgr.addFloatingText(item.x, item.y - 10, `+${cfg.value}`, COLORS.gold);
+                break;
+        }
+    }
+
+    _updateArrowTraps(dt) {
+        for (const trap of this.level.traps) {
+            if (trap.type !== 'arrow' || trap.fired) continue;
+
+            const dist = Math.abs(this.player.x - trap.x);
+            if (dist < 3 * TILE) {
+                trap.fired = true;
+                Sound.arrowShoot();
+                // Create arrow projectile
+                const arrow = {
+                    x: trap.x + (trap.dir > 0 ? TILE : 0),
+                    y: trap.y + TILE / 2,
+                    vx: trap.dir * 6,
+                    vy: 0,
+                    life: 2000,
+                    active: true
+                };
+                if (!this.level.arrows) this.level.arrows = [];
+                this.level.arrows.push(arrow);
+            }
+        }
+
+        // Update arrows
+        if (this.level.arrows) {
+            for (const arrow of this.level.arrows) {
+                if (!arrow.active) continue;
+                arrow.x += arrow.vx;
+                arrow.life -= dt;
+                if (arrow.life <= 0) {
+                    arrow.active = false;
+                    continue;
+                }
+                // Hit solid
+                const col = Math.floor(arrow.x / TILE);
+                const row = Math.floor(arrow.y / TILE);
+                if (this.level.isSolid(col, row)) {
+                    arrow.active = false;
+                    continue;
+                }
+                // Hit player
+                const phb = this.player.getHitbox();
+                if (arrow.x > phb.x && arrow.x < phb.x + phb.w &&
+                    arrow.y > phb.y && arrow.y < phb.y + phb.h) {
+                    this.player.takeDamage(1, this.level);
+                    arrow.active = false;
+                }
+            }
+            this.level.arrows = this.level.arrows.filter(a => a.active);
+        }
+    }
+
+    _nextLevel() {
+        this.effects.levelComplete(this.player.x, this.player.y);
+        Sound.levelComplete();
+
+        // Calculate time bonus
+        const timeLeft = Math.max(0, this.maxLevelTime - this.levelTime);
+        this.timeBonus += Math.floor(timeLeft / 100);
+
+        this.depth++;
+        this.totalGold = this.player.gold;
+
+        this.ui.transition(() => {
+            this._generateLevel();
+        });
+    }
+
+    _gameOver() {
+        this.state = 'gameover';
+        this.totalGold = this.player.gold;
+
+        // Update high score
+        if (this.totalGold > this.highScore) {
+            this.highScore = this.totalGold;
+            localStorage.setItem('spelunky_highscore', String(this.highScore));
+        }
+
+        this.ui.showGameOver({
+            depth: this.depth,
+            gold: this.totalGold,
+            kills: this.totalKills,
+            highScore: this.highScore
+        });
+
+        this._setupGameOverInput();
+    }
+
+    openShop() {
+        if (this.state !== 'playing') return;
+        this.state = 'shop';
+        this.ui.showShop(this.shop.items, this.player);
+        this._setupShopInput();
+    }
+
+    closeShop() {
+        if (this.state !== 'shop') return;
+        this.state = 'playing';
+        this.ui.hideShop();
+        if (this._shopKeyHandler) {
+            window.removeEventListener('keydown', this._shopKeyHandler);
+            this._shopKeyHandler = null;
+        }
+    }
+
+    _updateCamera(dt) {
+        const targetX = this.player.x - this.viewW / 2;
+        const targetY = this.player.y - this.viewH / 2 + 30;
+
+        // Smooth follow
+        this.camX += (targetX - this.camX) * 0.08;
+        this.camY += (targetY - this.camY) * 0.08;
+
+        this._clampCamera();
+    }
+
+    _clampCamera() {
+        const maxX = this.level.cols * TILE - this.viewW;
+        const maxY = this.level.rows * TILE - this.viewH;
+        this.camX = Math.max(0, Math.min(maxX, this.camX));
+        this.camY = Math.max(0, Math.min(maxY, this.camY));
+    }
+
+    _boxOverlap(a, b) {
+        return a.x < b.x + b.w && a.x + a.w > b.x &&
+            a.y < b.y + b.h && a.y + a.h > b.y;
+    }
+
+    render() {
+        const ctx = this.ctx;
+        ctx.clearRect(0, 0, this.viewW, this.viewH);
+
+        // Background gradient
+        const bgGrad = ctx.createLinearGradient(0, 0, 0, this.viewH);
+        bgGrad.addColorStop(0, COLORS.bgGrad1);
+        bgGrad.addColorStop(1, COLORS.bgGrad2);
+        ctx.fillStyle = bgGrad;
+        ctx.fillRect(0, 0, this.viewW, this.viewH);
+
+        if (this.state === 'playing' || this.state === 'shop') {
+            ctx.save();
+
+            // Apply screen shake
+            const shake = this.effects.getShakeOffset();
+            const camX = Math.round(this.camX + shake.x);
+            const camY = Math.round(this.camY + shake.y);
+            ctx.translate(-camX, -camY);
+
+            // Render level
+            this.level.render(ctx, camX, camY, this.viewW, this.viewH);
+
+            // Render arrows
+            if (this.level.arrows) {
+                for (const arrow of this.level.arrows) {
+                    if (!arrow.active) continue;
+                    ctx.fillStyle = COLORS.arrow;
+                    ctx.save();
+                    ctx.translate(arrow.x, arrow.y);
+                    ctx.rotate(arrow.vx > 0 ? 0 : Math.PI);
+                    ctx.fillRect(-10, -1.5, 20, 3);
+                    // Arrowhead
+                    ctx.beginPath();
+                    ctx.moveTo(10, -4);
+                    ctx.lineTo(14, 0);
+                    ctx.lineTo(10, 4);
+                    ctx.fill();
+                    ctx.restore();
+                }
+            }
+
+            // Render items
+            this.itemMgr.render(ctx);
+
+            // Render shop
+            if (this.shop) {
+                this.shop.render(ctx);
+            }
+
+            // Render enemies
+            this.enemyMgr.render(ctx);
+
+            // Render player
+            this.player.render(ctx);
+
+            // Render particles
+            this.effects.renderParticles(ctx);
+
+            ctx.restore();
+
+            // Darkness overlay (torch radius effect)
+            this._renderDarkness(ctx, camX, camY);
+
+            // Flash
+            this.effects.renderFlash(ctx, this.viewW, this.viewH);
+
+            // HUD
+            this.ui.renderHUD(ctx, this.player, this.level, this.timeBonus, this.viewW, this.viewH);
+
+            // Shop overlay
+            if (this.state === 'shop') {
+                this.ui.renderShopOverlay(ctx, this.viewW, this.viewH);
+            }
+        }
+
+        // Overlays
+        if (this.state === 'start') {
+            this.ui.renderStartOverlay(ctx, this.viewW, this.viewH);
+        } else if (this.state === 'gameover') {
+            this.ui.renderGameOver(ctx, this.viewW, this.viewH);
+        }
+
+        // Transition
+        this.ui.renderTransition(ctx, this.viewW, this.viewH);
+    }
+
+    _renderDarkness(ctx, camX, camY) {
+        const dc = this.darkCtx;
+        dc.clearRect(0, 0, this.viewW, this.viewH);
+
+        // Fill with darkness
+        dc.fillStyle = 'rgba(10,5,0,0.65)';
+        dc.fillRect(0, 0, this.viewW, this.viewH);
+
+        // Cut out torch lights
+        dc.globalCompositeOperation = 'destination-out';
+
+        // Player torch
+        const px = Math.round(this.player.x - camX);
+        const py = Math.round(this.player.y + this.player.h / 2 - camY);
+        const torchRadius = 130;
+        const flicker = 0.9 + Math.sin(Date.now() / 100) * 0.1;
+
+        const grad = dc.createRadialGradient(px, py, 0, px, py, torchRadius * flicker);
+        grad.addColorStop(0, 'rgba(0,0,0,1)');
+        grad.addColorStop(0.7, 'rgba(0,0,0,0.6)');
+        grad.addColorStop(1, 'rgba(0,0,0,0)');
+        dc.fillStyle = grad;
+        dc.fillRect(px - torchRadius, py - torchRadius, torchRadius * 2, torchRadius * 2);
+
+        // Level torches
+        for (const torch of this.level.torchPositions) {
+            const tx = Math.round(torch.x - camX);
+            const ty = Math.round(torch.y - camY - 10);
+            const tRadius = 70 * flicker;
+
+            if (tx < -tRadius || tx > this.viewW + tRadius) continue;
+            if (ty < -tRadius || ty > this.viewH + tRadius) continue;
+
+            const tGrad = dc.createRadialGradient(tx, ty, 0, tx, ty, tRadius);
+            tGrad.addColorStop(0, 'rgba(0,0,0,0.8)');
+            tGrad.addColorStop(1, 'rgba(0,0,0,0)');
+            dc.fillStyle = tGrad;
+            dc.fillRect(tx - tRadius, ty - tRadius, tRadius * 2, tRadius * 2);
+        }
+
+        // Door glow (if open)
+        if (this.level.doorOpen) {
+            const dx = Math.round(this.level.exitDoor.x + TILE / 2 - camX);
+            const dy = Math.round(this.level.exitDoor.y + TILE / 2 - camY);
+            const dRadius = 80;
+            const dGrad = dc.createRadialGradient(dx, dy, 0, dx, dy, dRadius);
+            dGrad.addColorStop(0, 'rgba(0,0,0,0.9)');
+            dGrad.addColorStop(1, 'rgba(0,0,0,0)');
+            dc.fillStyle = dGrad;
+            dc.fillRect(dx - dRadius, dy - dRadius, dRadius * 2, dRadius * 2);
+        }
+
+        dc.globalCompositeOperation = 'source-over';
+
+        // Apply darkness overlay
+        ctx.drawImage(this.darkCanvas, 0, 0);
+
+        // Add warm torch tint
+        const warmGrad = ctx.createRadialGradient(px, py, 0, px, py, torchRadius * 1.5);
+        warmGrad.addColorStop(0, 'rgba(255,150,50,0.04)');
+        warmGrad.addColorStop(1, 'rgba(255,150,50,0)');
+        ctx.fillStyle = warmGrad;
+        ctx.fillRect(px - torchRadius * 1.5, py - torchRadius * 1.5, torchRadius * 3, torchRadius * 3);
+    }
+}
+
+// Initialize game on load
+let game;
+function initGame() {
+    game = new Game();
+    game.start();
+}
+
+// Export for window.startGame
+window.startGame = initGame;
+
+// Auto-init if DOM is ready
+if (document.readyState === 'loading') {
+    initGame();;
+} else {
+    initGame();
+}
+
+                document.getElementById('loading').style.display = 'none';
+    
+</script>
+
+</body>
+</html>
