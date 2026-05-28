@@ -1,0 +1,4097 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>诅咒古堡 - 文字冒险RPG</title>
+  <style>
+    /* ===== 基础重置 ===== */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    @font-face {
+      font-family: 'GameFont';
+      src: local('Microsoft YaHei'), local('PingFang SC'), local('Noto Sans SC');
+    }
+
+    :root {
+      --bg-primary: #0a0a0f;
+      --bg-secondary: #12121a;
+      --bg-card: #1a1a28;
+      --bg-hover: #252538;
+      --text-primary: #e0d8c8;
+      --text-secondary: #8a8498;
+      --text-dim: #5a5468;
+      --accent: #c9a84c;
+      --accent-dim: #8a7030;
+      --danger: #c44040;
+      --danger-dim: #6a2020;
+      --success: #4caf50;
+      --border: #2a2a3a;
+      --glow: rgba(201, 168, 76, 0.15);
+      --shadow: rgba(0, 0, 0, 0.6);
+    }
+
+    body {
+      font-family: 'GameFont', 'Microsoft YaHei', sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      overflow-x: hidden;
+      line-height: 1.8;
+    }
+
+    /* ===== 背景纹理 ===== */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background:
+        radial-gradient(ellipse at 20% 50%, rgba(100, 60, 20, 0.08) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 20%, rgba(60, 40, 100, 0.06) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 80%, rgba(80, 40, 40, 0.06) 0%, transparent 50%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ===== 主布局 ===== */
+    .game-container {
+      display: grid;
+      grid-template-columns: 1fr 280px;
+      grid-template-rows: auto 1fr;
+      height: 100vh;
+      max-width: 1200px;
+      margin: 0 auto;
+      gap: 0;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ===== 顶部栏 ===== */
+    .top-bar {
+      grid-column: 1 / -1;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 20px;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .game-title {
+      font-size: 1.3em;
+      color: var(--accent);
+      letter-spacing: 3px;
+      text-shadow: 0 0 20px var(--glow);
+    }
+
+    .top-controls {
+      display: flex;
+      gap: 8px;
+    }
+
+    .top-controls button {
+      background: var(--bg-card);
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.9em;
+      transition: all 0.2s;
+    }
+
+    .top-controls button:hover {
+      background: var(--bg-hover);
+      color: var(--text-primary);
+      border-color: var(--accent-dim);
+    }
+
+    #skip-btn {
+      display: none;
+      background: rgba(201, 168, 76, 0.15);
+      border-color: var(--accent-dim);
+      color: var(--accent);
+    }
+
+    /* ===== 章节标题 ===== */
+    .chapter-header {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 10px;
+      background: linear-gradient(90deg, transparent, var(--bg-card), transparent);
+      border-bottom: 1px solid var(--border);
+    }
+
+    #chapter-title {
+      font-size: 1.1em;
+      color: var(--accent);
+      letter-spacing: 5px;
+      opacity: 0.9;
+    }
+
+    #chapter-title.fade-in {
+      animation: fadeSlideIn 1s ease;
+    }
+
+    /* ===== 主内容区 ===== */
+    .main-content {
+      grid-column: 1;
+      grid-row: 3;
+      display: flex;
+      flex-direction: column;
+      padding: 24px 32px;
+      overflow-y: auto;
+    }
+
+    /* ===== 文本区域 ===== */
+    #text-area {
+      flex: 1;
+      padding: 20px;
+      min-height: 200px;
+      line-height: 2;
+      font-size: 1.05em;
+      color: var(--text-primary);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    #text-area.active {
+      opacity: 1;
+    }
+
+    #text-area p {
+      margin-bottom: 0.8em;
+      text-indent: 2em;
+    }
+
+    #text-area p:first-child {
+      text-indent: 0;
+    }
+
+    /* ===== 选择区域 ===== */
+    #choices-area {
+      padding: 16px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .choice-btn {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      padding: 14px 20px;
+      background: var(--bg-card);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 1em;
+      text-align: left;
+      cursor: pointer;
+      transition: all 0.3s;
+      animation: choiceFadeIn 0.4s ease backwards;
+      font-family: inherit;
+      line-height: 1.6;
+    }
+
+    .choice-btn:hover:not(.disabled) {
+      background: var(--bg-hover);
+      border-color: var(--accent);
+      box-shadow: 0 0 15px var(--glow);
+      transform: translateX(6px);
+    }
+
+    .choice-btn.selected {
+      background: var(--accent-dim);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .choice-btn.disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .choice-number {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      background: var(--accent-dim);
+      color: var(--accent);
+      border-radius: 50%;
+      font-size: 0.85em;
+      font-weight: bold;
+      flex-shrink: 0;
+    }
+
+    /* ===== 侧边栏 ===== */
+    .sidebar {
+      grid-column: 2;
+      grid-row: 3;
+      background: var(--bg-secondary);
+      border-left: 1px solid var(--border);
+      padding: 16px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .sidebar-section {
+      background: var(--bg-card);
+      border-radius: 8px;
+      padding: 14px;
+      border: 1px solid var(--border);
+    }
+
+    .sidebar-title {
+      font-size: 0.85em;
+      color: var(--accent);
+      letter-spacing: 2px;
+      margin-bottom: 10px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* HP 条 */
+    .hp-bar-container {
+      background: var(--bg-primary);
+      border-radius: 10px;
+      height: 20px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      position: relative;
+    }
+
+    .hp-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #4caf50, #66bb6a);
+      transition: width 0.5s ease;
+      border-radius: 10px;
+    }
+
+    .hp-fill.low {
+      background: linear-gradient(90deg, #ff9800, #ffb74d);
+    }
+
+    .hp-fill.critical {
+      background: linear-gradient(90deg, #c44040, #e55555);
+      animation: hpPulse 1s ease infinite;
+    }
+
+    #hp-text {
+      text-align: center;
+      font-size: 0.8em;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+
+    /* 属性 */
+    .stat-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 0;
+      font-size: 0.9em;
+    }
+
+    .stat-icon {
+      font-size: 1.1em;
+      width: 24px;
+      text-align: center;
+    }
+
+    .stat-name {
+      color: var(--text-secondary);
+      flex: 1;
+    }
+
+    .stat-value {
+      color: var(--accent);
+      font-weight: bold;
+      min-width: 20px;
+      text-align: right;
+    }
+
+    /* 物品栏 */
+    #inventory-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .inventory-item {
+      background: var(--bg-hover);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 0.8em;
+      color: var(--text-secondary);
+      transition: all 0.2s;
+    }
+
+    .inventory-item:hover {
+      border-color: var(--accent-dim);
+      color: var(--text-primary);
+    }
+
+    .empty-inventory {
+      color: var(--text-dim);
+      font-size: 0.85em;
+      text-align: center;
+      padding: 10px;
+    }
+
+    /* ===== 战斗面板 ===== */
+    #combat-panel {
+      display: none;
+      flex-direction: column;
+      gap: 16px;
+      padding: 20px;
+      animation: fadeSlideIn 0.5s ease;
+    }
+
+    #combat-panel.active {
+      display: flex;
+    }
+
+    #enemy-info {
+      text-align: center;
+      padding: 16px;
+      background: var(--bg-card);
+      border-radius: 10px;
+      border: 1px solid var(--danger-dim);
+    }
+
+    .enemy-name {
+      font-size: 1.3em;
+      color: var(--danger);
+      margin-bottom: 10px;
+      letter-spacing: 2px;
+    }
+
+    .enemy-hp-bar {
+      background: var(--bg-primary);
+      border-radius: 10px;
+      height: 16px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    .enemy-hp-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--danger), #e55555);
+      transition: width 0.4s ease;
+      border-radius: 10px;
+    }
+
+    .enemy-hp-text {
+      font-size: 0.85em;
+      color: var(--text-secondary);
+      margin-top: 6px;
+    }
+
+    #combat-log {
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+      max-height: 250px;
+      overflow-y: auto;
+      font-size: 0.95em;
+      line-height: 1.8;
+    }
+
+    .combat-log-line {
+      padding: 2px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+    }
+
+    .combat-log-line.fade-in {
+      animation: fadeSlideIn 0.3s ease;
+    }
+
+    #combat-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .combat-btn {
+      flex: 1;
+      min-width: 100px;
+      padding: 12px 16px;
+      background: var(--bg-card);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.95em;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: inherit;
+    }
+
+    .combat-btn:hover {
+      background: var(--bg-hover);
+      border-color: var(--accent);
+      box-shadow: 0 0 10px var(--glow);
+    }
+
+    .combat-btn.back-btn {
+      background: var(--bg-primary);
+      color: var(--text-secondary);
+    }
+
+    .item-select-title {
+      width: 100%;
+      color: var(--accent);
+      font-size: 0.9em;
+      margin-bottom: 6px;
+    }
+
+    /* ===== 主菜单 ===== */
+    #menu-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: var(--bg-primary);
+      z-index: 100;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 30px;
+    }
+
+    #menu-overlay.active {
+      display: flex;
+    }
+
+    .menu-title {
+      font-size: 2.8em;
+      color: var(--accent);
+      text-shadow: 0 0 40px var(--glow), 0 0 80px rgba(201, 168, 76, 0.1);
+      letter-spacing: 8px;
+      animation: titleGlow 3s ease infinite;
+    }
+
+    .menu-subtitle {
+      color: var(--text-dim);
+      font-size: 1em;
+      letter-spacing: 4px;
+      margin-top: -15px;
+    }
+
+    .menu-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      min-width: 260px;
+    }
+
+    .menu-btn {
+      padding: 16px 30px;
+      background: var(--bg-card);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-size: 1.1em;
+      cursor: pointer;
+      transition: all 0.3s;
+      letter-spacing: 3px;
+      font-family: inherit;
+    }
+
+    .menu-btn:hover {
+      background: var(--bg-hover);
+      border-color: var(--accent);
+      box-shadow: 0 0 20px var(--glow);
+      transform: translateY(-2px);
+    }
+
+    /* ===== 结局画面 ===== */
+    #ending-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(10, 10, 15, 0.95);
+      z-index: 100;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      padding: 40px;
+    }
+
+    #ending-overlay.active {
+      display: flex;
+    }
+
+    #ending-title {
+      font-size: 2.2em;
+      color: var(--accent);
+      letter-spacing: 5px;
+      text-shadow: 0 0 30px var(--glow);
+    }
+
+    #ending-type {
+      font-size: 1em;
+      color: var(--text-secondary);
+      letter-spacing: 3px;
+    }
+
+    #ending-desc {
+      max-width: 600px;
+      text-align: center;
+      line-height: 2;
+      font-size: 1.05em;
+      color: var(--text-primary);
+    }
+
+    .ending-entry {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 16px;
+      background: var(--bg-card);
+      border-radius: 8px;
+      margin: 6px 0;
+      border: 1px solid var(--border);
+      text-align: left;
+    }
+
+    .ending-entry.locked {
+      opacity: 0.5;
+    }
+
+    .ending-icon {
+      font-size: 1.5em;
+      min-width: 30px;
+    }
+
+    .ending-name {
+      font-weight: bold;
+      color: var(--accent);
+    }
+
+    .ending-desc-mini {
+      font-size: 0.8em;
+      color: var(--text-secondary);
+      display: block;
+      margin-top: 4px;
+    }
+
+    #ending-close {
+      padding: 14px 40px;
+      background: var(--bg-card);
+      color: var(--accent);
+      border: 1px solid var(--accent-dim);
+      border-radius: 10px;
+      font-size: 1em;
+      cursor: pointer;
+      transition: all 0.3s;
+      letter-spacing: 2px;
+      font-family: inherit;
+      margin-top: 20px;
+    }
+
+    #ending-close:hover {
+      background: var(--accent-dim);
+      box-shadow: 0 0 20px var(--glow);
+    }
+
+    /* ===== 消息提示 ===== */
+    #message-toast {
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: var(--bg-card);
+      color: var(--accent);
+      border: 1px solid var(--accent-dim);
+      padding: 12px 28px;
+      border-radius: 10px;
+      font-size: 0.95em;
+      z-index: 200;
+      transition: transform 0.4s ease;
+      pointer-events: none;
+      box-shadow: 0 4px 20px var(--shadow);
+    }
+
+    #message-toast.show {
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* ===== 滚动条 ===== */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--bg-primary);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 3px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--text-dim);
+    }
+
+    /* ===== 动画 ===== */
+    @keyframes fadeSlideIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes choiceFadeIn {
+      from { opacity: 0; transform: translateX(-15px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    @keyframes titleGlow {
+      0%, 100% { text-shadow: 0 0 40px var(--glow), 0 0 80px rgba(201, 168, 76, 0.1); }
+      50% { text-shadow: 0 0 60px var(--glow), 0 0 120px rgba(201, 168, 76, 0.2); }
+    }
+
+    @keyframes hpPulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+
+    /* ===== 响应式 ===== */
+    @media (max-width: 768px) {
+      .game-container {
+        grid-template-columns: 1fr;
+      }
+      .sidebar {
+        grid-column: 1;
+        border-left: none;
+        border-top: 1px solid var(--border);
+        max-height: 200px;
+      }
+      .main-content {
+        padding: 16px;
+      }
+      .menu-title {
+        font-size: 2em;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- 主菜单 -->
+  <div id="menu-overlay" class="active">
+    <div class="menu-title">诅咒古堡</div>
+    <div class="menu-subtitle">文字冒险RPG</div>
+    <div class="menu-buttons">
+      <button id="menu-new-game" class="menu-btn">开始冒险</button>
+      <button id="menu-continue" class="menu-btn">继续旅程</button>
+      <button id="menu-endings" class="menu-btn">结局收集</button>
+    </div>
+  </div>
+
+  <!-- 结局画面 -->
+  <div id="ending-overlay">
+    <div id="ending-title"></div>
+    <div id="ending-type"></div>
+    <div id="ending-desc"></div>
+    <button id="ending-close">返回主菜单</button>
+  </div>
+
+  <!-- 消息提示 -->
+  <div id="message-toast"></div>
+
+  <!-- 游戏主界面 -->
+  <div class="game-container">
+    <!-- 顶部栏 -->
+    <div class="top-bar">
+      <div class="game-title">诅咒古堡</div>
+      <div class="top-controls">
+        <button id="skip-btn" title="跳过打字动画 (Space)">跳过 ▶▶</button>
+        <button id="sound-btn" title="开关音效">🔊</button>
+        <button id="save-btn" title="保存进度">💾</button>
+      </div>
+    </div>
+
+    <!-- 章节标题 -->
+    <div class="chapter-header">
+      <div id="chapter-title"></div>
+    </div>
+
+    <!-- 主内容 -->
+    <div class="main-content">
+      <div id="text-area"></div>
+      <div id="choices-area"></div>
+
+      <!-- 战斗面板 -->
+      <div id="combat-panel">
+        <div id="enemy-info"></div>
+        <div id="combat-log"></div>
+        <div id="combat-actions"></div>
+      </div>
+    </div>
+
+    <!-- 侧边栏 -->
+    <div class="sidebar">
+      <div class="sidebar-section">
+        <div class="sidebar-title">生命值</div>
+        <div class="hp-bar-container">
+          <div id="hp-bar" class="hp-fill" style="width: 100%"></div>
+        </div>
+        <div id="hp-text">HP: 100 / 100</div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-title">角色属性</div>
+        <div id="stats-display"></div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-title">背包</div>
+        <div id="inventory-list">
+          <div class="empty-inventory">背包为空</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+// === ./config.js ===
+// config.js - 常量配置
+const CONFIG = {
+  // 打字机效果速度（毫秒/字符）
+  TYPE_SPEED: 50,
+  TYPE_SPEED_FAST: 20,
+
+  // 属性相关
+  MAX_STAT: 10,
+  MIN_STAT: 1,
+  INITIAL_STAT_POINTS: 5, // 初始可分配点数
+  BASE_STATS: {
+    strength: 3,
+    dexterity: 3,
+    wisdom: 3,
+    charisma: 3,
+  },
+
+  // 战斗相关
+  COMBAT: {
+    BASE_HP: 100,
+    BASE_ATTACK: 10,
+    BASE_DEFENSE: 5,
+    ESCAPE_CHANCE: 0.4,
+    CRITICAL_CHANCE: 0.15,
+    CRITICAL_MULTIPLIER: 2.0,
+    DEFENSE_MULTIPLIER: 0.5, // 防御时受到伤害的倍率
+  },
+
+  // 存档
+  SAVE_KEY: 'text_adventure_save',
+  AUTO_SAVE_INTERVAL: 0, // 每次场景切换时自动保存
+
+  // 章节名称
+  CHAPTER_NAMES: {
+    prologue: '序章：诅咒之门',
+    chapter1: '第一章：幽暗大厅',
+    chapter2: '第二章：迷失花园',
+    chapter3: '第三章：深渊地牢',
+    chapter4: '第四章：暗影高塔',
+    chapter5: '终章：命运抉择',
+  },
+
+  // 属性名称映射
+  STAT_NAMES: {
+    strength: '力量',
+    dexterity: '敏捷',
+    wisdom: '智慧',
+    charisma: '魅力',
+  },
+
+  // 属性图标
+  STAT_ICONS: {
+    strength: '⚔️',
+    dexterity: '🏃',
+    wisdom: '📖',
+    charisma: '💬',
+  },
+};
+
+// === ./sound.js ===
+// sound.js - Web Audio API 音效系统
+class SoundManager {
+  constructor() {
+    this.ctx = null;
+    this.enabled = true;
+    this.volume = 0.3;
+    this._init();
+  }
+
+  _init() {
+    // 在用户交互后初始化 AudioContext
+    const initCtx = () => {
+      if (!this.ctx) {
+        this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      document.removeEventListener('click', initCtx);
+      document.removeEventListener('keydown', initCtx);
+    };
+    document.addEventListener('click', initCtx);
+    document.addEventListener('keydown', initCtx);
+  }
+
+  _createOscillator(type, frequency, duration, volume = this.volume) {
+    if (!this.enabled || !this.ctx) return;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = type;
+    osc.frequency.value = frequency;
+    gain.gain.setValueAtTime(volume, this.ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start();
+    osc.stop(this.ctx.currentTime + duration);
+  }
+
+  _createNoise(duration, volume = this.volume * 0.5) {
+    if (!this.enabled || !this.ctx) return;
+    const bufferSize = this.ctx.sampleRate * duration;
+    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+    const source = this.ctx.createBufferSource();
+    const gain = this.ctx.createGain();
+    source.buffer = buffer;
+    gain.gain.setValueAtTime(volume, this.ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+    source.connect(gain);
+    gain.connect(this.ctx.destination);
+    source.start();
+  }
+
+  // 点击音效 - 清脆短促
+  click() {
+    this._createOscillator('sine', 800, 0.08, this.volume * 0.4);
+    setTimeout(() => this._createOscillator('sine', 1200, 0.05, this.volume * 0.3), 30);
+  }
+
+  // 战斗音效 - 金属碰撞感
+  combat() {
+    this._createNoise(0.1, this.volume * 0.4);
+    this._createOscillator('sawtooth', 200, 0.15, this.volume * 0.3);
+    setTimeout(() => {
+      this._createOscillator('square', 150, 0.1, this.volume * 0.2);
+      this._createNoise(0.08, this.volume * 0.3);
+    }, 80);
+  }
+
+  // 获得物品音效 - 上升音阶
+  item() {
+    const notes = [523, 659, 784, 1047]; // C5, E5, G5, C6
+    notes.forEach((freq, i) => {
+      setTimeout(() => this._createOscillator('sine', freq, 0.2, this.volume * 0.3), i * 80);
+    });
+  }
+
+  // 死亡音效 - 下降阴沉
+  death() {
+    const notes = [400, 350, 300, 200, 150];
+    notes.forEach((freq, i) => {
+      setTimeout(() => {
+        this._createOscillator('sawtooth', freq, 0.4, this.volume * 0.25);
+      }, i * 200);
+    });
+    setTimeout(() => this._createNoise(0.8, this.volume * 0.2), 600);
+  }
+
+  // 胜利音效 - 欢快上升
+  victory() {
+    const melody = [523, 659, 784, 1047, 784, 1047, 1319];
+    melody.forEach((freq, i) => {
+      setTimeout(() => this._createOscillator('sine', freq, 0.25, this.volume * 0.35), i * 120);
+    });
+  }
+
+  // 恐怖氛围音效
+  horror() {
+    this._createOscillator('sine', 80, 1.5, this.volume * 0.15);
+    setTimeout(() => this._createOscillator('sine', 85, 1.0, this.volume * 0.1), 500);
+    this._createNoise(0.3, this.volume * 0.08);
+  }
+
+  // 打字音效 - 轻微键盘声
+  type() {
+    if (!this.enabled || !this.ctx) return;
+    const freq = 400 + Math.random() * 200;
+    this._createOscillator('sine', freq, 0.02, this.volume * 0.08);
+  }
+
+  // 切换音效
+  toggle() {
+    this.enabled = !this.enabled;
+    return this.enabled;
+  }
+}
+
+const sound = new SoundManager();
+
+// === ./story.js ===
+// story.js - 故事数据（章节、场景、选择、后果）
+// 每个场景: { text, chapter, choices[], combat?, onEnter? }
+// 每个选择: { text, nextScene, condition?, statCheck?, effects?, requireItem?, addItem?, removeItem?, setFlag? }
+
+const STORY = {
+  // ==================== 序章：诅咒之门 ====================
+  start: {
+    chapter: 'prologue',
+    text: `夜色如墨，冷风裹挟着腐朽的气息扑面而来。
+
+你站在一座古老城堡的铁门前，锈迹斑斑的铁门上刻满了扭曲的符文，在月光下泛着诡异的微光。传说这座被诅咒的古堡深处藏着无尽的宝藏——但从未有人活着走出来。
+
+你是最后一个被贪念驱使的冒险者。
+
+铁门虚掩着，门缝中透出幽幽的绿光。两侧的石墙上爬满了黑色的藤蔓，仿佛城堡本身在缓慢地呼吸。
+
+你深吸一口气，准备踏入这座吞噬了无数灵魂的诅咒之地。`,
+    choices: [
+      {
+        text: '用力推开铁门，大步走入',
+        nextScene: 'courtyard',
+        statCheck: { stat: 'strength', difficulty: 3 },
+        successEffects: { hp: 0, message: '你用力推开了沉重的铁门，锈蚀的铰链发出刺耳的尖叫。' },
+        failEffects: { hp: -5, message: '铁门纹丝不动，你只好侧身从门缝中挤了进去，手臂被锈铁划出一道血痕。' },
+      },
+      {
+        text: '翻越石墙潜入',
+        nextScene: 'courtyard',
+        statCheck: { stat: 'dexterity', difficulty: 4 },
+        successEffects: { addItem: '黑曜石碎片', message: '你灵巧地翻过石墙，在墙根发现了一块锋利的黑曜石碎片，便收入囊中。' },
+        failEffects: { hp: -8, message: '攀爬时脚下一滑，你重重摔在地上，膝盖传来剧痛。' },
+      },
+      {
+        text: '仔细观察铁门上的符文',
+        nextScene: 'courtyard',
+        statCheck: { stat: 'wisdom', difficulty: 5 },
+        successEffects: { setFlag: 'understood_rune', addItem: '符文拓片', message: '你辨认出这是一种古老的保护符文——它并非诅咒，而是封印。你将符文拓印下来。' },
+        failEffects: { message: '你盯着符文看了许久，却什么也看不懂。但你注意到铁门的铰链已经锈蚀得厉害。' },
+      },
+    ],
+  },
+
+  courtyard: {
+    chapter: 'prologue',
+    text: `你踏入了城堡的前庭。
+
+残破的石板路从脚下延伸向远处的主楼，两侧矗立着几尊面目模糊的石像——它们的姿态各异，有的双手合十祈祷，有的举剑向天，还有一尊似乎在……哭泣。
+
+月光从厚重的云层中透出，照亮了庭院中央的一座干涸喷泉。喷泉中立着一尊天使雕像，但天使的翅膀已经断裂，脸上带着一种诡异的微笑。
+
+空气中有淡淡的花香——奇怪的是，庭院角落的花园居然还开着几朵苍白的花。
+
+主楼的大门就在前方，黑色的橡木门半开着。左侧似乎通往一片幽暗的花园，右侧有一座小教堂的废墟。`,
+    choices: [
+      {
+        text: '直接走向主楼大门',
+        nextScene: 'entrance_hall',
+      },
+      {
+        text: '先去花园查看那些诡异的花',
+        nextScene: 'garden_visit',
+      },
+      {
+        text: '去右侧的小教堂废墟看看',
+        nextScene: 'chapel_ruins',
+      },
+    ],
+  },
+
+  garden_visit: {
+    chapter: 'prologue',
+    text: `你走向庭院角落的小花园。
+
+苍白的花朵在月光下散发着幽幽的荧光，花瓣上凝结着露珠——不，那不是露珠，是某种发光的液体。空气中弥漫着一种令人昏沉的甜香。
+
+花丛中似乎有什么东西在动。你定睛一看，是一只通体漆黑的蝴蝶，翅膀上带着银色的纹路，正停在一朵花上缓缓扇动翅膀。
+
+花丛深处，你看到了一株特别的植物——它的茎是血红色的，顶端开着一朵拳头大的黑色花朵。`,
+    choices: [
+      {
+        text: '采摘那朵黑色花朵',
+        nextScene: 'courtyard_return',
+        addItem: '幽冥之花',
+        effects: { message: '你小心翼翼地摘下那朵黑花。触碰的瞬间，一股寒意从指尖传遍全身——这朵花蕴含着某种黑暗的力量。' },
+        setFlag: 'has_dark_flower',
+      },
+      {
+        text: '收集花瓣上的发光液体',
+        nextScene: 'courtyard_return',
+        statCheck: { stat: 'wisdom', difficulty: 4 },
+        successEffects: { addItem: '月露精华', message: '你用随身的容器小心收集了那些发光的液体。这可能是某种珍贵的炼金材料。' },
+        failEffects: { hp: -3, message: '液体接触皮肤的瞬间，你感到一阵灼烧般的疼痛，手指微微发麻。' },
+      },
+      {
+        text: '捕捉那只黑蝴蝶',
+        nextScene: 'courtyard_return',
+        statCheck: { stat: 'dexterity', difficulty: 6 },
+        successEffects: { addItem: '幽灵蝶', setFlag: 'has_butterfly', message: '你以惊人的速度双手合拢，竟然真的捉住了那只蝴蝶。它在你掌心挣扎着，散发着微弱的冷光。' },
+        failEffects: { message: '蝴蝶在你即将触碰的瞬间化作一团黑雾消散了。' },
+      },
+      {
+        text: '花园太诡异了，转身离开',
+        nextScene: 'courtyard_return',
+      },
+    ],
+  },
+
+  chapel_ruins: {
+    chapter: 'prologue',
+    text: `小教堂已经半塌了，但残存的墙壁上还挂着一幅褪色的圣像画。画中是一位手持权杖的国王，面容庄严却带着一丝悲悯。
+
+教堂中央的祭坛上覆盖着厚厚的灰尘，但你注意到灰尘下面似乎有什么东西在反光。角落里有一具穿着破旧教士袍的骸骨，双手还保持着祈祷的姿势。
+
+墙壁上刻着一行模糊的文字，似乎是某种遗言。`,
+    choices: [
+      {
+        text: '清理祭坛上的灰尘',
+        nextScene: 'courtyard_return',
+        addItem: '银质十字架',
+        effects: { message: '灰尘下是一枚银质十字架，做工精美，表面刻有细密的驱邪符文。你将它收入囊中。' },
+      },
+      {
+        text: '仔细辨认墙上的文字',
+        nextScene: 'courtyard_return',
+        statCheck: { stat: 'wisdom', difficulty: 5 },
+        successEffects: { setFlag: 'read_epitaph', message: '你费力地辨认出："……勿触王冠……它会吞噬……灵魂的代价……"这是前人的警告。' },
+        failEffects: { message: '文字已经模糊到无法辨认，你只能隐约看出几个字母。' },
+      },
+      {
+        text: '搜索教士骸骨',
+        nextScene: 'courtyard_return',
+        effects: { addItem: '古旧钥匙', message: '你在骸骨的衣袋中发现了一把古旧的铜钥匙，上面刻着一个"L"的字母。' },
+      },
+    ],
+  },
+
+  courtyard_return: {
+    chapter: 'prologue',
+    text: `你回到了庭院中央。干涸的喷泉在月光下投射出长长的影子。
+
+主楼的黑色大门依然半开着，仿佛在无声地邀请你进入。从门缝中，你隐约听到了什么声音——像是远处传来的低沉吟唱，又像是风穿过空旷走廊的呜咽。
+
+无论如何，宝藏就在城堡深处。`,
+    choices: [
+      {
+        text: '推门进入主楼',
+        nextScene: 'entrance_hall',
+      },
+    ],
+  },
+
+  // ==================== 第一章：幽暗大厅 ====================
+  entrance_hall: {
+    chapter: 'chapter1',
+    text: `主楼的大厅比你想象的还要宏伟。
+
+穹顶高达数十米，一盏巨大的水晶吊灯悬挂在正中央，但上面的蜡烛早已熄灭，只留下干涸的蜡泪。大厅两侧各有一排石柱，石柱上雕刻着栩栩如生的龙形浮雕。
+
+地面是黑白相间的大理石棋盘格，你的脚步声在空旷的大厅中回荡。墙壁上挂着一幅幅巨大的肖像画，画中的人物似乎都在注视着你——不，你眨了眨眼，确定那只是光影的错觉。
+
+大厅的尽头是一座宽阔的楼梯，通往城堡的上层。左侧有一扇门，门上标着"图书馆"的字样；右侧的门则标着"餐厅"。楼梯下方还有一扇不起眼的小门，似乎是通往地下室的。`,
+    choices: [
+      {
+        text: '仔细查看那些肖像画',
+        nextScene: 'hall_paintings',
+      },
+      {
+        text: '进入左侧的图书馆',
+        nextScene: 'library',
+      },
+      {
+        text: '进入右侧的餐厅',
+        nextScene: 'dining_hall',
+      },
+      {
+        text: '打开楼梯下的小门',
+        nextScene: 'basement_entrance',
+      },
+    ],
+  },
+
+  hall_paintings: {
+    chapter: 'chapter1',
+    text: `你走近那些肖像画，借着从窗户透入的月光仔细端详。
+
+这些画描绘的是同一个家族的历代成员。从左到右，你能看出时间的流逝——最早的画中人物穿着华丽的铠甲，面容英武；越往右，画中人的表情越显得阴郁、憔悴，肤色也越来越苍白。
+
+最后一幅画特别引人注目：画中是一位年轻的国王，头戴一顶镶满宝石的金色王冠，但他的眼睛——他的眼睛完全是黑色的，没有瞳孔，没有眼白，只有无尽的黑暗。
+
+画框下方的铜牌上刻着："阿德里安·暗影之王，最后的统治者。"
+
+你注意到最后一幅画的画框似乎有些歪斜，后面似乎藏着什么。`,
+    choices: [
+      {
+        text: '移动画框看看后面藏着什么',
+        nextScene: 'hall_after_paintings',
+        statCheck: { stat: 'wisdom', difficulty: 4 },
+        successEffects: { addItem: '泛黄的信件', setFlag: 'found_letter', message: '你小心地移动画框，发现后面有一个暗格，里面放着一封泛黄的信件。信上的墨迹已经模糊，但你还是辨认出了一些内容。' },
+        failEffects: { hp: -10, message: '你刚触动画框，就触发了隐藏的机关！一支毒箭从画框下方射出，擦伤了你的手臂。你赶紧退后。' },
+      },
+      {
+        text: '尝试与画中的黑眼国王对话',
+        nextScene: 'hall_after_paintings',
+        statCheck: { stat: 'charisma', difficulty: 7 },
+        successEffects: { setFlag: 'spoke_to_king', message: '你盯着那双黑色的眼睛，轻声说道："我知道你还在听。"画中的嘴唇似乎微微动了一下，一个沙哑的声音在你脑海中响起："找到……王冠……或摧毁它……"' },
+        failEffects: { message: '你对着画说了半天，什么也没有发生。也许只是你的想象。' },
+      },
+      {
+        text: '不再理会这些画，继续前进',
+        nextScene: 'hall_after_paintings',
+      },
+    ],
+  },
+
+  hall_after_paintings: {
+    chapter: 'chapter1',
+    text: `你从画像前退开，重新审视整个大厅。
+
+空气中似乎多了一丝微妙的变化——温度降低了几度，你能看到自己呼出的白气。楼梯上方传来一阵轻微的脚步声，但很快就消失了。
+
+左侧的图书馆、右侧的餐厅、楼上的未知区域，还有楼梯下通往地下室的门——你需要选择下一步的方向。
+
+你注意到大厅角落有一个壁炉，壁炉架上放着一个烛台和几根蜡烛。`,
+    choices: [
+      {
+        text: '拿起烛台和蜡烛',
+        nextScene: 'hall_after_paintings_lit',
+        addItem: '烛台',
+        effects: { message: '你点燃了蜡烛，温暖的烛光照亮了周围几米的范围。至少在黑暗中，你不再完全无助。' },
+      },
+      {
+        text: '进入图书馆',
+        nextScene: 'library',
+      },
+      {
+        text: '进入餐厅',
+        nextScene: 'dining_hall',
+      },
+      {
+        text: '直接上楼',
+        nextScene: 'upper_floor',
+      },
+    ],
+  },
+
+  hall_after_paintings_lit: {
+    chapter: 'chapter1',
+    text: `烛光在大厅中投射出摇曳的光影。有了光源，你感觉安心了不少。
+
+在烛光的照耀下，你注意到黑白大理石地面上有一些不太明显的痕迹——似乎是某种拖拽的印记，从大厅中央一直延伸到楼梯下方的小门。
+
+这些痕迹看起来并不古老。`,
+    choices: [
+      {
+        text: '沿着痕迹走向地下室的门',
+        nextScene: 'basement_entrance',
+      },
+      {
+        text: '先去图书馆探索',
+        nextScene: 'library',
+      },
+      {
+        text: '先去餐厅探索',
+        nextScene: 'dining_hall',
+      },
+      {
+        text: '直接上楼',
+        nextScene: 'upper_floor',
+      },
+    ],
+  },
+
+  library: {
+    chapter: 'chapter1',
+    text: `图书馆的门发出一声沉重的呻吟后打开了。
+
+这是一间巨大的圆形房间，四面墙壁都是高达天花板的书架，上面密密麻麻地排列着成千上万本书籍。房间中央有一张巨大的橡木桌，桌上散落着一些翻开的书和几支干涸的墨水笔。
+
+空气中弥漫着陈旧纸张和灰尘的气味。奇怪的是，这里的灰尘似乎比大厅少得多——好像有人经常来这里。
+
+你注意到有几个书架上的书被特别标注了红色的书签。橡木桌上有一本特别大的书翻开着，书页上画着某种复杂的法阵图案。`,
+    choices: [
+      {
+        text: '查看桌上那本翻开的大书',
+        nextScene: 'library_book',
+        statCheck: { stat: 'wisdom', difficulty: 5 },
+        successEffects: { setFlag: 'read_spellbook', addItem: '咒语残页', message: '这是一本关于封印术的古籍。你快速浏览了法阵图案，将其中一页关于"破除封印"的咒语撕下带走。' },
+        failEffects: { message: '书上的文字是用某种你不认识的语言写成的，你完全看不懂。' },
+      },
+      {
+        text: '查看标注了红色书签的书',
+        nextScene: 'library_marked',
+      },
+      {
+        text: '搜索图书馆寻找有用的东西',
+        nextScene: 'library_search',
+        statCheck: { stat: 'wisdom', difficulty: 4 },
+        successEffects: { addItem: '古堡地图', message: '你在书架深处找到了一张古堡的平面图！这对你探索城堡会很有帮助。' },
+        failEffects: { message: '你翻找了半天，除了灰尘什么也没找到。' },
+      },
+      {
+        text: '离开图书馆',
+        nextScene: 'hall_after_paintings',
+      },
+    ],
+  },
+
+  library_book: {
+    chapter: 'chapter1',
+    text: `你仔细研究了桌上那本大书的内容。
+
+书名是《暗影之王的遗产》，记载了这座城堡最后一位统治者——阿德里安国王的故事。他曾经是一位英明的君主，但在发现了一件远古神器之后，就逐渐变得疯狂。
+
+那件神器就是一顶被诅咒的王冠。
+
+书上说，王冠赋予了国王强大的力量，但也在不断吞噬他的灵魂。最终，国王在疯狂中杀死了所有的臣民，然后将自己封印在城堡深处。
+
+"只有心怀纯粹之人，才能真正终结这诅咒。"这是书上的最后一句话。`,
+    choices: [
+      {
+        text: '将书收入背包',
+        nextScene: 'library_return',
+        addItem: '暗影之王的遗产',
+        effects: { message: '你将这本珍贵的古籍小心地收入背包。' },
+      },
+      {
+        text: '继续探索图书馆',
+        nextScene: 'library_return',
+      },
+    ],
+  },
+
+  library_marked: {
+    chapter: 'chapter1',
+    text: `你抽出了那些标有红色书签的书籍。
+
+这些书记载了各种关于这座城堡的传说和目击记录。有几本是探险者的日记——他们进入城堡后的经历，但日记的结尾都戛然而止。
+
+其中一本日记引起了你的注意：
+
+"第三天。我在地下室发现了一扇被封印的门。门后传来微弱的呼救声——像是一个女人的声音。我不敢打开它。我能感觉到门后的东西不是活人……"
+
+日记到这里就断了。最后一页夹着一把小铁钥匙。`,
+    choices: [
+      {
+        text: '收下小铁钥匙',
+        nextScene: 'library_return',
+        addItem: '小铁钥匙',
+        effects: { message: '你将那把小铁钥匙收入囊中。它可能在某个地方派上用场。' },
+      },
+      {
+        text: '继续探索图书馆',
+        nextScene: 'library_return',
+      },
+    ],
+  },
+
+  library_search: {
+    chapter: 'chapter1',
+    text: `你开始系统地搜索图书馆。
+
+在角落的一个书架后面，你发现了一个暗门——它被书架巧妙地遮挡着，如果不是仔细搜索，根本不会发现。
+
+暗门后面是一条狭窄的密道，通向城堡的某个未知区域。密道的墙壁上刻着奇怪的符号，空气中有一股潮湿的霉味。`,
+    choices: [
+      {
+        text: '进入密道',
+        nextScene: 'secret_passage',
+        requireItem: '烛台',
+        conditionMessage: '密道里漆黑一片，你需要光源才能进入。',
+      },
+      {
+        text: '先记住密道的位置，以后再来',
+        nextScene: 'library_return',
+        setFlag: 'found_secret_passage',
+      },
+    ],
+  },
+
+  library_return: {
+    chapter: 'chapter1',
+    text: `你回到了图书馆。书架上的书籍在昏暗的光线下显得格外阴森。
+
+你知道了更多关于这座城堡的秘密，但现在需要决定下一步的行动。`,
+    choices: [
+      {
+        text: '回到大厅',
+        nextScene: 'hall_after_paintings',
+      },
+      {
+        text: '去餐厅看看',
+        nextScene: 'dining_hall',
+      },
+    ],
+  },
+
+  dining_hall: {
+    chapter: 'chapter1',
+    text: `餐厅的门在你推开的瞬间发出一声刺耳的尖叫。
+
+一张长长的橡木餐桌占据了房间的大部分空间，桌上铺着已经褪色的红色桌布。桌上摆满了银质餐具——但盘子里装的不是食物，而是某种黑色的、已经凝固的物质。
+
+餐桌的主位上坐着一个人——不，是一具穿着华服的骷髅。它的手骨还握着一把银叉，仿佛在死前正在用餐。
+
+壁炉中跳动着幽蓝色的火焰——是谁点燃了它？
+
+你感到一股强烈的不安。有什么东西在注视着你。`,
+    choices: [
+      {
+        text: '搜索餐厅寻找有用的物品',
+        nextScene: 'dining_search',
+      },
+      {
+        text: '仔细查看壁炉中的蓝色火焰',
+        nextScene: 'dining_fireplace',
+      },
+      {
+        text: '检查骷髅身上有没有什么',
+        nextScene: 'dining_skeleton',
+        statCheck: { stat: 'charisma', difficulty: 3 },
+        successEffects: { message: '你鼓起勇气走近那具骷髅。' },
+        failEffects: { hp: -5, message: '你刚靠近骷髅，它就突然转头看向你！你惊叫着后退，心脏狂跳。冷静下来后你发现那只是你的错觉……大概吧。' },
+      },
+      {
+        text: '立刻离开餐厅',
+        nextScene: 'hall_after_paintings',
+      },
+    ],
+  },
+
+  dining_search: {
+    chapter: 'chapter1',
+    text: `你开始搜索餐厅。
+
+在餐具柜中，你找到了一瓶保存完好的红酒——标签上写着"1453年份"，这酒已经有几百年的历史了。旁边还有一把锋利的银质餐刀。
+
+在桌子底下，你发现了一个暗门——它通向一条狭窄的通道，似乎是仆人使用的专用通道。`,
+    choices: [
+      {
+        text: '拿走红酒和银质餐刀',
+        nextScene: 'dining_return',
+        addItem: '陈年红酒',
+        addItem2: '银质餐刀',
+        effects: { message: '你将红酒和银质餐刀收入囊中。银器对某些超自然生物可能有特殊效果。' },
+      },
+      {
+        text: '打开暗门进入仆人通道',
+        nextScene: 'servant_passage',
+      },
+      {
+        text: '继续探索餐厅',
+        nextScene: 'dining_return',
+      },
+    ],
+  },
+
+  dining_fireplace: {
+    chapter: 'chapter1',
+    text: `你走近壁炉，仔细观察那幽蓝色的火焰。
+
+奇怪的是，火焰虽然在跳动，却不散发任何热量——相反，你靠近时感到一股刺骨的寒意。壁炉内壁上刻着一些文字，在蓝光的照耀下若隐若现。
+
+你凑近去看——
+
+"我在火焰中等待，等一个能听到我声音的人。如果你听到了，请帮帮我……我被困在这座城堡里太久了……"
+
+声音从火焰中传出，是一个女人的声音，带着无尽的哀伤。`,
+    choices: [
+      {
+        text: '"你是谁？我该怎么帮你？"',
+        nextScene: 'ghost_encounter',
+        statCheck: { stat: 'charisma', difficulty: 5 },
+        successEffects: { setFlag: 'spoke_to_ghost', message: '火焰闪烁了一下，那个声音变得更加清晰。' },
+        failEffects: { message: '火焰剧烈跳动了一下，然后恢复了平静。声音消失了。也许你需要更加真诚一些。' },
+      },
+      {
+        text: '伸手触碰蓝色火焰',
+        nextScene: 'dining_return',
+        statCheck: { stat: 'wisdom', difficulty: 6 },
+        successEffects: { addItem: '幽灵之泪', message: '你的手指穿过火焰，触碰到了一滴冰冷的液体——一滴幽灵的眼泪。它凝结成了一颗幽蓝色的宝石。' },
+        failEffects: { hp: -15, message: '你的手刚碰到火焰，一股刺骨的寒意就传遍全身！你感觉自己的生命力被吸走了一部分。' },
+      },
+      {
+        text: '不去理会，继续探索',
+        nextScene: 'dining_return',
+      },
+    ],
+  },
+
+  ghost_encounter: {
+    chapter: 'chapter1',
+    text: `火焰猛地膨胀，一个半透明的身影从中浮现。
+
+那是一个穿着宫廷服饰的年轻女子，面容苍白但美丽，眼中带着深深的哀伤。她的身体是半透明的，你能透过她看到后面的壁炉。
+
+"谢谢你愿意听我说话，"她轻声说道，"我是艾莉诺，曾经是这座城堡的女主人……或者说，是阿德里安国王的妻子。"
+
+"我的丈夫被那顶诅咒的王冠吞噬了心智，他杀死了城堡里的所有人……包括我。但我们的灵魂无法离开，被王冠的力量束缚在这里。"
+
+"求求你，找到王冠，毁掉它。只有这样，我们才能得到安息。"`,
+    choices: [
+      {
+        text: '"我会帮你的。告诉我王冠在哪里。"',
+        nextScene: 'dining_return',
+        setFlag: 'ghost_quest',
+        addItem: '灵魂护符',
+        effects: { message: '艾莉诺的脸上露出感激的微笑。"王冠在城堡最高的塔楼里，被封印在一扇石门之后。"她递给你一枚散发着幽蓝光芒的护符。"这是我的灵魂结晶，它会保护你。"' },
+      },
+      {
+        text: '"我来这里是为了宝藏，不是为了救人。"',
+        nextScene: 'dining_return',
+        effects: { message: '艾莉诺的表情变得悲伤。"如果你只想要宝藏，那就去拿吧。但请记住——王冠的诅咒会吞噬每一个触碰它的人。"她的身影逐渐消散。' },
+      },
+    ],
+  },
+
+  dining_skeleton: {
+    chapter: 'chapter1',
+    text: `你鼓起勇气靠近了那具骷髅。
+
+仔细观察后，你发现骷髅的脖子上挂着一条金链子，链子末端是一把精致的金钥匙。骷髅的手骨虽然握着银叉，但如果你小心的话，应该可以取下钥匙。
+
+骷髅空洞的眼窝似乎在注视着你，但这一次它没有"动"。也许之前的恐惧只是你的错觉。`,
+    choices: [
+      {
+        text: '小心地取下金钥匙',
+        nextScene: 'dining_return',
+        addItem: '金钥匙',
+        effects: { message: '你屏住呼吸，小心翼翼地从骷髅脖子上取下了金钥匙。骷髅没有动——这一次。' },
+      },
+      {
+        text: '还是不要打扰死者了',
+        nextScene: 'dining_return',
+      },
+    ],
+  },
+
+  dining_return: {
+    chapter: 'chapter1',
+    text: `你回到了餐厅。幽蓝色的火焰依然在壁炉中跳动，那具骷髅依然保持着用餐的姿势。
+
+是时候决定下一步了。`,
+    choices: [
+      {
+        text: '回到大厅',
+        nextScene: 'hall_after_paintings',
+      },
+      {
+        text: '去地下室',
+        nextScene: 'basement_entrance',
+      },
+      {
+        text: '上楼探索',
+        nextScene: 'upper_floor',
+      },
+    ],
+  },
+
+  servant_passage: {
+    chapter: 'chapter1',
+    text: `你打开了桌子下的暗门，进入了一条狭窄的仆人通道。
+
+通道很矮，你不得不弯腰前行。墙壁上有几个壁龛，里面放着已经燃尽的火把。通道似乎通向城堡的后方。
+
+你走了大约几分钟，来到了一个十字路口。左边传来食物的香气——可能是厨房。右边似乎有水声。正前方的通道则通向更深的黑暗。`,
+    choices: [
+      {
+        text: '去左边（厨房方向）',
+        nextScene: 'kitchen',
+      },
+      {
+        text: '去右边（水声方向）',
+        nextScene: 'water_source',
+      },
+      {
+        text: '继续向前',
+        nextScene: 'basement_entrance',
+      },
+    ],
+  },
+
+  kitchen: {
+    chapter: 'chapter1',
+    text: `你来到了城堡的厨房。
+
+这里比你想象的要大——巨大的灶台、成排的刀架、还有几个大得可以装下一个人的铁锅。令人惊讶的是，灶台上还有余温，好像不久前有人在这里做饭。
+
+在厨房的角落，你发现了一个储藏室，里面有一些保存完好的食物和药材。还有一口古井，井水清澈见底。`,
+    choices: [
+      {
+        text: '搜索储藏室',
+        nextScene: 'kitchen_search',
+      },
+      {
+        text: '喝一口井水',
+        nextScene: 'kitchen_return',
+        statCheck: { stat: 'wisdom', difficulty: 4 },
+        successEffects: { hp: 20, message: '你仔细检查了井水，确认没有异常后喝了几口。清凉的井水让你恢复了不少体力。' },
+        failEffects: { hp: -10, message: '你喝了几口井水，但随即感到一阵恶心——水中似乎有什么不对劲。' },
+      },
+      {
+        text: '离开厨房',
+        nextScene: 'servant_passage',
+      },
+    ],
+  },
+
+  kitchen_search: {
+    chapter: 'chapter1',
+    text: `你开始搜索储藏室。
+
+在架子上，你找到了一些干粮、草药，还有一瓶标签模糊的药水。药水瓶上画着一个骷髅头和交叉的骨头——这是毒药还是解药？
+
+你还发现了一把巨大的屠刀，刀刃虽然有些锈迹，但依然锋利。`,
+    choices: [
+      {
+        text: '拿走草药和干粮',
+        nextScene: 'kitchen_return',
+        addItem: '草药包',
+        effects: { hp: 10, message: '你将草药和干粮收入囊中。嚼了几口干粮后，你感觉好多了。' },
+      },
+      {
+        text: '拿走那瓶药水',
+        nextScene: 'kitchen_return',
+        addItem: '神秘药水',
+        effects: { message: '你将那瓶药水小心地收好。在关键时刻，它可能是救命的良药——或者致命的毒药。' },
+      },
+      {
+        text: '拿走屠刀',
+        nextScene: 'kitchen_return',
+        addItem: '屠夫之刃',
+        effects: { message: '你拿起那把沉甸甸的屠刀。虽然不是什么名贵的武器，但在这种地方，任何武器都是好的。' },
+      },
+    ],
+  },
+
+  kitchen_return: {
+    chapter: 'chapter1',
+    text: `你完成了厨房的探索。灶台上的余温让你感到一丝暖意，但你知道这只是暂时的安宁。`,
+    choices: [
+      {
+        text: '回到仆人通道',
+        nextScene: 'servant_passage',
+      },
+      {
+        text: '回到大厅',
+        nextScene: 'hall_after_paintings',
+      },
+    ],
+  },
+
+  water_source: {
+    chapter: 'chapter1',
+    text: `你沿着有水声的方向走去，来到了一个地下蓄水池。
+
+池水清澈见底，在月光的照射下泛着银光。池边有一个石头祭坛，上面放着几个已经干涸的供品盘。祭坛后方的墙壁上雕刻着一尊水神的雕像，她的表情悲悯而庄严。
+
+你注意到水池底部似乎有什么东西在闪光。`,
+    choices: [
+      {
+        text: '潜入水池打捞闪光的物品',
+        nextScene: 'servant_passage',
+        statCheck: { stat: 'dexterity', difficulty: 5 },
+        successEffects: { addItem: '水神之泪', message: '你深吸一口气潜入水中，捞起了一颗散发着蓝光的珍珠。这一定是传说中的"水神之泪"。' },
+        failEffects: { hp: -8, message: '你潜入水中，但水比你想象的要深。你呛了几口水才浮上来，什么也没找到。' },
+      },
+      {
+        text: '在祭坛前祈祷',
+        nextScene: 'servant_passage',
+        statCheck: { stat: 'charisma', difficulty: 4 },
+        successEffects: { hp: 15, message: '你虔诚地祈祷。一股温暖的力量涌入你的身体，你的伤势似乎减轻了一些。' },
+        failEffects: { message: '你祈祷了一会儿，但什么也没有发生。' },
+      },
+      {
+        text: '返回仆人通道',
+        nextScene: 'servant_passage',
+      },
+    ],
+  },
+
+  secret_passage: {
+    chapter: 'chapter1',
+    text: `你举着烛台，小心翼翼地进入了密道。
+
+密道的墙壁上刻满了古老的符文，在烛光的照耀下闪烁着微弱的光芒。空气越来越潮湿，你能听到远处传来的滴水声。
+
+走了大约十分钟，你来到了一扇石门前。石门上刻着一个复杂的锁孔，形状像是一把特殊的钥匙。
+
+门缝中透出微弱的光线——门后面一定有什么。`,
+    choices: [
+      {
+        text: '用古旧钥匙尝试开锁',
+        nextScene: 'secret_room',
+        requireItem: '古旧钥匙',
+      },
+      {
+        text: '用力推开石门',
+        nextScene: 'secret_passage',
+        statCheck: { stat: 'strength', difficulty: 8 },
+        successEffects: { nextScene: 'secret_room', message: '你用尽全力推开了石门！' },
+        failEffects: { hp: -10, message: '石门纹丝不动，你反而伤了自己的肩膀。' },
+      },
+      {
+        text: '原路返回',
+        nextScene: 'library_return',
+      },
+    ],
+  },
+
+  secret_room: {
+    chapter: 'chapter1',
+    text: `石门在一阵沉闷的响声后缓缓打开。
+
+门后是一间密室，房间中央放着一个石制的祭坛。祭坛上有一本被铁链锁住的书，书的封面上镶着一颗血红色的宝石。
+
+房间的四角各放着一盏永不熄灭的油灯，散发着幽幽的绿光。墙壁上画满了壁画，描绘着某种黑暗的仪式。
+
+你感到一股强烈的压迫感——这个房间蕴含着某种强大的力量。`,
+    choices: [
+      {
+        text: '研究壁画上的仪式',
+        nextScene: 'hall_after_paintings',
+        statCheck: { stat: 'wisdom', difficulty: 6 },
+        successEffects: { setFlag: 'learned_ritual', message: '你仔细研究了壁画上的仪式。这是一种古老的封印术——用来封印强大的诅咒之物。你记住了仪式的关键步骤。' },
+        failEffects: { message: '壁画上的图案太过复杂，你无法理解其中的含义。' },
+      },
+      {
+        text: '尝试打开被锁住的书',
+        nextScene: 'hall_after_paintings',
+        requireItem: '小铁钥匙',
+        successEffects: { addItem: '禁忌之书', setFlag: 'has_forbidden_book', message: '铁链应声而落。你翻开书页，里面记载着各种黑暗的魔法和禁忌的知识。虽然危险，但这些知识可能会派上用场。' },
+        failEffects: { message: '书被铁链牢牢锁住，你需要找到对应的钥匙。' },
+      },
+      {
+        text: '取下宝石',
+        nextScene: 'hall_after_paintings',
+        effects: { addItem: '血红宝石', hp: -5, message: '你用力掰下了封面上的宝石。触碰的瞬间，你感到一阵眩晕——宝石似乎吸收了你的一部分生命力。但它的价值可能是值得的。' },
+      },
+    ],
+  },
+
+  // ==================== 第二章：迷失花园 ====================
+  upper_floor: {
+    chapter: 'chapter2',
+    text: `你沿着宽阔的楼梯走上二楼。
+
+楼上的走廊比大厅更加阴暗，只有几扇窗户透进微弱的月光。走廊两侧排列着许多房门，每扇门上都标有不同的纹章。
+
+走廊的尽头有一扇特别大的门，门上雕刻着一只展翅的凤凰——这可能是城堡主人的卧室。
+
+走廊中间有一扇半开的门，里面似乎透出温暖的光线。另一扇门上标着"天文台"的字样。`,
+    choices: [
+      {
+        text: '进入那扇半开的门',
+        nextScene: 'warm_room',
+      },
+      {
+        text: '去天文台',
+        nextScene: 'observatory',
+      },
+      {
+        text: '走向尽头的凤凰门',
+        nextScene: 'master_bedroom',
+      },
+      {
+        text: '搜索走廊两侧的房间',
+        nextScene: 'upper_search',
+      },
+    ],
+  },
+
+  warm_room: {
+    chapter: 'chapter2',
+    text: `你推开了那扇半开的门。
+
+令人惊讶的是，这是一间温暖舒适的房间。壁炉中燃烧着真正的火焰——不是那种幽蓝色的鬼火。房间布置得很温馨，有舒适的床铺、书桌，还有一个小茶几。
+
+茶几上放着一杯还在冒热气的茶。好像刚刚有人在这里——但现在房间里空无一人。
+
+书桌上放着一本日记和几张地图。`,
+    choices: [
+      {
+        text: '查看日记',
+        nextScene: 'warm_room_diary',
+      },
+      {
+        text: '查看地图',
+        nextScene: 'warm_room_map',
+      },
+      {
+        text: '喝那杯热茶',
+        nextScene: 'upper_floor',
+        hp: 15,
+        effects: { message: '你端起茶杯，犹豫了一下，还是喝了一口。茶很香，带着一种说不出的温暖。你感觉精神好了很多。' },
+      },
+      {
+        text: '搜索房间',
+        nextScene: 'upper_floor',
+        statCheck: { stat: 'wisdom', difficulty: 5 },
+        successEffects: { addItem: '隐身斗篷', message: '你在床底下发现了一件看起来很旧的斗篷。当你展开它时，斗篷竟然变得半透明！这是一件隐身斗篷。' },
+        failEffects: { message: '你搜索了一番，除了灰尘什么也没找到。' },
+      },
+    ],
+  },
+
+  warm_room_diary: {
+    chapter: 'chapter2',
+    text: `你翻开了书桌上的日记。
+
+日记的主人似乎是城堡的一位访客，笔迹很新：
+
+"第1天：我终于找到了传说中的诅咒古堡。入口比想象的容易。
+
+第3天：我发现了城堡的秘密——王冠不仅仅是诅咒的源头，它也是一把钥匙。持有王冠的人可以控制城堡中的一切，包括那些被困的灵魂。
+
+第5天：我找到了通往塔楼的路。但我开始听到那些声音了——城堡在跟我说话。它想要我戴上王冠。
+
+第7天：我必须做出选择了——戴上王冠获得力量，还是毁掉它让一切结束？
+
+日记到这里就结束了。最后一页上潦草地写着一行字："我选择了第三条路。"`,
+    choices: [
+      {
+        text: '带走日记',
+        nextScene: 'upper_floor',
+        addItem: '探险者日记',
+        effects: { message: '你将日记收入背包。"第三条路"是什么意思？这个信息可能很重要。' },
+      },
+      {
+        text: '放下日记，继续探索',
+        nextScene: 'upper_floor',
+      },
+    ],
+  },
+
+  warm_room_map: {
+    chapter: 'chapter2',
+    text: `你仔细查看了书桌上的地图。
+
+这是一张详细的城堡地图，标注了所有的房间和密道。你注意到地图上用红色墨水标注了几个位置：
+
+1. 地下室深处有一间"封印室"
+2. 塔楼顶层有一间"王座室"
+3. 花园下方有一条通往城堡外的秘密通道
+
+地图的角落写着一行小字："出口在花园喷泉下。"`,
+    choices: [
+      {
+        text: '带走地图',
+        nextScene: 'upper_floor',
+        addItem: '城堡详细地图',
+        setFlag: 'has_map',
+        effects: { message: '你将地图小心地折好收入背包。有了这张地图，你的探索会容易很多。' },
+      },
+      {
+        text: '记住地图内容，继续探索',
+        nextScene: 'upper_floor',
+        setFlag: 'memorized_map',
+      },
+    ],
+  },
+
+  observatory: {
+    chapter: 'chapter2',
+    text: `天文台是一个圆形的房间，穹顶是可以打开的，但现在被锁住了。
+
+房间中央放着一架巨大的天文望远镜，对准了天空。四周的墙壁上画满了星图和天体运行的轨迹。
+
+一个巨大的天球仪放在角落里，上面标注着各种星座和天体的位置。
+
+你注意到望远镜的目镜上似乎刻着什么文字。`,
+    choices: [
+      {
+        text: '通过望远镜观察天空',
+        nextScene: 'upper_floor',
+        statCheck: { stat: 'wisdom', difficulty: 5 },
+        successEffects: { setFlag: 'saw_alignment', message: '你通过望远镜观察天空。在月亮的旁边，你看到了一个异常的天体——一颗暗红色的星星，它不应该在那里。星星的位置似乎与某种天体排列有关。' },
+        failEffects: { message: '你通过望远镜看去，只看到了普通的星空，没什么特别的。' },
+      },
+      {
+        text: '检查目镜上的文字',
+        nextScene: 'upper_floor',
+        statCheck: { stat: 'wisdom', difficulty: 6 },
+        successEffects: { setFlag: 'telescope_code', message: '你辨认出目镜上刻着一组数字："1453-07-13"。这可能是某个重要日期，或者是某种密码。' },
+        failEffects: { message: '文字已经磨损得很厉害，你无法辨认。' },
+      },
+      {
+        text: '转动天球仪',
+        nextScene: 'upper_floor',
+        statCheck: { stat: 'wisdom', difficulty: 7 },
+        successEffects: { addItem: '星象水晶', message: '你按照墙上的星图转动天球仪到正确的位置。一声轻响后，天球仪打开了，里面有一颗散发着星光的水晶。' },
+        failEffects: { message: '你胡乱转动天球仪，什么也没有发生。' },
+      },
+    ],
+  },
+
+  master_bedroom: {
+    chapter: 'chapter2',
+    text: `你推开了雕刻着凤凰的大门。
+
+这是一间巨大的卧室——城堡主人的房间。一张四柱大床占据了房间的中央，床幔已经破旧不堪。房间的一角有一个巨大的衣柜，另一角是一个壁炉。
+
+最引人注目的是床对面的墙上挂着一面巨大的镜子。镜子的边框是用某种黑色的金属制成的，上面雕刻着复杂的花纹。
+
+当你靠近镜子时，你注意到——镜子里的你，好像不太对劲。`,
+    choices: [
+      {
+        text: '仔细端详镜中的自己',
+        nextScene: 'mirror_encounter',
+      },
+      {
+        text: '搜索卧室',
+        nextScene: 'bedroom_search',
+      },
+      {
+        text: '打开衣柜',
+        nextScene: 'bedroom_wardrobe',
+      },
+      {
+        text: '离开卧室',
+        nextScene: 'upper_floor',
+      },
+    ],
+  },
+
+  mirror_encounter: {
+    chapter: 'chapter2',
+    text: `你走近那面巨大的镜子。
+
+镜中的你看起来和平时一样——但当你盯着镜中自己的眼睛时，你发现了一些不同。镜中的你嘴角微微上扬，露出了一个你没有做出的笑容。
+
+然后，镜中的你开口了。
+
+"终于，"镜中的你说，声音像是从很远的地方传来，"又一个被贪念驱使的冒险者。你和其他人一样，都会死在这里。"
+
+镜中的你开始变形，变成了一个穿着黑色铠甲的骑士，手持一把漆黑的长剑。`,
+    choices: [
+      {
+        text: '"你是什么东西？"',
+        nextScene: 'mirror_fight',
+        effects: { message: '镜中的骑士冷笑："我是这座城堡的守护者，是所有贪婪之人的审判者。"' },
+      },
+      {
+        text: '后退并离开',
+        nextScene: 'upper_floor',
+        effects: { message: '你迅速后退。镜中的骑士哈哈大笑："逃吧！但你逃不出这座城堡！"' },
+      },
+      {
+        text: '用灵魂护符对准镜子',
+        nextScene: 'mirror_resolve',
+        requireItem: '灵魂护符',
+      },
+    ],
+  },
+
+  mirror_fight: {
+    chapter: 'chapter2',
+    combat: {
+      name: '镜中骑士',
+      hp: 50,
+      attack: 12,
+      defense: 8,
+      description: '一个从镜中走出的黑暗骑士，全身覆盖着漆黑的铠甲。',
+      rewards: { addItem: '暗影碎片', setFlag: 'defeated_mirror_knight' },
+    },
+    text: `镜中骑士从镜子里走了出来！他举起黑色的长剑，向你发起了攻击。`,
+    choices: [
+      {
+        text: '继续探索',
+        nextScene: 'upper_floor',
+      },
+    ],
+  },
+
+  mirror_resolve: {
+    chapter: 'chapter2',
+    text: `你举起灵魂护符，对准了那面镜子。
+
+护符散发出耀眼的蓝光，与镜中的黑暗力量产生了强烈的对抗。镜面上出现了裂纹，越来越多——
+
+"不！"镜中的骑士发出一声惨叫，"这不可能！"
+
+随着一声巨响，镜子碎裂了。碎片散落一地，每一片都映照着不同的画面——你看到了城堡的过去，看到了阿德里安国王是如何一步步堕入疯狂的。
+
+在碎片中，你发现了一块特别大的镜片，它依然映照着画面——画面中是通往塔楼的路。`,
+    choices: [
+      {
+        text: '带走那块镜片',
+        nextScene: 'upper_floor',
+        addItem: '真相之镜',
+        setFlag: 'mirror_resolved',
+        effects: { message: '你小心地拿起那块镜片。它似乎能映照出真相——在它的照耀下，幻象和陷阱将无所遁形。' },
+      },
+      {
+        text: '继续探索',
+        nextScene: 'upper_floor',
+      },
+    ],
+  },
+
+  bedroom_search: {
+    chapter: 'chapter2',
+    text: `你开始搜索卧室。
+
+在床头柜的抽屉里，你发现了一个精美的音乐盒。打开它，一段忧伤的旋律在房间里回荡。
+
+你还发现枕头下面藏着一封信——信是写给"亲爱的艾莉诺"的，落款是"永远爱你的阿德里安"。信中充满了温柔的话语，但最后一段变得混乱："我控制不住了……它在吞噬我……原谅我……"`,
+    choices: [
+      {
+        text: '带走音乐盒',
+        nextScene: 'upper_floor',
+        addItem: '悲伤的音乐盒',
+        effects: { message: '你合上音乐盒，将它收入背包。这段旋律似乎蕴含着某种力量。' },
+      },
+      {
+        text: '带走信件',
+        nextScene: 'upper_floor',
+        addItem: '阿德里安的信',
+        setFlag: 'has_kings_letter',
+        effects: { message: '你将信件小心地折好。这封信可能会在某个关键时刻派上用场。' },
+      },
+    ],
+  },
+
+  bedroom_wardrobe: {
+    chapter: 'chapter2',
+    text: `你打开了那个巨大的衣柜。
+
+衣柜里挂满了华丽的宫廷服饰，虽然已经褪色破旧，但依然能看出曾经的奢华。在衣柜的深处，你发现了一套完整的铠甲——不是普通士兵的铠甲，而是国王的御用铠甲。
+
+铠甲的胸甲上刻着一行字："暗影守护者"。
+
+铠甲旁边放着一把剑——剑鞘上镶满了宝石，剑柄上刻着一只凤凰。`,
+    choices: [
+      {
+        text: '穿上铠甲',
+        nextScene: 'upper_floor',
+        addItem: '暗影铠甲',
+        effects: { message: '你穿上了那套铠甲。出乎意料地合身，仿佛它一直在等待着你。你感到一股力量涌入身体。' },
+      },
+      {
+        text: '拿起那把剑',
+        nextScene: 'upper_floor',
+        addItem: '凤凰之剑',
+        effects: { message: '你握住剑柄，一股温暖的力量从剑身传来。这是一把被祝福过的武器，对黑暗生物有额外的伤害。' },
+      },
+      {
+        text: '都拿走',
+        nextScene: 'upper_floor',
+        addItem: '暗影铠甲',
+        addItem2: '凤凰之剑',
+        effects: { message: '你将铠甲和剑都收入囊中。现在你看起来就像一个真正的骑士。' },
+      },
+    ],
+  },
+
+  upper_search: {
+    chapter: 'chapter2',
+    text: `你开始搜索走廊两侧的房间。
+
+大部分房间都是空的，只有灰尘和破旧的家具。但在其中一间房间里，你发现了一些有用的东西：
+
+一个房间里有一箱箭矢和一把弓。另一个房间里有一面古老的盾牌。还有一个房间里有一个装满金币的宝箱——但当你打开它时，金币化为了灰烬。
+
+在最后一间房间里，你发现了一个被困在瓶子里的小精灵。`,
+    choices: [
+      {
+        text: '拿走弓和箭矢',
+        nextScene: 'upper_floor',
+        addItem: '古弓',
+        effects: { message: '你拿起弓，试了试弦。虽然有些旧，但依然可用。' },
+      },
+      {
+        text: '拿走古老的盾牌',
+        nextScene: 'upper_floor',
+        addItem: '骑士盾牌',
+        effects: { message: '你拿起那面盾牌，上面刻着一个骑士家族的纹章。它可能会在战斗中保护你。' },
+      },
+      {
+        text: '释放瓶中的精灵',
+        nextScene: 'upper_floor',
+        statCheck: { stat: 'charisma', difficulty: 5 },
+        successEffects: { addItem: '精灵的祝福', setFlag: 'freed_fairy', message: '你小心地打开了瓶塞。一道金光飞出，化作一个小小的精灵。"谢谢你救了我！"精灵说，"作为报答，我给你一个祝福——在你最需要的时候，我会帮助你。"' },
+        failEffects: { message: '你试图打开瓶子，但瓶塞被魔法封住了，怎么也打不开。' },
+      },
+    ],
+  },
+
+  // ==================== 第三章：深渊地牢 ====================
+  basement_entrance: {
+    chapter: 'chapter3',
+    text: `你推开了通往地下室的门。
+
+一段陡峭的石阶向下延伸，消失在黑暗中。空气中弥漫着潮湿和腐朽的气味，还有一丝若有若无的血腥味。
+
+石阶的墙壁上挂着几盏已经熄灭的火把。你听到从下面传来的声音——像是铁链拖地的声音，又像是低沉的呻吟。
+
+你的每一步都会在石壁间产生回响，仿佛有无数人在跟随你。`,
+    choices: [
+      {
+        text: '小心翼翼地走下石阶',
+        nextScene: 'basement_corridor',
+        statCheck: { stat: 'dexterity', difficulty: 4 },
+        successEffects: { message: '你放轻脚步，悄无声息地走下了石阶。' },
+        failEffects: { hp: -5, message: '你不小心踩到了一块松动的石阶，差点摔倒。你的动静惊动了下面的什么东西。' },
+      },
+      {
+        text: '大声喊话试探',
+        nextScene: 'basement_corridor',
+        statCheck: { stat: 'charisma', difficulty: 6 },
+        successEffects: { message: '"有人在吗？"你的声音在石壁间回荡。下面的铁链声停了——好像有什么东西在听。' },
+        failEffects: { hp: -8, message: '你的喊声引来了回应——一支箭从黑暗中射出，擦伤了你的肩膀！' },
+      },
+      {
+        text: '如果之前拿了烛台，点燃后前进',
+        nextScene: 'basement_corridor',
+        requireItem: '烛台',
+      },
+    ],
+  },
+
+  basement_corridor: {
+    chapter: 'chapter3',
+    text: `你来到了地下室的走廊。
+
+走廊很长，两侧是一排排铁栅栏的牢房。大部分牢房都是空的，但偶尔你能看到里面有一些模糊的身影——是骸骨，穿着破旧的衣服，保持着各种最后的姿势。
+
+走廊的尽头分为两个方向：左边是一扇厚重的铁门，门上刻着警告的文字；右边是一条更狭窄的通道，通向更深的黑暗。
+
+铁门上的文字写着："封印之地，擅入者死。"
+
+狭窄通道的入口处，你看到了一些新鲜的抓痕——好像有什么东西从这里经过。`,
+    choices: [
+      {
+        text: '打开铁门进入封印之地',
+        nextScene: 'sealed_room',
+        statCheck: { stat: 'strength', difficulty: 6 },
+        successEffects: { message: '你用力推开了沉重的铁门。' },
+        failEffects: { hp: -10, message: '铁门异常沉重，你花了很大力气才推开它。在推门的过程中，你被门上的铁刺划伤了。' },
+      },
+      {
+        text: '沿着狭窄通道前进',
+        nextScene: 'deep_tunnels',
+      },
+      {
+        text: '搜索牢房看看有没有有用的物品',
+        nextScene: 'cell_search',
+      },
+    ],
+  },
+
+  sealed_room: {
+    chapter: 'chapter3',
+    text: `铁门后是一间巨大的圆形房间。
+
+房间中央有一个石制的祭坛，祭坛上放着一个水晶球，散发着微弱的紫色光芒。祭坛周围的地面上画着一个巨大的魔法阵，阵中的符文在微微发光。
+
+房间的墙壁上挂满了铁链——这些铁链似乎在束缚着什么。你听到铁链末端传来微弱的呼吸声。
+
+在祭坛后面，你看到了一扇被封印的石门。石门上刻着与城堡入口铁门上相同的符文。`,
+    choices: [
+      {
+        text: '查看水晶球',
+        nextScene: 'sealed_room_crystal',
+      },
+      {
+        text: '检查铁链末端',
+        nextScene: 'sealed_room_chain',
+      },
+      {
+        text: '研究封印石门',
+        nextScene: 'sealed_door',
+      },
+      {
+        text: '离开这个房间',
+        nextScene: 'basement_corridor',
+      },
+    ],
+  },
+
+  sealed_room_crystal: {
+    chapter: 'chapter3',
+    text: `你走近那个水晶球。
+
+当你靠近时，水晶球内的紫色光芒变得更加明亮。你看到了水晶球中浮现的画面——
+
+画面中是城堡的全貌，但城堡被一层黑色的雾气笼罩着。雾气的源头是城堡最高处的塔楼——王冠就在那里。
+
+你还看到了城堡中所有的灵魂——他们被困在雾气中，无法离开，也无法安息。其中最明亮的一个光点是艾莉诺的灵魂。
+
+水晶球似乎在向你展示一切的真相。`,
+    choices: [
+      {
+        text: '触碰水晶球',
+        nextScene: 'sealed_room',
+        statCheck: { stat: 'wisdom', difficulty: 7 },
+        successEffects: { addItem: '预言水晶', setFlag: 'crystal_vision', message: '你触碰了水晶球。一股信息涌入你的脑海——你看到了封印王冠的方法。你需要找到三件圣物：银质十字架、水神之泪、和幽灵之泪。将它们放在祭坛上，就能永久封印王冠。' },
+        failEffects: { hp: -15, message: '你触碰水晶球的瞬间，一股强大的力量将你弹飞！你重重地摔在地上，感觉头昏眼花。' },
+      },
+      {
+        text: '不触碰，继续探索',
+        nextScene: 'sealed_room',
+      },
+    ],
+  },
+
+  sealed_room_chain: {
+    chapter: 'chapter3',
+    text: `你小心翼翼地走向那些铁链。
+
+铁链的末端锁着一个半透明的身影——是一个幽灵，看起来像是一个年老的管家。他抬起头看着你，眼中满是疲惫和悲伤。
+
+"又是一个冒险者，"他用沙哑的声音说，"你是来找宝藏的吗？还是来终结这一切的？"
+
+"我是这座城堡的管家，被诅咒束缚在这里已经几百年了。如果你能找到我的主人阿德里安的王冠，求求你，毁掉它。"`,
+    choices: [
+      {
+        text: '"告诉我更多关于王冠的事。"',
+        nextScene: 'sealed_room',
+        setFlag: 'butler_info',
+        effects: { message: '管家叹了口气："王冠是用一种叫做'暗影之金'的材料制成的。它能赋予佩戴者力量，但代价是灵魂。只有用三件圣物的力量才能摧毁它。"他顿了顿，"或者……你可以选择戴上它，成为新的暗影之王。"' },
+      },
+      {
+        text: '"我怎么才能帮你？"',
+        nextScene: 'sealed_room',
+        setFlag: 'butler_quest',
+        effects: { message: '"如果你能毁掉王冠，我们所有人就能得到安息。"管家说，"但要小心——城堡的守护者会阻止你。你需要勇气、智慧，和一点点运气。"' },
+      },
+      {
+        text: '不去理会他，继续探索',
+        nextScene: 'sealed_room',
+      },
+    ],
+  },
+
+  sealed_door: {
+    chapter: 'chapter3',
+    text: `你走到那扇封印石门前。
+
+石门上的符文和城堡入口铁门上的一样——这是一种古老的封印符文。如果你之前研究过这些符文，你可能知道如何解开封印。
+
+石门后面传来微弱的光芒和温暖的气息——与其他地方的阴冷截然不同。`,
+    choices: [
+      {
+        text: '使用符文拓片解开封印',
+        nextScene: 'treasure_vault',
+        requireItem: '符文拓片',
+      },
+      {
+        text: '使用咒语残页解开封印',
+        nextScene: 'treasure_vault',
+        requireItem: '咒语残页',
+      },
+      {
+        text: '用蛮力推开石门',
+        nextScene: 'sealed_room',
+        statCheck: { stat: 'strength', difficulty: 9 },
+        successEffects: { nextScene: 'treasure_vault', message: '你用尽全力推开了石门！封印在你的力量面前崩溃了。' },
+        failEffects: { hp: -20, message: '你用力推门，但封印的力量将你弹了回来。你感到一阵剧痛。' },
+      },
+      {
+        text: '暂时离开，先去找解开封印的方法',
+        nextScene: 'basement_corridor',
+      },
+    ],
+  },
+
+  deep_tunnels: {
+    chapter: 'chapter3',
+    text: `你沿着狭窄的通道深入。
+
+通道越来越窄，越来越暗。墙壁上的抓痕越来越密集——有什么东西经常在这里活动。
+
+突然，你听到了前方传来的沙沙声。声音越来越近——
+
+一群巨大的老鼠从黑暗中涌出！它们的眼睛泛着红光，体型比普通老鼠大了好几倍。领头的是一只体型更大的老鼠，它的背上似乎骑着什么东西。`,
+    choices: [
+      {
+        text: '拔出武器迎战',
+        nextScene: 'rat_combat',
+        combat: {
+          name: '鼠群',
+          hp: 35,
+          attack: 8,
+          defense: 3,
+          description: '一群被诅咒变异的巨鼠，眼睛泛着诡异的红光。',
+          rewards: { addItem: '鼠王之牙', setFlag: 'defeated_rats' },
+        },
+      },
+      {
+        text: '用火把/烛台驱赶它们',
+        nextScene: 'deep_tunnels_2',
+        requireItem: '烛台',
+        effects: { message: '你举起燃烧的烛台，火焰让鼠群不敢靠近。它们吱吱叫着让开了一条路。' },
+      },
+      {
+        text: '转身逃跑',
+        nextScene: 'basement_corridor',
+        statCheck: { stat: 'dexterity', difficulty: 5 },
+        successEffects: { message: '你转身就跑，成功逃离了鼠群。' },
+        failEffects: { hp: -12, message: '你在逃跑时被几只巨鼠咬伤了。' },
+      },
+    ],
+  },
+
+  rat_combat: {
+    chapter: 'chapter3',
+    text: `你击败了鼠群，从它们的尸体上搜到了一些有用的东西。领头巨鼠的牙齿异常锋利，你将它取了下来。
+
+通道继续向前延伸，你决定继续深入。`,
+    choices: [
+      {
+        text: '继续深入通道',
+        nextScene: 'deep_tunnels_2',
+      },
+    ],
+  },
+
+  deep_tunnels_2: {
+    chapter: 'chapter3',
+    text: `你继续深入通道，来到了一个地下洞穴。
+
+洞穴中央有一个地下湖，湖水漆黑如墨。湖中央有一个小岛，岛上似乎放着什么东西——在微弱的光线下，你看不太清楚。
+
+湖边有一条破旧的小船，看起来勉强可以使用。洞穴的另一端有一条向上的阶梯，似乎通向城堡的另一部分。`,
+    choices: [
+      {
+        text: '划船去湖心小岛',
+        nextScene: 'lake_island',
+      },
+      {
+        text: '沿着阶梯向上',
+        nextScene: 'tower_base',
+      },
+      {
+        text: '搜索湖边',
+        nextScene: 'deep_tunnels_2',
+        statCheck: { stat: 'wisdom', difficulty: 5 },
+        successEffects: { addItem: '水下呼吸药剂', message: '你在湖边的石头缝里发现了一瓶药剂——标签上画着一个潜水的人。这可能是水下呼吸药剂。' },
+        failEffects: { message: '你搜索了一番，但除了潮湿的石头什么也没找到。' },
+      },
+    ],
+  },
+
+  lake_island: {
+    chapter: 'chapter3',
+    text: `你小心翼翼地划着小船来到湖心小岛。
+
+小岛上放着一个石制的箱子，箱子上刻着与封印石门相同的符文。箱子没有上锁，但你感觉到上面有某种魔法封印。
+
+箱子旁边立着一块石碑，上面刻着："此箱中藏有通往自由之路的钥匙，但只有心怀善念之人才能打开。"`,
+    choices: [
+      {
+        text: '尝试打开石箱',
+        nextScene: 'deep_tunnels_2',
+        statCheck: { stat: 'charisma', difficulty: 6 },
+        successEffects: { addItem: '自由之钥', setFlag: 'has_freedom_key', message: '你怀着诚挚的心打开了石箱。里面放着一把金色的钥匙，散发着温暖的光芒。石碑上的文字变为了："你证明了你的善良。这把钥匙将为你打开通往自由的大门。"' },
+        failEffects: { hp: -10, message: '你试图打开石箱，但封印的力量将你弹开。你的手被灼伤了。' },
+      },
+      {
+        text: '离开小岛',
+        nextScene: 'deep_tunnels_2',
+      },
+    ],
+  },
+
+  cell_search: {
+    chapter: 'chapter3',
+    text: `你开始搜索那些牢房。
+
+大部分牢房里只有骸骨和破旧的物品。但在一间牢房里，你发现了一本被藏在墙壁裂缝中的日记。
+
+日记的主人是城堡的最后一任卫队长：
+
+"国王疯了。他戴着那顶王冠，杀死了所有反抗他的人。我试图保护平民，但失败了。我被关在这里，等待处决。
+
+如果你看到这本日记，求求你，找到王冠，毁掉它。王冠在塔楼顶层的王座室里，被三道封印保护着。
+
+三道封印的钥匙分别在：管家手中、花园女神的祭坛上、和湖心小岛上。"`,
+    choices: [
+      {
+        text: '带走日记',
+        nextScene: 'basement_corridor',
+        addItem: '卫队长日记',
+        setFlag: 'has_captain_diary',
+        effects: { message: '你将日记收入囊中。这些信息对你找到王冠非常重要。' },
+      },
+      {
+        text: '继续搜索',
+        nextScene: 'basement_corridor',
+      },
+    ],
+  },
+
+  // ==================== 第四章：暗影高塔 ====================
+  tower_base: {
+    chapter: 'chapter4',
+    text: `你沿着阶梯向上，来到了城堡塔楼的底部。
+
+塔楼内部是一个巨大的螺旋楼梯，盘旋而上，消失在高处的黑暗中。楼梯的扶手上雕刻着各种恶魔和怪物的形象，在火光的照耀下显得格外恐怖。
+
+你能感觉到塔楼中有某种强大的存在——空气中弥漫着压迫感，让你呼吸困难。
+
+楼梯的第一层平台上有一扇门，门上标着"守卫室"。楼梯继续向上延伸。`,
+    choices: [
+      {
+        text: '进入守卫室',
+        nextScene: 'guard_room',
+      },
+      {
+        text: '直接沿着楼梯向上',
+        nextScene: 'tower_stairs',
+      },
+      {
+        text: '在楼梯口休息恢复体力',
+        nextScene: 'tower_base',
+        hp: 20,
+        effects: { message: '你靠在墙上休息了一会儿，感觉体力恢复了一些。' },
+      },
+    ],
+  },
+
+  guard_room: {
+    chapter: 'chapter4',
+    text: `守卫室里一片狼藉——桌椅翻倒，武器散落一地。看起来这里曾经发生过一场激烈的战斗。
+
+在角落里，你发现了一个保存完好的武器架，上面放着几件武器。还有一面巨大的盾牌靠在墙上。
+
+最引人注目的是墙上挂着的一幅画像——画中是一位穿着银色铠甲的骑士，手持一把闪亮的长剑。画框下方的铜牌上写着："银月骑士团团长——最后的守护者"。`,
+    choices: [
+      {
+        text: '拿走武器架上的武器',
+        nextScene: 'tower_base',
+        addItem: '精钢长剑',
+        effects: { message: '你从武器架上取下了一把精钢长剑。剑身虽然有些锈迹，但依然锋利。' },
+      },
+      {
+        text: '拿走那面大盾牌',
+        nextScene: 'tower_base',
+        addItem: '守卫大盾',
+        effects: { message: '你拿起了那面巨大的盾牌。它很重，但能提供很好的防护。' },
+      },
+      {
+        text: '搜索房间',
+        nextScene: 'tower_base',
+        statCheck: { stat: 'wisdom', difficulty: 5 },
+        successEffects: { addItem: '治疗药水', message: '你在翻倒的桌子下发现了一瓶治疗药水。在关键时刻，它可能会救你一命。' },
+        failEffects: { message: '你搜索了一番，但没什么有用的发现。' },
+      },
+    ],
+  },
+
+  tower_stairs: {
+    chapter: 'chapter4',
+    text: `你开始沿着螺旋楼梯向上攀登。
+
+楼梯越往上越窄，空气也越来越稀薄。你能听到从上方传来的风声——塔楼顶部是开放的。
+
+爬了大约一半，你来到了一个宽敞的平台。平台的中央有一面巨大的石门，门上刻着复杂的图案——一只展翅的凤凰，被锁链束缚着。
+
+石门的两侧各有一个火炬台，火焰是诡异的紫色。门上刻着一行字："只有通过试炼的人，才能继续前进。"`,
+    choices: [
+      {
+        text: '推开石门接受试炼',
+        nextScene: 'trial_room',
+      },
+      {
+        text: '检查火炬台',
+        nextScene: 'tower_stairs',
+        statCheck: { stat: 'wisdom', difficulty: 6 },
+        successEffects: { addItem: '紫焰精华', message: '你小心地从火炬台中取出了一些紫色的火焰精华。这种火焰似乎蕴含着某种特殊的力量。' },
+        failEffects: { hp: -5, message: '你试图触碰紫色火焰，却被灼伤了手指。' },
+      },
+      {
+        text: '继续向上攀登',
+        nextScene: 'tower_stairs_blocked',
+      },
+    ],
+  },
+
+  tower_stairs_blocked: {
+    chapter: 'chapter4',
+    text: `你试图绕过石门继续向上攀登，但楼梯被一道无形的屏障挡住了。
+
+你伸手触碰——一股电流般的感觉传遍全身。屏障的力量很强，你无法强行通过。
+
+看来你必须通过石门后的试炼才能继续前进。`,
+    choices: [
+      {
+        text: '返回推开石门',
+        nextScene: 'trial_room',
+      },
+      {
+        text: '返回塔底',
+        nextScene: 'tower_base',
+      },
+    ],
+  },
+
+  trial_room: {
+    chapter: 'chapter4',
+    text: `石门在你推动的瞬间发出一声沉闷的响声，缓缓打开了。
+
+门后是一间巨大的试炼场。场地的中央站着一个——不，是一个幽灵。它穿着古老的铠甲，手持一把散发着寒光的长剑。
+
+幽灵抬起头看着你，空洞的眼窝中闪烁着两点红光。
+
+"我在这里等待了数百年，"幽灵说，声音像是从坟墓中传来，"等待一个有资格继续前进的人。证明你的实力——或者你的智慧。"`,
+    choices: [
+      {
+        text: '"我准备好战斗了。"',
+        nextScene: 'trial_combat',
+        combat: {
+          name: '幽灵守卫',
+          hp: 60,
+          attack: 15,
+          defense: 10,
+          description: '一个等待了数百年的幽灵守卫，铠甲上还残留着当年战斗的痕迹。',
+          rewards: { addItem: '幽灵之刃', setFlag: 'defeated_ghost_guard' },
+        },
+      },
+      {
+        text: '"有没有不需要战斗的方式？"',
+        nextScene: 'trial_resolve',
+        statCheck: { stat: 'charisma', difficulty: 7 },
+        successEffects: { message: '幽灵沉默了片刻。"你和那些只想要宝藏的人不一样。好吧，让我看看你的智慧。"' },
+        failEffects: { message: '幽灵冷笑："在这里，只有强者才能生存。准备战斗吧。"' },
+      },
+      {
+        text: '使用阿德里安的信',
+        nextScene: 'trial_resolve',
+        requireItem: '阿德里安的信',
+        effects: { message: '你拿出那封信，递给幽灵。幽灵接过信，空洞的眼窝中流出了两行幽蓝色的泪水。"这是……主人的信……"' },
+      },
+    ],
+  },
+
+  trial_combat: {
+    chapter: 'chapter4',
+    text: `你击败了幽灵守卫。它的身体化作点点光芒消散，留下了一把散发着寒光的长剑。
+
+"你很强大，"幽灵最后的声音在空气中回荡，"继续前进吧，但要小心——上面的守护者比我强大得多。"`,
+    choices: [
+      {
+        text: '继续向上攀登',
+        nextScene: 'tower_top',
+      },
+    ],
+  },
+
+  trial_resolve: {
+    chapter: 'chapter4',
+    text: `幽灵看着你，沉默了很久。
+
+"很久没有人愿意和我说话了，"它最终开口，声音中带着一丝疲惫，"我只是想完成我的使命——守护这条路。但几百年过去了，我已经忘记了为什么要守护它。"
+
+"你让我想起了……一些事情。去吧，继续前进。但要小心，上面的守护者……他不会像我这样好说话。"
+
+幽灵的身影逐渐消散，通往上方的路打开了。`,
+    choices: [
+      {
+        text: '继续向上攀登',
+        nextScene: 'tower_top',
+        addItem: '幽灵的祝福',
+        effects: { message: '幽灵消散前，一团光芒融入了你的身体。你感到一股温暖的力量——这是幽灵的祝福。' },
+      },
+    ],
+  },
+
+  tower_top: {
+    chapter: 'chapter4',
+    text: `你终于来到了塔楼的顶层。
+
+这里是一间巨大的王座室。房间的中央放着一把用黑色金属制成的王座，王座上坐着一个人——不，是一个影子。
+
+影子逐渐凝聚成了一个实体——一个穿着黑色铠甲的骑士，与镜中骑士相似，但更加高大、更加强大。他的眼睛燃烧着暗红色的火焰，手中握着一把漆黑的巨剑。
+
+"欢迎来到我的领地，"他的声音像是雷鸣，"我是暗影守卫，王冠的最后守护者。你想要王冠？先过我这一关。"`,
+    choices: [
+      {
+        text: '"我准备好了。"',
+        nextScene: 'final_combat',
+        combat: {
+          name: '暗影守卫',
+          hp: 80,
+          attack: 18,
+          defense: 12,
+          description: '王冠的最后守护者，由暗影之力凝聚而成的强大存在。',
+          rewards: { addItem: '暗影核心', setFlag: 'defeated_shadow_guard' },
+        },
+      },
+      {
+        text: '"等等，我们能不能谈谈？"',
+        nextScene: 'final_negotiate',
+        statCheck: { stat: 'charisma', difficulty: 8 },
+        successEffects: { message: '暗影守卫停下了动作。"……你想说什么？"' },
+        failEffects: { message: '暗影守卫冷笑："没有什么好谈的。要么战斗，要么死亡。"' },
+      },
+      {
+        text: '使用幽灵之泪',
+        nextScene: 'final_resolve',
+        requireItem: '幽灵之泪',
+        effects: { message: '你举起幽灵之泪，它散发出耀眼的蓝光。暗影守卫的身体开始颤抖——这颗泪珠中蕴含的力量让他感到痛苦。' },
+      },
+    ],
+  },
+
+  final_combat: {
+    chapter: 'chapter4',
+    text: `你击败了暗影守卫！他的身体化作一团黑雾消散，只留下一颗散发着暗红色光芒的核心。
+
+王座后面的一扇门缓缓打开了——门后是通往最终之地的路。`,
+    choices: [
+      {
+        text: '走向最终之地',
+        nextScene: 'finale',
+      },
+    ],
+  },
+
+  final_negotiate: {
+    chapter: 'chapter4',
+    text: `"我曾经也是一个人，"暗影守卫说，声音中带着一丝疲惫，"我是阿德里安国王的骑士团长。国王疯了之后，我试图阻止他，但失败了。我的灵魂被王冠束缚，成为了它的守护者。"
+
+"几百年来，我看着一个又一个冒险者来到这里，他们要么死在我的剑下，要么……被王冠吞噬。"
+
+"如果你想终结这一切，你需要证明你有这个资格。"`,
+    choices: [
+      {
+        text: '"我有三件圣物，可以封印王冠。"',
+        nextScene: 'finale',
+        condition: () => {
+          const inv = window.game?.character?.inventory || [];
+          return inv.includes('银质十字架') && inv.includes('水神之泪') && inv.includes('幽灵之泪');
+        },
+        successEffects: { message: '暗影守卫看着你手中的三件圣物，沉默了很久。"你真的找到了它们……也许，你就是那个能终结这一切的人。"他让开了路。' },
+        failEffects: { message: '暗影守卫摇了摇头："你没有足够的圣物。我不能让你过去。"' },
+      },
+      {
+        text: '"告诉我怎样才能终结这一切。"',
+        nextScene: 'tower_top',
+        effects: { message: '"找到三件圣物：银质十字架、水神之泪、幽灵之泪。将它们放在最终之地的祭坛上，就能封印王冠。"暗影守卫说，"但如果你没有它们……你就必须和我战斗。"' },
+      },
+    ],
+  },
+
+  final_resolve: {
+    chapter: 'chapter4',
+    text: `幽灵之泪的光芒越来越强，暗影守卫的身体开始崩溃。
+
+"这……这是艾莉诺的眼泪……"他跪倒在地，"她还记得我……"
+
+暗影守卫的身体逐渐变得透明，最终化作点点光芒消散。在他消失的地方，你看到了一个微笑的面容——那是他生前的样子。
+
+"谢谢你……"他的声音在空气中回荡，"终于……自由了……"`,
+    choices: [
+      {
+        text: '走向最终之地',
+        nextScene: 'finale',
+        addItem: '幽灵的祝福',
+        effects: { message: '暗影守卫消散前，一道光芒融入了你的身体。这是他最后的祝福。' },
+      },
+    ],
+  },
+
+  // ==================== 终章：命运抉择 ====================
+  finale: {
+    chapter: 'chapter5',
+    text: `你来到了塔楼的最顶层——王冠之间。
+
+这是一个圆形的房间，穹顶是开放的，你可以看到满天的星辰。房间的中央有一个石制的祭坛，祭坛上放着——
+
+一顶王冠。
+
+金色的王冠上镶满了宝石，在月光下散发着迷人的光芒。但你也能感觉到它蕴含的黑暗力量——那种力量在诱惑你，呼唤你。
+
+"戴上它……"一个声音在你脑海中响起，"戴上它，你将获得无尽的力量……"
+
+祭坛的周围刻着复杂的符文阵。如果你有三件圣物，也许可以在这里进行封印仪式。
+
+你的心跳加速。这是你最后的选择。`,
+    choices: [
+      {
+        text: '戴上王冠',
+        nextScene: 'ending_dark_lord',
+        effects: { message: '你的双手不受控制地伸向王冠……' },
+      },
+      {
+        text: '用三件圣物封印王冠',
+        nextScene: 'ending_seal',
+        condition: () => {
+          const inv = window.game?.character?.inventory || [];
+          return inv.includes('银质十字架') && inv.includes('水神之泪') && inv.includes('幽灵之泪');
+        },
+      },
+      {
+        text: '摧毁王冠',
+        nextScene: 'ending_destroy',
+        condition: () => {
+          return window.game?.character?.stats?.strength >= 7;
+        },
+      },
+      {
+        text: '转身离开，放弃一切',
+        nextScene: 'ending_escape',
+      },
+    ],
+  },
+
+  // ==================== 结局场景 ====================
+  ending_dark_lord: {
+    chapter: 'chapter5',
+    text: `你将王冠戴在了头上。
+
+一瞬间，无穷的力量涌入你的身体。你感到自己变得无比强大——可以摧毁一切，可以创造一切。
+
+但随后，黑暗开始侵蚀你的意识。你试图抵抗，但它太强大了。你的记忆开始模糊，你的意志开始崩溃……
+
+当你再次睁开眼睛时，你已经不是你了。
+
+你坐在王座上，穿着黑色的铠甲，手中握着一把漆黑的巨剑。你的眼睛燃烧着暗红色的火焰。
+
+新的暗影之王诞生了。城堡中的灵魂们发出绝望的哀号，因为他们知道——诅咒将继续，永无止境。
+
+【结局：暗影之王——你成为了新的诅咒。】`,
+    choices: [
+      {
+        text: '重新开始',
+        nextScene: 'restart',
+      },
+    ],
+  },
+
+  ending_seal: {
+    chapter: 'chapter5',
+    text: `你将三件圣物放在祭坛上，开始进行封印仪式。
+
+银质十字架散发出圣洁的白光，水神之泪泛起蔚蓝的波纹，幽灵之泪绽放出幽蓝的光芒。三种光芒交织在一起，形成了一个巨大的封印阵。
+
+王冠开始剧烈颤抖，发出刺耳的尖叫。黑暗的力量在与圣光对抗，但三件圣物的力量太过强大。
+
+最终，王冠的光芒完全消失了。它变成了一块普通的金属，所有的诅咒都被封印了。
+
+城堡中传来一声悠长的叹息——那是所有被困灵魂的解脱。
+
+你看到艾莉诺的幽灵出现在你面前，她的脸上带着感激的微笑。"谢谢你，"她说，"我们终于可以安息了。"
+
+她和其他灵魂一起，化作点点光芒，飞向了天空。
+
+城堡的诅咒，终于解除了。
+
+【结局：灵魂解放者——你用圣物封印了王冠，解放了所有被困的灵魂。】`,
+    choices: [
+      {
+        text: '重新开始',
+        nextScene: 'restart',
+      },
+    ],
+  },
+
+  ending_destroy: {
+    chapter: 'chapter5',
+    text: `你举起武器，用尽全力向王冠砍去！
+
+王冠在你的力量下碎裂了。但就在碎裂的瞬间，一股巨大的黑暗能量爆发出来，将你掀飞。
+
+你重重地摔在地上，感觉全身的骨头都要散架了。但你看到了——王冠的碎片在燃烧，黑暗的力量在消散。
+
+城堡开始震动，墙壁上出现了裂缝。王冠的毁灭引发了连锁反应——诅咒古堡正在崩塌！
+
+你挣扎着站起来，拼命向外跑去……
+
+当你终于逃出城堡时，身后传来一声巨响。你回头望去，只见整座城堡在黑暗中崩塌、消失，仿佛从未存在过。
+
+诅咒，连同城堡一起，被永远埋葬了。
+
+【结局：毁灭者——你用力量摧毁了王冠，但也摧毁了整座城堡。】`,
+    choices: [
+      {
+        text: '重新开始',
+        nextScene: 'restart',
+      },
+    ],
+  },
+
+  ending_escape: {
+    chapter: 'chapter5',
+    text: `你转过身，向出口走去。
+
+"你要放弃吗？"那个声音在你脑海中响起，"你真的要放弃这一切？"
+
+你没有回头。
+
+你走下了塔楼，穿过了大厅，走过了庭院。城堡的大门在你面前打开，月光洒在你的身上。
+
+当你走出城堡的那一刻，你听到身后传来一声叹息。你没有回头——你知道，如果你回头，你可能就走不了了。
+
+你离开了诅咒古堡。你没有获得宝藏，也没有终结诅咒。但你活了下来——在这个被诅咒的地方，活着本身就是一种胜利。
+
+也许有一天，会有另一个冒险者来到这里。也许那个人会有勇气完成你没有完成的事。
+
+【结局：幸存者——你选择了活着离开，将诅咒留给了未来。】`,
+    choices: [
+      {
+        text: '重新开始',
+        nextScene: 'restart',
+      },
+    ],
+  },
+
+  ending_hero: {
+    chapter: 'chapter5',
+    text: `你封印了王冠，解放了所有被困的灵魂。
+
+在灵魂们离去之前，艾莉诺走到你面前。她的身影已经变得几乎完全透明。
+
+"谢谢你，"她说，声音中带着无尽的感激，"你不仅终结了诅咒，还给了我们安宁。作为感谢，我想告诉你一个秘密。"
+
+她指向祭坛下方。"那里有一条秘密通道，通往城堡的宝库。阿德里安在疯狂之前，将他所有的财宝都藏在了那里。那是你应得的奖励。"
+
+你按照她的指引，找到了宝库。里面堆满了金银珠宝、珍贵的魔法物品和古代的神器。
+
+你带着这些财宝离开了城堡，成为了传说中的英雄。
+
+【结局：传奇英雄——你不仅终结了诅咒，还获得了无尽的财宝，成为了传奇。】`,
+    choices: [
+      {
+        text: '重新开始',
+        nextScene: 'restart',
+      },
+    ],
+  },
+
+  ending_curse: {
+    chapter: 'chapter5',
+    text: `你将王冠戴在了头上——但这一次，你试图用自己的意志控制它的力量。
+
+王冠的黑暗力量开始侵蚀你的意识，但你早有准备。你用之前学到的所有知识和力量与它对抗。
+
+这是一场漫长而艰苦的战斗。你几乎失去了自我，但在最后一刻，你想起了所有帮助过你的人——艾莉诺、管家、幽灵守卫……他们的期望让你坚持了下来。
+
+最终，你成功了。你控制了王冠的力量，但没有被它吞噬。
+
+你成为了城堡新的守护者——不是诅咒的奴隶，而是它的主人。你用这份力量保护着城堡中的灵魂，直到他们找到安息的方式。
+
+【结局：守护者——你控制了王冠的力量，成为了城堡的守护者。】`,
+    choices: [
+      {
+        text: '重新开始',
+        nextScene: 'restart',
+      },
+    ],
+  },
+
+  ending_sacrifice: {
+    chapter: 'chapter5',
+    text: `你决定用自己的生命力来净化王冠。
+
+你将双手放在王冠上，开始将自己的生命力注入其中。王冠的黑暗力量与你的生命力产生了剧烈的反应——你能感觉到自己的生命在流逝，但你没有停止。
+
+随着时间的推移，王冠的黑暗力量开始减弱。你的身体变得越来越虚弱，但王冠变得越来越纯净。
+
+最终，王冠完全净化了。但它也耗尽了你所有的生命力。
+
+你倒在祭坛旁，看着满天的星辰。你知道，你做了正确的事。
+
+城堡中的灵魂们围绕着你，他们的脸上带着感激和悲伤。艾莉诺握住你的手，轻声说："谢谢你……你不会被遗忘的。"
+
+你的意识逐渐模糊，但你感到无比的平静。
+
+【结局：牺牲者——你用自己的生命净化了王冠，成为了永恒的传说。】`,
+    choices: [
+      {
+        text: '重新开始',
+        nextScene: 'restart',
+      },
+    ],
+  },
+};
+
+// === ./character.js ===
+// character.js - 角色系统（属性、物品、状态）
+
+class Character {
+  constructor() {
+    this.stats = { ...CONFIG.BASE_STATS };
+    this.inventory = [];
+    this.hp = CONFIG.COMBAT.BASE_HP;
+    this.maxHp = CONFIG.COMBAT.BASE_HP;
+    this.flags = {}; // 剧情标记
+    this.currentScene = 'start';
+    this.chapter = 'prologue';
+    this.history = []; // 已访问场景
+    this.combatState = null;
+  }
+
+  // 属性相关
+  getStat(statName) {
+    return this.stats[statName] || 0;
+  }
+
+  modifyStat(statName, amount) {
+    if (this.stats[statName] !== undefined) {
+      this.stats[statName] = Math.max(0, Math.min(20, this.stats[statName] + amount));
+    }
+  }
+
+  // HP 相关
+  modifyHp(amount) {
+    this.hp = Math.max(0, Math.min(this.maxHp, this.hp + amount));
+    return this.hp;
+  }
+
+  isAlive() {
+    return this.hp > 0;
+  }
+
+  healFull() {
+    this.hp = this.maxHp;
+  }
+
+  // 物品系统
+  addItem(item) {
+    if (!this.inventory.includes(item)) {
+      this.inventory.push(item);
+      return true;
+    }
+    return false;
+  }
+
+  removeItem(item) {
+    const idx = this.inventory.indexOf(item);
+    if (idx >= 0) {
+      this.inventory.splice(idx, 1);
+      return true;
+    }
+    return false;
+  }
+
+  hasItem(item) {
+    return this.inventory.includes(item);
+  }
+
+  // 剧情标记
+  setFlag(flag) {
+    this.flags[flag] = true;
+  }
+
+  hasFlag(flag) {
+    return !!this.flags[flag];
+  }
+
+  // 场景记录
+  visitScene(sceneId) {
+    if (!this.history.includes(sceneId)) {
+      this.history.push(sceneId);
+    }
+    this.currentScene = sceneId;
+  }
+
+  hasVisited(sceneId) {
+    return this.history.includes(sceneId);
+  }
+
+  // 序列化
+  serialize() {
+    return {
+      stats: { ...this.stats },
+      inventory: [...this.inventory],
+      hp: this.hp,
+      maxHp: this.maxHp,
+      flags: { ...this.flags },
+      currentScene: this.currentScene,
+      chapter: this.chapter,
+      history: [...this.history],
+    };
+  }
+
+  // 反序列化
+  static deserialize(data) {
+    const c = new Character();
+    if (!data) return c;
+    c.stats = data.stats || { ...CONFIG.BASE_STATS };
+    c.inventory = data.inventory || [];
+    c.hp = data.hp ?? CONFIG.COMBAT.BASE_HP;
+    c.maxHp = data.maxHp ?? CONFIG.COMBAT.BASE_HP;
+    c.flags = data.flags || {};
+    c.currentScene = data.currentScene || 'start';
+    c.chapter = data.chapter || 'prologue';
+    c.history = data.history || [];
+    return c;
+  }
+}
+
+// === ./combat.js ===
+// combat.js - 遭遇战系统（简单回合制）
+
+class CombatSystem {
+  constructor(character, onCombatEnd) {
+    this.character = character;
+    this.onCombatEnd = onCombatEnd;
+    this.enemy = null;
+    this.log = [];
+    this.playerTurn = true;
+    this.finished = false;
+    this.result = null; // 'win' | 'lose' | 'escape'
+  }
+
+  start(enemyData) {
+    this.enemy = {
+      name: enemyData.name,
+      hp: enemyData.hp,
+      maxHp: enemyData.hp,
+      attack: enemyData.attack,
+      defense: enemyData.defense,
+      description: enemyData.description,
+      rewards: enemyData.rewards || {},
+    };
+    this.log = [`⚔️ 遭遇了 ${this.enemy.name}！`, this.enemy.description];
+    this.playerTurn = true;
+    this.finished = false;
+    this.result = null;
+    return this.log.slice();
+  }
+
+  // 玩家攻击力
+  getPlayerAttack() {
+    const base = CONFIG.COMBAT.BASE_ATTACK + this.character.getStat('strength') * 2;
+    const variance = Math.floor(base * 0.3);
+    let damage = base + Math.floor(Math.random() * variance * 2) - variance;
+
+    // 暴击
+    if (Math.random() < CONFIG.COMBAT.CRITICAL_CHANCE + this.character.getStat('dexterity') * 0.01) {
+      damage = Math.floor(damage * CONFIG.COMBAT.CRITICAL_MULTIPLIER);
+      return { damage, critical: true };
+    }
+    return { damage, critical: false };
+  }
+
+  // 玩家防御力
+  getPlayerDefense() {
+    return CONFIG.COMBAT.BASE_DEFENSE + this.character.getStat('dexterity');
+  }
+
+  // 敌人攻击
+  getEnemyAttack() {
+    const base = this.enemy.attack;
+    const variance = Math.floor(base * 0.3);
+    return base + Math.floor(Math.random() * variance * 2) - variance;
+  }
+
+  // 玩家行动
+  playerAction(action, item) {
+    if (this.finished || !this.playerTurn) return [];
+    const msgs = [];
+
+    switch (action) {
+      case 'attack': {
+        const { damage, critical } = this.getPlayerAttack();
+        const actualDmg = Math.max(1, damage - this.enemy.defense);
+        this.enemy.hp = Math.max(0, this.enemy.hp - actualDmg);
+        if (critical) {
+          msgs.push(`💥 暴击！你对 ${this.enemy.name} 造成了 ${actualDmg} 点伤害！`);
+        } else {
+          msgs.push(`⚔️ 你攻击了 ${this.enemy.name}，造成了 ${actualDmg} 点伤害。`);
+        }
+        if (this.enemy.hp <= 0) {
+          msgs.push(`🎉 你击败了 ${this.enemy.name}！`);
+          this.finished = true;
+          this.result = 'win';
+          this._applyRewards(msgs);
+        }
+        break;
+      }
+      case 'defend': {
+        this._isDefending = true;
+        msgs.push('🛡️ 你举起防御姿态，准备迎接攻击。');
+        break;
+      }
+      case 'useItem': {
+        if (item && this.character.hasItem(item)) {
+          const healed = this._useItemEffect(item);
+          if (healed > 0) {
+            msgs.push(`💊 你使用了 ${item}，恢复了 ${healed} 点生命值。`);
+          } else {
+            msgs.push(`你使用了 ${item}。`);
+          }
+        } else {
+          msgs.push('你没有这个物品。');
+          return msgs;
+        }
+        break;
+      }
+      case 'escape': {
+        const chance = CONFIG.COMBAT.ESCAPE_CHANCE + this.character.getStat('dexterity') * 0.05;
+        if (Math.random() < chance) {
+          msgs.push('🏃 你成功逃离了战斗！');
+          this.finished = true;
+          this.result = 'escape';
+        } else {
+          msgs.push('🏃 你试图逃跑，但被敌人挡住了去路！');
+        }
+        break;
+      }
+    }
+
+    if (this.finished) return msgs;
+
+    // 敌人回合
+    this.playerTurn = false;
+    msgs.push(...this._enemyTurn());
+    this.playerTurn = true;
+
+    // 检查玩家死亡
+    if (!this.character.isAlive()) {
+      msgs.push('💀 你的意识逐渐模糊……你倒下了。');
+      this.finished = true;
+      this.result = 'lose';
+    }
+
+    return msgs;
+  }
+
+  _enemyTurn() {
+    const msgs = [];
+    let atk = this.getEnemyAttack();
+
+    if (this._isDefending) {
+      atk = Math.floor(atk * CONFIG.COMBAT.DEFENSE_DEF_MULTIPLIER);
+      this._isDefending = false;
+      msgs.push(`🛡️ 防御减伤！${this.enemy.name} 的攻击被削弱了。`);
+    }
+
+    const actualDmg = Math.max(1, atk - this.getPlayerDefense());
+    this.character.modifyHp(-actualDmg);
+    msgs.push(`💀 ${this.enemy.name} 攻击了你，造成了 ${actualDmg} 点伤害。（HP: ${this.character.hp}/${this.character.maxHp}）`);
+
+    return msgs;
+  }
+
+  _useItemEffect(item) {
+    let healed = 0;
+    switch (item) {
+      case '草药包':
+        healed = 25;
+        break;
+      case '治疗药水':
+        healed = 50;
+        break;
+      case '神秘药水':
+        healed = Math.random() < 0.7 ? 40 : -20;
+        break;
+      case '陈年红酒':
+        healed = 15;
+        break;
+      case '月露精华':
+        healed = 30;
+        break;
+      default:
+        healed = 10;
+    }
+    this.character.modifyHp(healed);
+    this.character.removeItem(item);
+    return healed;
+  }
+
+  _applyRewards(msgs) {
+    const rewards = this.enemy.rewards;
+    if (rewards.addItem) {
+      this.character.addItem(rewards.addItem);
+      msgs.push(`🎁 获得了 ${rewards.addItem}！`);
+    }
+    if (rewards.setFlag) {
+      this.character.setFlag(rewards.setFlag);
+    }
+  }
+
+  getState() {
+    return {
+      enemyName: this.enemy?.name || '',
+      enemyHp: this.enemy?.hp || 0,
+      enemyMaxHp: this.enemy?.maxHp || 0,
+      playerHp: this.character.hp,
+      playerMaxHp: this.character.maxHp,
+      finished: this.finished,
+      result: this.result,
+      log: this.log,
+    };
+  }
+}
+
+// === ./endings.js ===
+// endings.js - 结局系统（多结局条件判定）
+
+const ENDINGS = {
+  dark_lord: {
+    id: 'dark_lord',
+    title: '暗影之王',
+    description: '你戴上了诅咒王冠，成为了新的暗影之王。你的灵魂被吞噬，诅咒将永远延续。',
+    type: 'bad', // bad / neutral / good / true
+    condition: (char) => char.currentScene === 'ending_dark_lord',
+  },
+  seal: {
+    id: 'seal',
+    title: '灵魂解放者',
+    description: '你用三件圣物封印了王冠，解放了所有被困的灵魂。城堡的诅咒终于被解除。',
+    type: 'good',
+    condition: (char) => char.currentScene === 'ending_seal',
+  },
+  destroy: {
+    id: 'destroy',
+    title: '毁灭者',
+    description: '你用蛮力摧毁了王冠，但也摧毁了整座城堡。诅咒被永远埋葬在废墟之下。',
+    type: 'neutral',
+    condition: (char) => char.currentScene === 'ending_destroy',
+  },
+  escape: {
+    id: 'escape',
+    title: '幸存者',
+    description: '你选择了活着离开诅咒古堡。虽然没有终结诅咒，但你保住了自己的性命。',
+    type: 'neutral',
+    condition: (char) => char.currentScene === 'ending_escape',
+  },
+  hero: {
+    id: 'hero',
+    title: '传奇英雄',
+    description: '你不仅封印了王冠，还获得了城堡的宝藏。你的名字将被永远铭记。',
+    type: 'true',
+    condition: (char) =>
+      char.currentScene === 'ending_seal' &&
+      char.hasFlag('ghost_quest') &&
+      char.hasFlag('butler_quest'),
+  },
+  curse: {
+    id: 'curse',
+    title: '守护者',
+    description: '你控制了王冠的力量，成为了城堡新的守护者。你的命运与城堡永远绑定。',
+    type: 'neutral',
+    condition: (char) =>
+      char.currentScene === 'ending_dark_lord' &&
+      char.getStat('charisma') >= 7,
+  },
+  sacrifice: {
+    id: 'sacrifice',
+    title: '牺牲者',
+    description: '你用自己的生命力净化了王冠，成为了永恒的传说。你的牺牲拯救了所有人。',
+    type: 'good',
+    condition: (char) =>
+      char.currentScene === 'ending_seal' &&
+      char.hasFlag('spoke_to_ghost') &&
+      char.hp <= 20,
+  },
+  fairy: {
+    id: 'fairy',
+    title: '精灵的救赎',
+    description: '你之前释放的精灵在你最危急的时刻出现，将你从诅咒中解救出来。',
+    type: 'good',
+    condition: (char) =>
+      char.currentScene === 'ending_dark_lord' &&
+      char.hasFlag('freed_fairy'),
+  },
+  death: {
+    id: 'death',
+    title: '诅咒的牺牲品',
+    description: '你在冒险途中失去了生命，成为了诅咒古堡的又一个牺牲品。',
+    type: 'bad',
+    condition: (char) => char.hp <= 0,
+  },
+};
+
+// 根据当前状态判断结局
+function evaluateEnding(character) {
+  // 优先检查特殊结局
+  if (character.hp <= 0) return ENDINGS.death;
+
+  // 检查场景结局
+  for (const ending of Object.values(ENDINGS)) {
+    if (ending.condition(character)) {
+      return ending;
+    }
+  }
+  return null;
+}
+
+// 获取所有已解锁的结局
+function getUnlockedEndings() {
+  try {
+    const data = JSON.parse(localStorage.getItem('text_adventure_endings') || '[]');
+    return data;
+  } catch {
+    return [];
+  }
+}
+
+// 保存已解锁的结局
+function unlockEnding(endingId) {
+  const unlocked = getUnlockedEndings();
+  if (!unlocked.includes(endingId)) {
+    unlocked.push(endingId);
+    localStorage.setItem('text_adventure_endings', JSON.stringify(unlocked));
+  }
+}
+
+// 获取结局完成度
+function getCompletionRate() {
+  const unlocked = getUnlockedEndings();
+  const total = Object.keys(ENDINGS).length;
+  return { unlocked: unlocked.length, total, rate: Math.round((unlocked.length / total) * 100) };
+}
+
+// === ./ui.js ===
+// ui.js - 打字机效果文本、选择按钮、状态栏、物品栏
+
+class UI {
+  constructor() {
+    // DOM 元素引用
+    this.textArea = document.getElementById('text-area');
+    this.choicesArea = document.getElementById('choices-area');
+    this.chapterTitle = document.getElementById('chapter-title');
+    this.hpBar = document.getElementById('hp-bar');
+    this.hpText = document.getElementById('hp-text');
+    this.statsDisplay = document.getElementById('stats-display');
+    this.inventoryList = document.getElementById('inventory-list');
+    this.combatPanel = document.getElementById('combat-panel');
+    this.combatLog = document.getElementById('combat-log');
+    this.combatActions = document.getElementById('combat-actions');
+    this.enemyInfo = document.getElementById('enemy-info');
+    this.menuOverlay = document.getElementById('menu-overlay');
+    this.endingOverlay = document.getElementById('ending-overlay');
+    this.messageToast = document.getElementById('message-toast');
+    this.soundBtn = document.getElementById('sound-btn');
+    this.skipBtn = document.getElementById('skip-btn');
+
+    this._typewriterTimer = null;
+    this._currentText = '';
+    this._charIndex = 0;
+    this._isTyping = false;
+    this._onTypeComplete = null;
+    this._skipRequested = false;
+  }
+
+  // ===== 打字机效果 =====
+  async showText(text, onAction) {
+    return new Promise((resolve) => {
+      this._currentText = text;
+      this._charIndex = 0;
+      this._isTyping = true;
+      this._skipRequested = false;
+      this.textArea.innerHTML = '';
+      this.choicesArea.innerHTML = '';
+      this.textArea.classList.add('active');
+
+      // 显示跳过按钮
+      if (this.skipBtn) {
+        this.skipBtn.style.display = 'inline-block';
+      }
+
+      this._onTypeComplete = () => {
+        this._isTyping = false;
+        if (this.skipBtn) this.skipBtn.style.display = 'none';
+        if (onAction) onAction();
+        resolve();
+      };
+
+      this._typeNext();
+    });
+  }
+
+  _typeNext() {
+    if (this._skipRequested) {
+      this.textArea.innerHTML = this._formatText(this._currentText);
+      this._isTyping = false;
+      if (this.skipBtn) this.skipBtn.style.display = 'none';
+      if (this._onTypeComplete) this._onTypeComplete();
+      return;
+    }
+
+    if (this._charIndex >= this._currentText.length) {
+      this._isTyping = false;
+      if (this.skipBtn) this.skipBtn.style.display = 'none';
+      if (this._onTypeComplete) this._onTypeComplete();
+      return;
+    }
+
+    const char = this._currentText[this._charIndex];
+    // 追加字符
+    if (char === '\n') {
+      this.textArea.innerHTML += '<br>';
+    } else {
+      this.textArea.innerHTML += this._escapeChar(char);
+    }
+
+    // 打字音效（每3个字符一次，避免太频繁）
+    if (this._charIndex % 3 === 0) {
+      sound.type();
+    }
+
+    this._charIndex++;
+
+    // 根据标点符号调整速度
+    let delay = CONFIG.TYPE_SPEED;
+    if ('。！？……'.includes(char)) delay = CONFIG.TYPE_SPEED * 4;
+    else if ('，、；：'.includes(char)) delay = CONFIG.TYPE_SPEED * 2;
+    else if (char === '\n') delay = CONFIG.TYPE_SPEED * 3;
+
+    this._typewriterTimer = setTimeout(() => this._typeNext(), delay);
+  }
+
+  skipTypewriter() {
+    if (this._isTyping) {
+      this._skipRequested = true;
+      sound.click();
+    }
+  }
+
+  _escapeChar(char) {
+    const map = { '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' };
+    return map[char] || char;
+  }
+
+  _formatText(text) {
+    return text
+      .split('\n')
+      .map((line) => (line.trim() === '' ? '<br>' : `<p>${line}</p>`))
+      .join('');
+  }
+
+  // ===== 选择按钮 =====
+  showChoices(choices, onSelect) {
+    this.choicesArea.innerHTML = '';
+    choices.forEach((choice, index) => {
+      const btn = document.createElement('button');
+      btn.className = 'choice-btn';
+      btn.innerHTML = `<span class="choice-number">${index + 1}</span> ${choice.text}`;
+
+      if (choice.disabled) {
+        btn.classList.add('disabled');
+        if (choice.disabledReason) {
+          btn.title = choice.disabledReason;
+        }
+      }
+
+      btn.addEventListener('click', () => {
+        if (choice.disabled) {
+          sound.click();
+          this.showMessage(choice.disabledReason || '条件不满足');
+          return;
+        }
+        sound.click();
+        btn.classList.add('selected');
+        // 禁用所有按钮
+        this.choicesArea.querySelectorAll('.choice-btn').forEach((b) => {
+          b.classList.add('disabled');
+          b.style.pointerEvents = 'none';
+        });
+        onSelect(choice, index);
+      });
+
+      // 延迟显示动画
+      btn.style.animationDelay = `${index * 0.1}s`;
+      this.choicesArea.appendChild(btn);
+    });
+  }
+
+  // ===== 章节标题 =====
+  setChapterTitle(title) {
+    if (this.chapterTitle) {
+      this.chapterTitle.textContent = title;
+      this.chapterTitle.classList.add('fade-in');
+      setTimeout(() => this.chapterTitle.classList.remove('fade-in'), 1000);
+    }
+  }
+
+  // ===== 状态栏 =====
+  updateStats(character) {
+    // HP
+    const hpPercent = Math.max(0, (character.hp / character.maxHp) * 100);
+    if (this.hpBar) {
+      this.hpBar.style.width = hpPercent + '%';
+      this.hpBar.className = 'hp-fill';
+      if (hpPercent <= 25) this.hpBar.classList.add('critical');
+      else if (hpPercent <= 50) this.hpBar.classList.add('low');
+    }
+    if (this.hpText) {
+      this.hpText.textContent = `HP: ${character.hp} / ${character.maxHp}`;
+    }
+
+    // 属性
+    if (this.statsDisplay) {
+      this.statsDisplay.innerHTML = '';
+      for (const [key, name] of Object.entries(CONFIG.STAT_NAMES)) {
+        const icon = CONFIG.STAT_ICONS[key];
+        const val = character.getStat(key);
+        const statEl = document.createElement('div');
+        statEl.className = 'stat-item';
+        statEl.innerHTML = `<span class="stat-icon">${icon}</span><span class="stat-name">${name}</span><span class="stat-value">${val}</span>`;
+        this.statsDisplay.appendChild(statEl);
+      }
+    }
+  }
+
+  // ===== 物品栏 =====
+  updateInventory(character) {
+    if (!this.inventoryList) return;
+    this.inventoryList.innerHTML = '';
+    if (character.inventory.length === 0) {
+      this.inventoryList.innerHTML = '<div class="empty-inventory">背包为空</div>';
+      return;
+    }
+    character.inventory.forEach((item) => {
+      const el = document.createElement('div');
+      el.className = 'inventory-item';
+      el.textContent = item;
+      el.title = item;
+      this.inventoryList.appendChild(el);
+    });
+  }
+
+  // ===== 战斗面板 =====
+  showCombat(combatState) {
+    if (!this.combatPanel) return;
+    this.combatPanel.classList.add('active');
+    this.textArea.classList.remove('active');
+    this.choicesArea.innerHTML = '';
+
+    this.updateCombatUI(combatState);
+  }
+
+  hideCombat() {
+    if (this.combatPanel) {
+      this.combatPanel.classList.remove('active');
+    }
+    this.textArea.classList.add('active');
+  }
+
+  updateCombatUI(combatState) {
+    if (!combatState) return;
+
+    // 敌人信息
+    if (this.enemyInfo) {
+      const hpPercent = Math.max(0, (combatState.enemyHp / combatState.enemyMaxHp) * 100);
+      this.enemyInfo.innerHTML = `
+        <div class="enemy-name">${combatState.enemyName}</div>
+        <div class="enemy-hp-bar">
+          <div class="enemy-hp-fill" style="width: ${hpPercent}%"></div>
+        </div>
+        <div class="enemy-hp-text">HP: ${combatState.enemyHp} / ${combatState.enemyMaxHp}</div>
+      `;
+    }
+
+    // 战斗日志
+    if (this.combatLog) {
+      this.combatLog.innerHTML = combatState.log.map((msg) => `<div class="combat-log-line">${msg}</div>`).join('');
+      this.combatLog.scrollTop = this.combatLog.scrollHeight;
+    }
+  }
+
+  showCombatActions(onAction) {
+    if (!this.combatActions) return;
+    this.combatActions.innerHTML = '';
+
+    const actions = [
+      { id: 'attack', text: '⚔️ 攻击', desc: '用力量进行攻击' },
+      { id: 'defend', text: '🛡️ 防御', desc: '减少受到的伤害' },
+      { id: 'useItem', text: '💊 使用物品', desc: '使用背包中的物品' },
+      { id: 'escape', text: '🏃 逃跑', desc: '尝试逃离战斗' },
+    ];
+
+    actions.forEach((action) => {
+      const btn = document.createElement('button');
+      btn.className = 'combat-btn';
+      btn.textContent = action.text;
+      btn.title = action.desc;
+      btn.addEventListener('click', () => {
+        sound.combat();
+        if (action.id === 'useItem') {
+          this._showItemSelection(onAction);
+        } else {
+          onAction(action.id);
+        }
+      });
+      this.combatActions.appendChild(btn);
+    });
+  }
+
+  _showItemSelection(onAction) {
+    const character = window.game?.character;
+    if (!character || character.inventory.length === 0) {
+      this.showMessage('背包中没有可用的物品！');
+      return;
+    }
+
+    this.combatActions.innerHTML = '<div class="item-select-title">选择要使用的物品：</div>';
+    const usableItems = character.inventory.filter((item) =>
+      ['草药包', '治疗药水', '神秘药水', '陈年红酒', '月露精华', '幽冥之花'].includes(item)
+    );
+
+    if (usableItems.length === 0) {
+      this.showMessage('没有可以在战斗中使用的物品！');
+      setTimeout(() => this.showCombatActions(onAction), 1500);
+      return;
+    }
+
+    usableItems.forEach((item) => {
+      const btn = document.createElement('button');
+      btn.className = 'combat-btn item-btn';
+      btn.textContent = item;
+      btn.addEventListener('click', () => {
+        sound.item();
+        onAction('useItem', item);
+      });
+      this.combatActions.appendChild(btn);
+    });
+
+    const backBtn = document.createElement('button');
+    backBtn.className = 'combat-btn back-btn';
+    backBtn.textContent = '← 返回';
+    backBtn.addEventListener('click', () => this.showCombatActions(onAction));
+    this.combatActions.appendChild(backBtn);
+  }
+
+  appendCombatLog(msgs) {
+    if (!this.combatLog) return;
+    msgs.forEach((msg) => {
+      const line = document.createElement('div');
+      line.className = 'combat-log-line fade-in';
+      line.textContent = msg;
+      this.combatLog.appendChild(line);
+    });
+    this.combatLog.scrollTop = this.combatLog.scrollHeight;
+  }
+
+  // ===== 菜单 =====
+  showMenu(onNewGame, onContinue, onEndings) {
+    if (!this.menuOverlay) return;
+    this.menuOverlay.classList.add('active');
+
+    const newGameBtn = document.getElementById('menu-new-game');
+    const continueBtn = document.getElementById('menu-continue');
+    const endingsBtn = document.getElementById('menu-endings');
+
+    if (newGameBtn) {
+      newGameBtn.onclick = () => {
+        sound.click();
+        this.hideMenu();
+        onNewGame();
+      };
+    }
+    if (continueBtn) {
+      continueBtn.onclick = () => {
+        sound.click();
+        this.hideMenu();
+        onContinue();
+      };
+    }
+    if (endingsBtn) {
+      endingsBtn.onclick = () => {
+        sound.click();
+        onEndings();
+      };
+    }
+  }
+
+  hideMenu() {
+    if (this.menuOverlay) {
+      this.menuOverlay.classList.remove('active');
+    }
+  }
+
+  // ===== 结局画面 =====
+  showEnding(ending) {
+    if (!this.endingOverlay) return;
+    const title = document.getElementById('ending-title');
+    const desc = document.getElementById('ending-desc');
+    const type = document.getElementById('ending-type');
+
+    if (title) title.textContent = ending.title;
+    if (desc) desc.textContent = ending.description;
+    if (type) {
+      const typeMap = { bad: '🌑 坏结局', neutral: '🌗 中立结局', good: '🌖 好结局', true: '🌕 真结局' };
+      type.textContent = typeMap[ending.type] || '';
+    }
+
+    this.endingOverlay.classList.add('active');
+
+    // 根据结局类型播放音效
+    if (ending.type === 'bad' || ending.id === 'death') {
+      sound.death();
+    } else {
+      sound.victory();
+    }
+  }
+
+  hideEnding() {
+    if (this.endingOverlay) {
+      this.endingOverlay.classList.remove('active');
+    }
+  }
+
+  // ===== 消息提示 =====
+  showMessage(text, duration = 2500) {
+    if (!this.messageToast) return;
+    this.messageToast.textContent = text;
+    this.messageToast.classList.add('show');
+    setTimeout(() => this.messageToast.classList.remove('show'), duration);
+  }
+
+  // ===== 音效按钮 =====
+  updateSoundButton(enabled) {
+    if (this.soundBtn) {
+      this.soundBtn.textContent = enabled ? '🔊' : '🔇';
+    }
+  }
+
+  // ===== 结局收集展示 =====
+  showEndingsCollection(endings, unlockedIds) {
+    if (!this.endingOverlay) return;
+    const title = document.getElementById('ending-title');
+    const desc = document.getElementById('ending-desc');
+    const type = document.getElementById('ending-type');
+
+    if (title) title.textContent = '结局收集';
+    if (type) {
+      const completion = Math.round((unlockedIds.length / Object.keys(endings).length) * 100);
+      type.textContent = `完成度: ${unlockedIds.length}/${Object.keys(endings).length} (${completion}%)`;
+    }
+    if (desc) {
+      desc.innerHTML = '';
+      for (const [id, ending] of Object.entries(endings)) {
+        const el = document.createElement('div');
+        el.className = 'ending-entry';
+        const unlocked = unlockedIds.includes(id);
+        el.classList.add(unlocked ? 'unlocked' : 'locked');
+        const typeIcon = { bad: '🌑', neutral: '🌗', good: '🌖', true: '🌕' };
+        el.innerHTML = `
+          <span class="ending-icon">${unlocked ? typeIcon[ending.type] : '❓'}</span>
+          <span class="ending-name">${unlocked ? ending.title : '???'}</span>
+          ${unlocked ? `<span class="ending-desc-mini">${ending.description}</span>` : ''}
+        `;
+        desc.appendChild(el);
+      }
+    }
+
+    this.endingOverlay.classList.add('active');
+  }
+
+  // 清除所有内容
+  clearAll() {
+    if (this.textArea) this.textArea.innerHTML = '';
+    if (this.choicesArea) this.choicesArea.innerHTML = '';
+    this.hideCombat();
+  }
+}
+
+// === main.js ===
+// main.js - 游戏引擎、状态机、事件监听
+
+class Game {
+  constructor() {
+    this.character = null;
+    this.ui = new UI();
+    this.combat = null;
+    this.state = 'menu'; // menu | playing | combat | ending
+    this.currentSceneData = null;
+
+    // 暴露给全局（供 story.js 条件判断使用）
+    window.game = this;
+
+    this._bindEvents();
+    this._showMainMenu();
+  }
+
+  // ===== 事件绑定 =====
+  _bindEvents() {
+    // 音效开关
+    const soundBtn = document.getElementById('sound-btn');
+    if (soundBtn) {
+      soundBtn.addEventListener('click', () => {
+        const enabled = sound.toggle();
+        this.ui.updateSoundButton(enabled);
+      });
+    }
+
+    // 跳过打字
+    const skipBtn = document.getElementById('skip-btn');
+    if (skipBtn) {
+      skipBtn.addEventListener('click', () => {
+        this.ui.skipTypewriter();
+      });
+    }
+
+    // 键盘快捷键
+    document.addEventListener('keydown', (e) => {
+      // 空格跳过打字
+      if (e.code === 'Space' && this.ui._isTyping) {
+        e.preventDefault();
+        this.ui.skipTypewriter();
+        return;
+      }
+      // 数字键选择
+      if (e.key >= '1' && e.key <= '9' && this.state === 'playing') {
+        const btns = this.ui.choicesArea?.querySelectorAll('.choice-btn:not(.disabled)');
+        const idx = parseInt(e.key) - 1;
+        if (btns && btns[idx]) {
+          btns[idx].click();
+        }
+      }
+    });
+
+    // 结局界面关闭
+    const endingClose = document.getElementById('ending-close');
+    if (endingClose) {
+      endingClose.addEventListener('click', () => {
+        sound.click();
+        this.ui.hideEnding();
+        this._showMainMenu();
+      });
+    }
+
+    // 存档按钮
+    const saveBtn = document.getElementById('save-btn');
+    if (saveBtn) {
+      saveBtn.addEventListener('click', () => {
+        this._saveGame();
+        this.ui.showMessage('游戏已保存');
+      });
+    }
+  }
+
+  // ===== 主菜单 =====
+  _showMainMenu() {
+    this.state = 'menu';
+    const hasSave = !!localStorage.getItem(CONFIG.SAVE_KEY);
+    this.ui.showMenu(
+      () => this._newGame(),
+      () => this._loadGame(),
+      () => this._showEndingsCollection()
+    );
+  }
+
+  // ===== 新游戏 =====
+  _newGame() {
+    this.character = new Character();
+    this.ui.clearAll();
+    this.ui.updateStats(this.character);
+    this.ui.updateInventory(this.character);
+    this._enterScene('start');
+  }
+
+  // ===== 存档 =====
+  _saveGame() {
+    if (!this.character) return;
+    const data = this.character.serialize();
+    localStorage.setItem(CONFIG.SAVE_KEY, JSON.stringify(data));
+  }
+
+  // ===== 读档 =====
+  _loadGame() {
+    try {
+      const data = JSON.parse(localStorage.getItem(CONFIG.SAVE_KEY));
+      if (!data) {
+        this.ui.showMessage('没有找到存档');
+        this._showMainMenu();
+        return;
+      }
+      this.character = Character.deserialize(data);
+      this.ui.clearAll();
+      this.ui.updateStats(this.character);
+      this.ui.updateInventory(this.character);
+      this._enterScene(this.character.currentScene);
+    } catch (e) {
+      console.error('读取存档失败:', e);
+      this.ui.showMessage('存档损坏，开始新游戏');
+      this._newGame();
+    }
+  }
+
+  // ===== 进入场景 =====
+  async _enterScene(sceneId) {
+    // 重新开始
+    if (sceneId === 'restart') {
+      localStorage.removeItem(CONFIG.SAVE_KEY);
+      this._newGame();
+      return;
+    }
+
+    const scene = STORY[sceneId];
+    if (!scene) {
+      console.error('场景不存在:', sceneId);
+      this.ui.showMessage('场景不存在: ' + sceneId);
+      return;
+    }
+
+    this.state = 'playing';
+    this.currentSceneData = scene;
+    this.character.visitScene(sceneId);
+    this.character.chapter = scene.chapter;
+
+    // 更新章节标题
+    const chapterName = CONFIG.CHAPTER_NAMES[scene.chapter] || '';
+    if (chapterName) {
+      this.ui.setChapterTitle(chapterName);
+    }
+
+    // 场景进入效果
+    if (scene.chapter === 'chapter3' || scene.chapter === 'chapter4') {
+      sound.horror();
+    }
+
+    // 战斗场景
+    if (scene.combat) {
+      await this._startCombat(scene);
+      return;
+    }
+
+    // 显示文本
+    await this.ui.showText(scene.text);
+
+    // 应用场景效果
+    if (scene.effects) {
+      this._applyEffects(scene.effects);
+    }
+    if (scene.addItem) {
+      this.character.addItem(scene.addItem);
+      sound.item();
+      this.ui.showMessage(`获得了 ${scene.addItem}！`);
+    }
+    if (scene.setFlag) {
+      this.character.setFlag(scene.setFlag);
+    }
+    if (scene.hp) {
+      this.character.modifyHp(scene.hp);
+    }
+
+    // 更新UI
+    this.ui.updateStats(this.character);
+    this.ui.updateInventory(this.character);
+
+    // 检查结局
+    const ending = evaluateEnding(this.character);
+    if (ending && ending.id !== 'death') {
+      this._triggerEnding(ending);
+      return;
+    }
+
+    // 显示选择
+    this._showSceneChoices(scene);
+
+    // 自动保存
+    this._saveGame();
+  }
+
+  // ===== 显示场景选择 =====
+  _showSceneChoices(scene) {
+    const choices = scene.choices.map((choice) => {
+      const processed = { ...choice };
+
+      // 检查物品需求
+      if (choice.requireItem && !this.character.hasItem(choice.requireItem)) {
+        processed.disabled = true;
+        processed.disabledReason = choice.conditionMessage || `需要物品: ${choice.requireItem}`;
+      }
+
+      // 检查条件函数
+      if (choice.condition && !choice.condition()) {
+        processed.disabled = true;
+        processed.disabledReason = '条件不满足';
+      }
+
+      return processed;
+    });
+
+    this.ui.showChoices(choices, (choice) => this._handleChoice(choice));
+  }
+
+  // ===== 处理选择 =====
+  async _handleChoice(choice) {
+    // 设置标记
+    if (choice.setFlag) {
+      this.character.setFlag(choice.setFlag);
+    }
+
+    // 移除物品
+    if (choice.removeItem) {
+      this.character.removeItem(choice.removeItem);
+    }
+
+    // 属性检定
+    if (choice.statCheck) {
+      const { stat, difficulty } = choice.statCheck;
+      const roll = this.character.getStat(stat) + Math.floor(Math.random() * 6) + 1;
+      const success = roll >= difficulty;
+
+      if (success && choice.successEffects) {
+        await this.ui.showText(choice.successEffects.message || '');
+        this._applyEffects(choice.successEffects);
+      } else if (!success && choice.failEffects) {
+        await this.ui.showText(choice.failEffects.message || '');
+        this._applyEffects(choice.failEffects);
+      }
+
+      // 更新UI
+      this.ui.updateStats(this.character);
+      this.ui.updateInventory(this.character);
+
+      // 检查死亡
+      if (!this.character.isAlive()) {
+        const ending = evaluateEnding(this.character);
+        if (ending) {
+          this._triggerEnding(ending);
+          return;
+        }
+      }
+    } else if (choice.effects) {
+      await this.ui.showText(choice.effects.message || '');
+      this._applyEffects(choice.effects);
+      this.ui.updateStats(this.character);
+      this.ui.updateInventory(this.character);
+    }
+
+    // 添加物品
+    if (choice.addItem) {
+      this.character.addItem(choice.addItem);
+      sound.item();
+      this.ui.showMessage(`获得了 ${choice.addItem}！`);
+      this.ui.updateInventory(this.character);
+    }
+    if (choice.addItem2) {
+      this.character.addItem(choice.addItem2);
+      this.ui.updateInventory(this.character);
+    }
+
+    // 进入下一个场景
+    const nextScene = choice.effects?.nextScene || choice.successEffects?.nextScene || choice.nextScene;
+    if (nextScene) {
+      await new Promise((r) => setTimeout(r, 500));
+      this._enterScene(nextScene);
+    }
+  }
+
+  // ===== 应用效果 =====
+  _applyEffects(effects) {
+    if (!effects) return;
+    if (effects.hp) {
+      this.character.modifyHp(effects.hp);
+    }
+    if (effects.addItem) {
+      this.character.addItem(effects.addItem);
+      sound.item();
+    }
+    if (effects.removeItem) {
+      this.character.removeItem(effects.removeItem);
+    }
+    if (effects.setFlag) {
+      this.character.setFlag(effects.setFlag);
+    }
+    if (effects.modifyStat) {
+      for (const [stat, val] of Object.entries(effects.modifyStat)) {
+        this.character.modifyStat(stat, val);
+      }
+    }
+  }
+
+  // ===== 战斗系统 =====
+  async _startCombat(scene) {
+    this.state = 'combat';
+    this.combat = new CombatSystem(this.character, (result) => this._onCombatEnd(result, scene));
+
+    // 先显示战斗前文本
+    await this.ui.showText(scene.text);
+
+    // 开始战斗
+    const initLog = this.combat.start(scene.combat);
+    const combatState = this.combat.getState();
+    combatState.log = initLog;
+
+    this.ui.showCombat(combatState);
+    this._showCombatActions(scene);
+  }
+
+  _showCombatActions(scene) {
+    this.ui.showCombatActions((action, item) => {
+      const msgs = this.combat.playerAction(action, item);
+      const state = this.combat.getState();
+      state.log = msgs;
+      this.ui.updateCombatUI(state);
+      this.ui.updateStats(this.character);
+
+      if (this.combat.finished) {
+        setTimeout(() => this._onCombatEnd(this.combat.result, scene), 1500);
+      }
+    });
+  }
+
+  async _onCombatEnd(result, scene) {
+    this.ui.hideCombat();
+    this.state = 'playing';
+
+    if (result === 'win') {
+      // 检查死亡结局
+      if (!this.character.isAlive()) {
+        const ending = evaluateEnding(this.character);
+        if (ending) {
+          this._triggerEnding(ending);
+          return;
+        }
+      }
+      // 继续到下一场景
+      if (scene.choices && scene.choices.length > 0) {
+        await this.ui.showText(scene.text || '战斗胜利！');
+        this._showSceneChoices(scene);
+      }
+    } else if (result === 'escape') {
+      // 逃跑回到上一个场景
+      await this.ui.showText('你成功逃离了战斗。');
+      const prevScene = this.character.history[this.character.history.length - 2] || 'entrance_hall';
+      this._enterScene(prevScene);
+    } else if (result === 'lose') {
+      const ending = evaluateEnding(this.character);
+      if (ending) {
+        this._triggerEnding(ending);
+      }
+    }
+
+    this.ui.updateStats(this.character);
+    this.ui.updateInventory(this.character);
+    this._saveGame();
+  }
+
+  // ===== 结局 =====
+  _triggerEnding(ending) {
+    this.state = 'ending';
+    unlockEnding(ending.id);
+    this.ui.showEnding(ending);
+  }
+
+  // ===== 结局收集 =====
+  _showEndingsCollection() {
+    const unlocked = getUnlockedEndings();
+    this.ui.showEndingsCollection(ENDINGS, unlocked);
+  }
+}
+
+// ===== 启动游戏 =====
+document.addEventListener('DOMContentLoaded', () => {
+  new Game();
+});
+
+
+</script>
+
+</body>
+</html>

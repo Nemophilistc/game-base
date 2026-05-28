@@ -1,0 +1,2541 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>卡牌战争 - Card War</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #0a0a1a; }
+    #container {
+      width: 100%; height: 100%;
+      display: flex; align-items: center; justify-content: center;
+    }
+    #gameCanvas {
+      width: 100%; height: 100%;
+      display: block;
+      image-rendering: auto;
+    }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <canvas id="gameCanvas"></canvas>
+  </div>
+  <script>
+// === ./config.js ===
+// config.js - Game constants and card definitions
+
+const GAME_CONFIG = {
+  STARTING_HP: 30,
+  DECK_SIZE: 20,
+  HAND_SIZE: 5,
+  MAX_FIELD: 3,
+  MAX_MANA: 10,
+  CARD_WIDTH: 100,
+  CARD_HEIGHT: 140,
+  FIELD_CARD_WIDTH: 90,
+  FIELD_CARD_HEIGHT: 110,
+  CARD_RADIUS: 8,
+  ANIMATION_SPEED: 0.08,
+};
+
+// Card type constants
+const CARD_TYPE = {
+  CREATURE: 'creature',
+  SPELL: 'spell',
+  HEAL: 'heal',
+};
+
+// Card rarity (affects glow color)
+const RARITY = {
+  COMMON: 'common',
+  RARE: 'rare',
+  EPIC: 'epic',
+  LEGENDARY: 'legendary',
+};
+
+// All card definitions - 24 unique cards
+const CARD_DEFS = [
+  // --- Creatures (14) ---
+  { id: 'warrior', name: '战士', type: CARD_TYPE.CREATURE, cost: 1, atk: 1, hp: 2, rarity: RARITY.COMMON, icon: 'sword', desc: '忠诚的战士' },
+  { id: 'archer', name: '弓箭手', type: CARD_TYPE.CREATURE, cost: 2, atk: 2, hp: 1, rarity: RARITY.COMMON, icon: 'bow', desc: '远程攻击' },
+  { id: 'knight', name: '骑士', type: CARD_TYPE.CREATURE, cost: 3, atk: 3, hp: 3, rarity: RARITY.COMMON, icon: 'shield', desc: '攻守兼备' },
+  { id: 'wolf', name: '战狼', type: CARD_TYPE.CREATURE, cost: 2, atk: 2, hp: 2, rarity: RARITY.COMMON, icon: 'wolf', desc: '凶猛的战狼' },
+  { id: 'golem', name: '石像魔', type: CARD_TYPE.CREATURE, cost: 4, atk: 2, hp: 6, rarity: RARITY.RARE, icon: 'golem', desc: '坚不可摧' },
+  { id: 'mage', name: '法师', type: CARD_TYPE.CREATURE, cost: 3, atk: 3, hp: 2, rarity: RARITY.RARE, icon: 'staff', desc: '奥术之力' },
+  { id: 'dragon', name: '幼龙', type: CARD_TYPE.CREATURE, cost: 5, atk: 4, hp: 5, rarity: RARITY.EPIC, icon: 'dragon', desc: '龙族之威' },
+  { id: 'assassin', name: '刺客', type: CARD_TYPE.CREATURE, cost: 3, atk: 4, hp: 1, rarity: RARITY.RARE, icon: 'dagger', desc: '一击必杀' },
+  { id: 'titan', name: '泰坦', type: CARD_TYPE.CREATURE, cost: 7, atk: 6, hp: 7, rarity: RARITY.LEGENDARY, icon: 'titan', desc: '远古巨神' },
+  { id: 'fairy', name: '精灵', type: CARD_TYPE.CREATURE, cost: 1, atk: 1, hp: 1, rarity: RARITY.COMMON, icon: 'star', desc: '小巧灵活' },
+  { id: 'elemental', name: '元素', type: CARD_TYPE.CREATURE, cost: 4, atk: 3, hp: 4, rarity: RARITY.RARE, icon: 'element', desc: '自然之力' },
+  { id: 'phoenix', name: '凤凰', type: CARD_TYPE.CREATURE, cost: 6, atk: 5, hp: 5, rarity: RARITY.EPIC, icon: 'fire', desc: '涅槃重生' },
+  { id: 'skeleton', name: '骷髅兵', type: CARD_TYPE.CREATURE, cost: 1, atk: 1, hp: 1, rarity: RARITY.COMMON, icon: 'skull', desc: '亡灵军团' },
+  { id: 'demon', name: '恶魔', type: CARD_TYPE.CREATURE, cost: 5, atk: 5, hp: 4, rarity: RARITY.EPIC, icon: 'demon', desc: '深渊之力' },
+
+  // --- Spells (6) ---
+  { id: 'fireball', name: '火球术', type: CARD_TYPE.SPELL, cost: 3, damage: 3, rarity: RARITY.COMMON, icon: 'fireball', desc: '对一个敌人造成3点伤害', target: 'single' },
+  { id: 'lightning', name: '闪电链', type: CARD_TYPE.SPELL, cost: 4, damage: 2, rarity: RARITY.RARE, icon: 'lightning', desc: '对所有敌方生物造成2点伤害', target: 'all' },
+  { id: 'frostbolt', name: '冰霜箭', type: CARD_TYPE.SPELL, cost: 2, damage: 2, rarity: RARITY.COMMON, icon: 'frost', desc: '对一个敌人造成2点伤害', target: 'single' },
+  { id: 'shield', name: '圣盾术', type: CARD_TYPE.SPELL, cost: 2, buffHp: 3, rarity: RARITY.COMMON, icon: 'shieldspell', desc: '使一个友方生物+0/+3', target: 'friendly' },
+  { id: 'bloodlust', name: '嗜血术', type: CARD_TYPE.SPELL, cost: 3, buffAtk: 2, rarity: RARITY.RARE, icon: 'blood', desc: '使一个友方生物+2/+0', target: 'friendly' },
+  { id: 'inferno', name: '地狱火', type: CARD_TYPE.SPELL, cost: 6, damage: 4, rarity: RARITY.EPIC, icon: 'inferno', desc: '对所有敌方生物造成4点伤害', target: 'all' },
+
+  // --- Heal (4) ---
+  { id: 'heal1', name: '治疗术', type: CARD_TYPE.HEAL, cost: 1, healAmount: 3, rarity: RARITY.COMMON, icon: 'heal', desc: '恢复3点生命值' },
+  { id: 'heal2', name: '圣光术', type: CARD_TYPE.HEAL, cost: 3, healAmount: 6, rarity: RARITY.RARE, icon: 'holy', desc: '恢复6点生命值' },
+  { id: 'heal3', name: '生命泉', type: CARD_TYPE.HEAL, cost: 5, healAmount: 10, rarity: RARITY.EPIC, icon: 'fountain', desc: '恢复10点生命值' },
+  { id: 'heal4', name: '药剂', type: CARD_TYPE.HEAL, cost: 2, healAmount: 4, rarity: RARITY.COMMON, icon: 'potion', desc: '恢复4点生命值' },
+];
+
+// Rarity colors
+const RARITY_COLORS = {
+  [RARITY.COMMON]: '#a0a0a0',
+  [RARITY.RARE]: '#4a9eff',
+  [RARITY.EPIC]: '#b44aff',
+  [RARITY.LEGENDARY]: '#ffaa00',
+};
+
+// Icon symbols for card art
+const ICON_SYMBOLS = {
+  sword: '⚔',
+  bow: '🏹',
+  shield: '🛡',
+  wolf: '🐺',
+  golem: '🧱',
+  staff: '🪄',
+  dragon: '🐉',
+  dagger: '🗡',
+  titan: '🧍',
+  star: '⭐',
+  element: '🌊',
+  fire: '🔥',
+  skull: '💀',
+  demon: '👿',
+  fireball: '🔥',
+  lightning: '⚡',
+  frost: '❄',
+  shieldspell: '🛡',
+  blood: '🩸',
+  inferno: '🔥',
+  heal: '❤',
+  holy: '✨',
+  fountain: '🌊',
+  potion: '🧪',
+};
+
+// Background colors for card art by icon
+const ICON_BG_COLORS = {
+  sword: '#8B4513',
+  bow: '#2E7D32',
+  shield: '#37474F',
+  wolf: '#5D4037',
+  golem: '#616161',
+  staff: '#4A148C',
+  dragon: '#B71C1C',
+  dagger: '#212121',
+  titan: '#1A237E',
+  star: '#F57F17',
+  element: '#00695C',
+  fire: '#BF360C',
+  skull: '#37474F',
+  demon: '#4A0000',
+  fireball: '#D84315',
+  lightning: '#1565C0',
+  frost: '#0277BD',
+  shieldspell: '#1B5E20',
+  blood: '#880E4F',
+  inferno: '#BF360C',
+  heal: '#2E7D32',
+  holy: '#F9A825',
+  fountain: '#00838F',
+  potion: '#6A1B9A',
+};
+
+// === ./sound.js ===
+// sound.js - Web Audio API sound effects
+
+let audioCtx = null;
+let masterGain = null;
+let muted = false;
+
+function getCtx() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    masterGain = audioCtx.createGain();
+    masterGain.gain.value = 0.35;
+    masterGain.connect(audioCtx.destination);
+  }
+  return audioCtx;
+}
+
+function ensureResumed() {
+  const ctx = getCtx();
+  if (ctx.state === 'suspended') ctx.resume();
+}
+
+function playTone(freq, duration, type = 'sine', volume = 0.3, delay = 0) {
+  if (muted) return;
+  const ctx = getCtx();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = type;
+  osc.frequency.value = freq;
+  gain.gain.value = 0;
+  osc.connect(gain);
+  gain.connect(masterGain);
+  const t = ctx.currentTime + delay;
+  gain.gain.setValueAtTime(volume, t);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
+  osc.start(t);
+  osc.stop(t + duration + 0.01);
+}
+
+function playNoise(duration, volume = 0.1, delay = 0) {
+  if (muted) return;
+  const ctx = getCtx();
+  const bufferSize = ctx.sampleRate * duration;
+  const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < bufferSize; i++) {
+    data[i] = Math.random() * 2 - 1;
+  }
+  const source = ctx.createBufferSource();
+  source.buffer = buffer;
+  const gain = ctx.createGain();
+  gain.gain.value = volume;
+  source.connect(gain);
+  gain.connect(masterGain);
+  const t = ctx.currentTime + delay;
+  gain.gain.setValueAtTime(volume, t);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
+  source.start(t);
+  source.stop(t + duration + 0.01);
+}
+
+const Sound = {
+  init() { ensureResumed(); },
+
+  toggleMute() {
+    muted = !muted;
+    return muted;
+  },
+
+  isMuted() { return muted; },
+
+  // Card draw - quick rising tone
+  cardDraw() {
+    ensureResumed();
+    playTone(600, 0.08, 'sine', 0.2);
+    playTone(900, 0.1, 'sine', 0.15, 0.04);
+  },
+
+  // Card play - satisfying thunk
+  cardPlay() {
+    ensureResumed();
+    playTone(300, 0.06, 'square', 0.15);
+    playTone(450, 0.12, 'sine', 0.2, 0.03);
+    playNoise(0.05, 0.08, 0.02);
+  },
+
+  // Creature attack - aggressive swoosh
+  creatureAttack() {
+    ensureResumed();
+    playTone(200, 0.15, 'sawtooth', 0.15);
+    playTone(400, 0.1, 'square', 0.12, 0.05);
+    playNoise(0.12, 0.15, 0.02);
+  },
+
+  // Spell cast - magical shimmer
+  spellCast() {
+    ensureResumed();
+    playTone(800, 0.15, 'sine', 0.15);
+    playTone(1000, 0.12, 'sine', 0.12, 0.05);
+    playTone(1200, 0.1, 'sine', 0.1, 0.1);
+    playTone(1600, 0.2, 'sine', 0.08, 0.15);
+  },
+
+  // Lightning - electric crackle
+  lightning() {
+    ensureResumed();
+    playNoise(0.3, 0.2);
+    playTone(100, 0.2, 'sawtooth', 0.15);
+    playTone(2000, 0.1, 'square', 0.1, 0.1);
+  },
+
+  // Damage taken - impact thud
+  damageTaken() {
+    ensureResumed();
+    playTone(120, 0.2, 'sine', 0.25);
+    playTone(80, 0.3, 'sine', 0.2, 0.05);
+    playNoise(0.1, 0.12, 0.03);
+  },
+
+  // Heal - gentle rising chime
+  heal() {
+    ensureResumed();
+    playTone(500, 0.15, 'sine', 0.15);
+    playTone(600, 0.15, 'sine', 0.15, 0.08);
+    playTone(800, 0.2, 'sine', 0.12, 0.16);
+    playTone(1000, 0.3, 'sine', 0.1, 0.24);
+  },
+
+  // Turn start - bell
+  turnStart() {
+    ensureResumed();
+    playTone(800, 0.4, 'sine', 0.2);
+    playTone(1200, 0.5, 'sine', 0.15, 0.05);
+  },
+
+  // Game win - triumphant fanfare
+  gameWin() {
+    ensureResumed();
+    playTone(523, 0.2, 'sine', 0.2);
+    playTone(659, 0.2, 'sine', 0.2, 0.15);
+    playTone(784, 0.2, 'sine', 0.2, 0.3);
+    playTone(1047, 0.6, 'sine', 0.25, 0.45);
+  },
+
+  // Game lose - descending sad tones
+  gameLose() {
+    ensureResumed();
+    playTone(400, 0.3, 'sine', 0.2);
+    playTone(350, 0.3, 'sine', 0.18, 0.2);
+    playTone(300, 0.3, 'sine', 0.16, 0.4);
+    playTone(250, 0.5, 'sine', 0.14, 0.6);
+  },
+
+  // Creature death
+  creatureDeath() {
+    ensureResumed();
+    playTone(200, 0.15, 'square', 0.12);
+    playTone(100, 0.3, 'sine', 0.15, 0.08);
+    playNoise(0.15, 0.1, 0.05);
+  },
+
+  // Button click
+  click() {
+    ensureResumed();
+    playTone(700, 0.06, 'sine', 0.12);
+  },
+};
+
+// === ./cards.js ===
+// cards.js - Card definitions, deck building, hand management
+
+let nextId = 1;
+
+// Create a card instance from a definition
+function createCardInstance(defId) {
+  const def = CARD_DEFS.find(d => d.id === defId);
+  if (!def) return null;
+  const card = {
+    ...def,
+    uid: nextId++,
+    currentHp: def.hp || 0,
+    currentAtk: def.atk || 0,
+    canAttack: false, // summoning sickness
+    hasAttacked: false,
+    buffAtk: 0,
+    buffHp: 0,
+  };
+  return card;
+}
+
+// Build a random deck of 20 cards with good variety
+function buildDeck() {
+  const deck = [];
+  // Ensure we have at least: 10 creatures, 4 spells, 3 heals
+  const creatures = CARD_DEFS.filter(c => c.type === CARD_TYPE.CREATURE);
+  const spells = CARD_DEFS.filter(c => c.type === CARD_TYPE.SPELL);
+  const heals = CARD_DEFS.filter(c => c.type === CARD_TYPE.HEAL);
+
+  // Add 10-12 creatures
+  const shuffledCreatures = shuffle([...creatures]);
+  for (let i = 0; i < 11; i++) {
+    deck.push(createCardInstance(shuffledCreatures[i % shuffledCreatures.length].id));
+  }
+
+  // Add 5 spells
+  const shuffledSpells = shuffle([...spells]);
+  for (let i = 0; i < 5; i++) {
+    deck.push(createCardInstance(shuffledSpells[i % shuffledSpells.length].id));
+  }
+
+  // Add 4 heals
+  const shuffledHeals = shuffle([...heals]);
+  for (let i = 0; i < 4; i++) {
+    deck.push(createCardInstance(shuffledHeals[i % shuffledHeals.length].id));
+  }
+
+  return shuffle(deck);
+}
+
+// Shuffle array (Fisher-Yates)
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// Draw cards from deck to hand
+function drawCards(deck, hand, count) {
+  const drawn = [];
+  for (let i = 0; i < count && deck.length > 0 && hand.length < 10; i++) {
+    const card = deck.pop();
+    hand.push(card);
+    drawn.push(card);
+  }
+  return drawn;
+}
+
+// Remove card from hand by uid
+function removeFromHand(hand, uid) {
+  const idx = hand.findIndex(c => c.uid === uid);
+  if (idx >= 0) return hand.splice(idx, 1)[0];
+  return null;
+}
+
+// Remove card from field by uid
+function removeFromField(field, uid) {
+  const idx = field.findIndex(c => c.uid === uid);
+  if (idx >= 0) return field.splice(idx, 1)[0];
+  return null;
+}
+
+// Check if card is a creature
+function isCreature(card) {
+  return card && card.type === CARD_TYPE.CREATURE;
+}
+
+// Check if card is a spell
+function isSpell(card) {
+  return card && card.type === CARD_TYPE.SPELL;
+}
+
+// Check if card is heal
+function isHeal(card) {
+  return card && card.type === CARD_TYPE.HEAL;
+}
+
+// Create a specific deck for AI based on difficulty
+function buildAIDeck(difficulty) {
+  const deck = buildDeck();
+  // Hard difficulty gets slightly better cards
+  if (difficulty === 'hard') {
+    // Replace some low-cost cards with higher-cost ones
+    for (let i = 0; i < 3; i++) {
+      const lowIdx = deck.findIndex(c => c.cost <= 1);
+      if (lowIdx >= 0) {
+        const epics = CARD_DEFS.filter(c => c.rarity === 'epic' || c.rarity === 'legendary');
+        const replacement = createCardInstance(epics[Math.floor(Math.random() * epics.length)].id);
+        deck[lowIdx] = replacement;
+      }
+    }
+  }
+  return shuffle(deck);
+}
+
+// === ./combat.js ===
+// combat.js - Battle system, damage calculation, card effects
+
+// Apply damage to a creature, returns true if it dies
+function damageCreature(creature, amount) {
+  creature.currentHp -= amount;
+  return creature.currentHp <= 0;
+}
+
+// Apply damage to player face
+function damageFace(player, amount) {
+  player.hp = Math.max(0, player.hp - amount);
+  return player.hp <= 0;
+}
+
+// Heal player
+function healPlayer(player, amount) {
+  player.hp = Math.min(GAME_CONFIG.STARTING_HP + 10, player.hp + amount);
+}
+
+// Buff a creature
+function buffCreature(creature, atk, hp) {
+  creature.currentAtk += atk;
+  creature.currentHp += hp;
+  creature.buffAtk += atk;
+  creature.buffHp += hp;
+}
+
+// Execute creature attack - attacker hits target creature or face
+function executeCreatureAttack(attacker, target, defendingField, defendingPlayer) {
+  const result = {
+    attackerUid: attacker.uid,
+    targetUid: null,
+    attackerDied: false,
+    targetDied: false,
+    faceDamage: 0,
+    attackerDmg: 0,
+    targetDmg: 0,
+  };
+
+  if (target === null) {
+    // Attack face
+    result.faceDamage = attacker.currentAtk;
+    result.targetDmg = attacker.currentAtk;
+    const dead = damageFace(defendingPlayer, attacker.currentAtk);
+    attacker.hasAttacked = true;
+    attacker.canAttack = false;
+    return result;
+  }
+
+  // Attack creature - both take damage
+  result.targetUid = target.uid;
+  result.attackerDmg = target.currentAtk;
+  result.targetDmg = attacker.currentAtk;
+
+  result.targetDied = damageCreature(target, attacker.currentAtk);
+  result.attackerDied = damageCreature(attacker, target.currentAtk);
+
+  attacker.hasAttacked = true;
+  attacker.canAttack = false;
+
+  return result;
+}
+
+// Play a spell card
+function playSpell(card, target, opponentField, opponent, player) {
+  const result = {
+    cardUid: card.uid,
+    type: 'spell',
+    damage: 0,
+    targets: [],
+    faceDamage: 0,
+    kills: [],
+  };
+
+  if (card.target === 'single' && card.damage) {
+    // Single target damage spell
+    if (target === null) {
+      // Hit face
+      result.faceDamage = card.damage;
+      damageFace(opponent, card.damage);
+    } else {
+      result.damage = card.damage;
+      const died = damageCreature(target, card.damage);
+      result.targets.push(target.uid);
+      if (died) result.kills.push(target.uid);
+    }
+  } else if (card.target === 'all' && card.damage) {
+    // AOE damage
+    result.damage = card.damage;
+    for (const creature of [...opponentField]) {
+      const died = damageCreature(creature, card.damage);
+      result.targets.push(creature.uid);
+      if (died) result.kills.push(creature.uid);
+    }
+  } else if (card.target === 'friendly' && target) {
+    // Buff friendly creature
+    if (card.buffAtk) {
+      buffCreature(target, card.buffAtk, 0);
+      result.damage = card.buffAtk;
+    }
+    if (card.buffHp) {
+      buffCreature(target, 0, card.buffHp);
+      result.damage = card.buffHp;
+    }
+    result.targets.push(target.uid);
+  }
+
+  return result;
+}
+
+// Play a heal card
+function playHeal(card, player) {
+  const oldHp = player.hp;
+  healPlayer(player, card.healAmount);
+  return {
+    cardUid: card.uid,
+    type: 'heal',
+    healAmount: player.hp - oldHp,
+  };
+}
+
+// Remove dead creatures from field, returns removed creatures
+function removeDeadCreatures(field) {
+  const dead = field.filter(c => c.currentHp <= 0);
+  const alive = field.filter(c => c.currentHp > 0);
+  field.length = 0;
+  field.push(...alive);
+  return dead;
+}
+
+// Prepare creatures for attack phase - mark those that can attack
+function prepareAttackPhase(field) {
+  for (const creature of field) {
+    if (!creature.hasAttacked) {
+      creature.canAttack = true;
+    }
+  }
+}
+
+// Reset creatures for new turn
+function resetCreaturesForTurn(field) {
+  for (const creature of field) {
+    creature.canAttack = true;
+    creature.hasAttacked = false;
+  }
+}
+
+// Calculate total damage on field
+function totalFieldDamage(field) {
+  return field.reduce((sum, c) => sum + c.currentAtk, 0);
+}
+
+// Evaluate board state (positive = player advantage)
+function evaluateBoard(playerField, aiField, playerHp, aiHp) {
+  let score = 0;
+  // HP advantage
+  score += (playerHp - aiHp) * 1.5;
+  // Field advantage
+  for (const c of playerField) {
+    score += c.currentAtk + c.currentHp * 0.8;
+  }
+  for (const c of aiField) {
+    score -= c.currentAtk + c.currentHp * 0.8;
+  }
+  return score;
+}
+
+// === ./ai.js ===
+// ai.js - AI opponent card play strategy
+
+// AI decides what plays to make this turn
+// Returns array of actions: { type: 'play'|'attack', cardUid, targetUid, attackTargetUid }
+function aiDecideTurn(gameState) {
+  const { ai, player, difficulty } = gameState;
+  const actions = [];
+
+  // Phase 1: Decide which cards to play
+  const playActions = aiDecidePlays(gameState);
+  actions.push(...playActions);
+
+  // Phase 2: Decide attack targets
+  const attackActions = aiDecideAttacks(gameState);
+  actions.push(...attackActions);
+
+  return actions;
+}
+
+// Decide card plays
+function aiDecidePlays(gameState) {
+  const { ai, player, difficulty } = gameState;
+  const plays = [];
+  let availableMana = ai.mana;
+  const hand = [...ai.hand];
+  const field = ai.field;
+
+  // Sort hand by priority based on difficulty
+  const prioritized = prioritizeHand(hand, gameState, difficulty);
+
+  for (const card of prioritized) {
+    if (card.cost > availableMana) continue;
+    if (isCreature(card) && field.length >= 3) continue;
+
+    // Decide target for targeted spells
+    let target = null;
+    if (isSpell(card)) {
+      if (card.target === 'single') {
+        target = aiChooseSpellTarget(card, gameState);
+        if (target === undefined) continue; // No good target
+      } else if (card.target === 'friendly') {
+        target = aiChooseBuffTarget(card, gameState);
+        if (!target) continue; // No friendly creature to buff
+      }
+    }
+
+    // For heal, check if AI needs healing
+    if (isHeal(card)) {
+      if (ai.hp > 20 && difficulty !== 'easy') continue; // Don't waste heals at high HP
+      if (ai.hp > 25 && difficulty === 'easy') continue;
+    }
+
+    plays.push({
+      type: 'play',
+      cardUid: card.uid,
+      targetUid: target ? target.uid : null,
+    });
+    availableMana -= card.cost;
+
+    // Remove from simulated hand
+    const idx = hand.findIndex(c => c.uid === card.uid);
+    if (idx >= 0) hand.splice(idx, 1);
+  }
+
+  return plays;
+}
+
+// Prioritize hand cards for playing
+function prioritizeHand(hand, gameState, difficulty) {
+  const sorted = [...hand];
+
+  if (difficulty === 'easy') {
+    // Random order
+    for (let i = sorted.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [sorted[i], sorted[j]] = [sorted[j], sorted[i]];
+    }
+    return sorted;
+  }
+
+  sorted.sort((a, b) => {
+    const scoreA = cardPlayScore(a, gameState);
+    const scoreB = cardPlayScore(b, gameState);
+    return scoreB - scoreA;
+  });
+
+  return sorted;
+}
+
+// Score a card for playing (higher = better)
+function cardPlayScore(card, gameState) {
+  const { ai, player } = gameState;
+
+  if (isCreature(card)) {
+    let score = card.currentAtk + card.currentHp;
+    // Prefer filling the board
+    if (ai.field.length < 2) score += 3;
+    // Prefer higher cost cards if we have the mana
+    score += card.cost * 0.5;
+    return score;
+  }
+
+  if (isSpell(card)) {
+    if (card.target === 'all') {
+      // AOE is great when opponent has multiple creatures
+      const killCount = player.field.filter(c => c.currentHp <= card.damage).length;
+      return killCount * 4 + card.damage;
+    }
+    if (card.target === 'single') {
+      // Good if we can kill a high-value target
+      const bestTarget = player.field.reduce((best, c) => {
+        const value = c.currentAtk + c.currentHp;
+        return value > best ? value : best;
+      }, 0);
+      return bestTarget > 0 ? bestTarget + card.damage : 2;
+    }
+    if (card.target === 'friendly') {
+      // Buff is good if we have creatures
+      if (ai.field.length === 0) return -1;
+      return 3 + (card.buffAtk || 0) + (card.buffHp || 0);
+    }
+  }
+
+  if (isHeal(card)) {
+    const hpMissing = gameState.ai.hp < 20 ? (20 - gameState.ai.hp) * 0.8 : 0;
+    return hpMissing + card.healAmount * 0.3;
+  }
+
+  return 0;
+}
+
+// Choose target for single-target damage spell
+function aiChooseSpellTarget(card, gameState) {
+  const { player, ai, difficulty } = gameState;
+  const enemies = player.field;
+
+  if (enemies.length === 0) {
+    // No creatures, go face
+    return null; // null = face
+  }
+
+  if (difficulty === 'easy') {
+    // Random target or face
+    if (Math.random() < 0.3) return null;
+    return enemies[Math.floor(Math.random() * enemies.length)];
+  }
+
+  // Medium/Hard: prioritize killing blows
+  const canKill = enemies.filter(c => c.currentHp <= card.damage);
+  if (canKill.length > 0) {
+    // Kill the highest ATK one
+    canKill.sort((a, b) => b.currentAtk - a.currentAtk);
+    return canKill[0];
+  }
+
+  // Otherwise hit highest threat
+  enemies.sort((a, b) => (b.currentAtk + b.currentHp) - (a.currentAtk + a.currentHp));
+  return enemies[0];
+}
+
+// Choose friendly creature to buff
+function aiChooseBuffTarget(card, gameState) {
+  const { ai, difficulty } = gameState;
+  if (ai.field.length === 0) return null;
+
+  if (difficulty === 'easy') {
+    return ai.field[Math.floor(Math.random() * ai.field.length)];
+  }
+
+  // Prefer buffing creature with highest ATK (for +atk) or lowest HP (for +hp)
+  if (card.buffAtk) {
+    ai.field.sort((a, b) => b.currentAtk - a.currentAtk);
+    return ai.field[0];
+  }
+  if (card.buffHp) {
+    ai.field.sort((a, b) => a.currentHp - b.currentHp);
+    return ai.field[0];
+  }
+  return ai.field[0];
+}
+
+// Decide attack targets
+function aiDecideAttacks(gameState) {
+  const { ai, player, difficulty } = gameState;
+  const attacks = [];
+  const attackers = ai.field.filter(c => c.canAttack && !c.hasAttacked);
+  const enemies = player.field;
+
+  for (const attacker of attackers) {
+    const target = aiChooseAttackTarget(attacker, enemies, gameState);
+    attacks.push({
+      type: 'attack',
+      attackerUid: attacker.uid,
+      targetUid: target ? target.uid : null, // null = face
+    });
+  }
+
+  return attacks;
+}
+
+// Choose what a creature should attack
+function aiChooseAttackTarget(attacker, enemies, gameState) {
+  const { player, ai, difficulty } = gameState;
+
+  if (enemies.length === 0) {
+    return null; // Go face
+  }
+
+  if (difficulty === 'easy') {
+    // 50% face, 50% random creature
+    if (Math.random() < 0.5) return null;
+    return enemies[Math.floor(Math.random() * enemies.length)];
+  }
+
+  // Medium/Hard: evaluate trades
+  const aliveEnemies = enemies.filter(e => e.currentHp > 0);
+
+  // Can we kill something without dying?
+  const goodTrades = aliveEnemies.filter(e =>
+    e.currentHp <= attacker.currentAtk && e.currentAtk < attacker.currentHp
+  );
+
+  if (goodTrades.length > 0) {
+    // Kill the most valuable one
+    goodTrades.sort((a, b) => (b.currentAtk + b.currentHp) - (a.currentAtk + a.currentHp));
+    return goodTrades[0];
+  }
+
+  // Can we kill something (even if we die)?
+  const canKill = aliveEnemies.filter(e => e.currentHp <= attacker.currentAtk);
+  if (canKill.length > 0 && difficulty === 'hard') {
+    // Kill highest value
+    canKill.sort((a, b) => (b.currentAtk + b.currentHp) - (a.currentAtk + a.currentHp));
+    return canKill[0];
+  }
+
+  // Check if we should go face
+  const totalDmg = totalFieldDamage(ai.field);
+  if (totalDmg >= player.hp) {
+    // Lethal! Go face
+    return null;
+  }
+
+  if (difficulty === 'hard') {
+    // Check if clearing a specific enemy is valuable
+    const threats = aliveEnemies.filter(e => e.currentAtk >= 3);
+    if (threats.length > 0) {
+      threats.sort((a, b) => b.currentAtk - a.currentAtk);
+      return threats[0];
+    }
+  }
+
+  // Default: go face if no good trades
+  if (attacker.currentAtk >= 2 || enemies.length === 0) {
+    return null;
+  }
+
+  // Hit lowest HP enemy
+  aliveEnemies.sort((a, b) => a.currentHp - b.currentHp);
+  return aliveEnemies[0];
+}
+
+// === ./effects.js ===
+// effects.js - Card animations, attack effects, damage numbers
+
+const animations = [];
+const particles = [];
+const damageNumbers = [];
+
+// --- Animation system ---
+
+function addAnimation(anim) {
+  anim.progress = 0;
+  anim.done = false;
+  animations.push(anim);
+  return anim;
+}
+
+function isAnimating() {
+  return animations.some(a => !a.done) || damageNumbers.length > 0 || particles.length > 20;
+}
+
+function updateAnimations(dt) {
+  // Update animations
+  for (let i = animations.length - 1; i >= 0; i--) {
+    const a = animations[i];
+    a.progress += dt * (a.speed || 2.5);
+    if (a.progress >= 1) {
+      a.progress = 1;
+      a.done = true;
+      if (a.onComplete) a.onComplete();
+      animations.splice(i, 1);
+    } else if (a.onUpdate) {
+      a.onUpdate(a.progress);
+    }
+  }
+
+  // Update particles
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) {
+      particles.splice(i, 1);
+      continue;
+    }
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.vy += (p.gravity || 0) * dt;
+    p.alpha = Math.max(0, p.life / p.maxLife);
+  }
+
+  // Update damage numbers
+  for (let i = damageNumbers.length - 1; i >= 0; i--) {
+    const d = damageNumbers[i];
+    d.life -= dt;
+    if (d.life <= 0) {
+      damageNumbers.splice(i, 1);
+      continue;
+    }
+    d.y -= 40 * dt;
+    d.alpha = Math.max(0, d.life / d.maxLife);
+    d.scale = 1 + (1 - d.life / d.maxLife) * 0.3;
+  }
+}
+
+// Easing functions
+function easeOutBack(t) {
+  const c1 = 1.70158;
+  const c3 = c1 + 1;
+  return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+}
+
+function easeOutBounce(t) {
+  const n1 = 7.5625;
+  const d1 = 2.75;
+  if (t < 1 / d1) return n1 * t * t;
+  if (t < 2 / d1) return n1 * (t -= 1.5 / d1) * t + 0.75;
+  if (t < 2.5 / d1) return n1 * (t -= 2.25 / d1) * t + 0.9375;
+  return n1 * (t -= 2.625 / d1) * t + 0.984375;
+}
+
+function easeInOutCubic(t) {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+function lerp(a, b, t) {
+  return a + (b - a) * t;
+}
+
+// --- Particles ---
+
+function spawnParticles(x, y, count, color, opts = {}) {
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = (opts.speed || 80) * (0.5 + Math.random() * 0.5);
+    particles.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life: (opts.life || 0.6) * (0.5 + Math.random() * 0.5),
+      maxLife: opts.life || 0.6,
+      color,
+      size: (opts.size || 3) * (0.5 + Math.random()),
+      alpha: 1,
+      gravity: opts.gravity || 100,
+    });
+  }
+}
+
+function spawnAttackParticles(x, y) {
+  spawnParticles(x, y, 12, '#ff4444', { speed: 120, life: 0.4, size: 3, gravity: 200 });
+  spawnParticles(x, y, 8, '#ffaa00', { speed: 80, life: 0.3, size: 2, gravity: 150 });
+}
+
+function spawnSpellParticles(x, y, color) {
+  spawnParticles(x, y, 20, color, { speed: 100, life: 0.5, size: 4, gravity: -50 });
+  spawnParticles(x, y, 10, '#ffffff', { speed: 60, life: 0.4, size: 2, gravity: -30 });
+}
+
+function spawnHealParticles(x, y) {
+  spawnParticles(x, y, 15, '#44ff88', { speed: 60, life: 0.8, size: 3, gravity: -80 });
+  spawnParticles(x, y, 10, '#88ffaa', { speed: 40, life: 1, size: 2, gravity: -100 });
+}
+
+function spawnDeathParticles(x, y) {
+  spawnParticles(x, y, 25, '#666666', { speed: 100, life: 0.6, size: 4, gravity: 200 });
+  spawnParticles(x, y, 15, '#333333', { speed: 60, life: 0.8, size: 3, gravity: 150 });
+}
+
+// --- Damage Numbers ---
+
+function addDamageNumber(x, y, amount, color = '#ff4444') {
+  damageNumbers.push({
+    x, y,
+    text: `-${amount}`,
+    color,
+    life: 1,
+    maxLife: 1,
+    alpha: 1,
+    scale: 1,
+  });
+}
+
+function addHealNumber(x, y, amount) {
+  damageNumbers.push({
+    x, y,
+    text: `+${amount}`,
+    color: '#44ff88',
+    life: 1.2,
+    maxLife: 1.2,
+    alpha: 1,
+    scale: 1,
+  });
+}
+
+function addBuffNumber(x, y, text) {
+  damageNumbers.push({
+    x, y,
+    text,
+    color: '#ffaa44',
+    life: 1,
+    maxLife: 1,
+    alpha: 1,
+    scale: 1,
+  });
+}
+
+// --- Rendering ---
+
+function renderEffects(ctx) {
+  // Render particles
+  for (const p of particles) {
+    ctx.save();
+    ctx.globalAlpha = p.alpha;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // Render damage numbers
+  for (const d of damageNumbers) {
+    ctx.save();
+    ctx.globalAlpha = d.alpha;
+    ctx.font = `bold ${Math.round(22 * d.scale)}px Arial`;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#000';
+    ctx.fillText(d.text, d.x + 1, d.y + 1);
+    ctx.fillStyle = d.color;
+    ctx.fillText(d.text, d.x, d.y);
+    ctx.restore();
+  }
+}
+
+function clearEffects() {
+  animations.length = 0;
+  particles.length = 0;
+  damageNumbers.length = 0;
+}
+
+// === ./ui.js ===
+// ui.js - UI rendering, card drawing, overlays
+
+const { CARD_WIDTH, CARD_HEIGHT, FIELD_CARD_WIDTH, FIELD_CARD_HEIGHT, CARD_RADIUS } = GAME_CONFIG;
+
+// --- Card Rendering ---
+
+function drawRoundedRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+// Draw a card at position
+function drawCard(ctx, card, x, y, opts = {}) {
+  const w = opts.field ? FIELD_CARD_WIDTH : CARD_WIDTH;
+  const h = opts.field ? FIELD_CARD_HEIGHT : CARD_HEIGHT;
+  const hovered = opts.hovered || false;
+  const playable = opts.playable || false;
+  const selected = opts.selected || false;
+  const canAttack = opts.canAttack || false;
+  const faceDown = opts.faceDown || false;
+  const scale = opts.scale || 1;
+  const alpha = opts.alpha !== undefined ? opts.alpha : 1;
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+
+  if (scale !== 1) {
+    ctx.translate(x + w / 2, y + h / 2);
+    ctx.scale(scale, scale);
+    ctx.translate(-(x + w / 2), -(y + h / 2));
+  }
+
+  if (faceDown) {
+    // Card back
+    drawRoundedRect(ctx, x, y, w, h, CARD_RADIUS);
+    const grad = ctx.createLinearGradient(x, y, x + w, y + h);
+    grad.addColorStop(0, '#2a1a4a');
+    grad.addColorStop(0.5, '#3d2a6a');
+    grad.addColorStop(1, '#2a1a4a');
+    ctx.fillStyle = grad;
+    ctx.fill();
+    ctx.strokeStyle = '#6a4aaa';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Pattern on back
+    ctx.strokeStyle = '#5a3a8a';
+    ctx.lineWidth = 1;
+    const cx = x + w / 2, cy = y + h / 2;
+    for (let r = 10; r < Math.min(w, h) * 0.4; r += 8) {
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.fillStyle = '#8a6acc';
+    ctx.font = 'bold 16px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('?', cx, cy + 6);
+
+    ctx.restore();
+    return;
+  }
+
+  const rarityColor = RARITY_COLORS[card.rarity] || '#888';
+  const isCreature = card.type === CARD_TYPE.CREATURE;
+
+  // Glow for playable/selected/attackable
+  if (selected || canAttack) {
+    ctx.shadowColor = canAttack ? '#ffaa00' : '#44ff88';
+    ctx.shadowBlur = 12;
+  } else if (hovered) {
+    ctx.shadowColor = '#8866ff';
+    ctx.shadowBlur = 10;
+  }
+
+  // Card background
+  drawRoundedRect(ctx, x, y, w, h, CARD_RADIUS);
+  const bgGrad = ctx.createLinearGradient(x, y, x, y + h);
+  bgGrad.addColorStop(0, '#1a1a2e');
+  bgGrad.addColorStop(1, '#16213e');
+  ctx.fillStyle = bgGrad;
+  ctx.fill();
+
+  // Border
+  ctx.strokeStyle = rarityColor;
+  ctx.lineWidth = selected ? 3 : 2;
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Card art area
+  const artY = y + 4;
+  const artH = h * 0.4;
+  const artX = x + 4;
+  const artW = w - 8;
+
+  drawRoundedRect(ctx, artX, artY, artW, artH, 4);
+  const iconBg = ICON_BG_COLORS[card.icon] || '#333';
+  const artGrad = ctx.createLinearGradient(artX, artY, artX, artY + artH);
+  artGrad.addColorStop(0, iconBg);
+  artGrad.addColorStop(1, adjustColor(iconBg, -30));
+  ctx.fillStyle = artGrad;
+  ctx.fill();
+
+  // Icon symbol
+  const iconSize = opts.field ? 20 : 26;
+  ctx.font = `${iconSize}px Arial`;
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#fff';
+  const icon = ICON_SYMBOLS[card.icon] || '?';
+  ctx.fillText(icon, x + w / 2, artY + artH / 2 + iconSize / 3);
+
+  // Mana cost (top-left)
+  const costSize = opts.field ? 18 : 22;
+  drawCircle(ctx, x + (opts.field ? 10 : 12), y + (opts.field ? 10 : 12), opts.field ? 10 : 12, '#1565C0', '#42A5F5');
+  ctx.fillStyle = '#fff';
+  ctx.font = `bold ${costSize * 0.7}px Arial`;
+  ctx.textAlign = 'center';
+  ctx.fillText(card.cost, x + (opts.field ? 10 : 12), y + (opts.field ? 14 : 16));
+
+  // Card name
+  const nameY = artY + artH + (opts.field ? 12 : 16);
+  ctx.fillStyle = '#e0e0ff';
+  ctx.font = `bold ${opts.field ? 10 : 12}px Arial`;
+  ctx.textAlign = 'center';
+  ctx.fillText(card.name, x + w / 2, nameY);
+
+  // Description (for non-field cards)
+  if (!opts.field && card.desc) {
+    ctx.fillStyle = '#a0a0c0';
+    ctx.font = '9px Arial';
+    const descY = nameY + 14;
+    // Word wrap
+    const words = card.desc.split('');
+    let line = '';
+    let lineY = descY;
+    for (const char of words) {
+      const testLine = line + char;
+      if (ctx.measureText(testLine).width > w - 16) {
+        ctx.fillText(line, x + w / 2, lineY);
+        line = char;
+        lineY += 12;
+      } else {
+        line = testLine;
+      }
+    }
+    ctx.fillText(line, x + w / 2, lineY);
+  }
+
+  // ATK/HP for creatures
+  if (isCreature) {
+    const statY = y + h - (opts.field ? 8 : 10);
+    const statSize = opts.field ? 14 : 18;
+
+    // ATK (bottom-left)
+    drawCircle(ctx, x + (opts.field ? 12 : 15), statY, opts.field ? 10 : 13, '#c62828', '#ef5350');
+    ctx.fillStyle = '#fff';
+    ctx.font = `bold ${statSize * 0.75}px Arial`;
+    ctx.textAlign = 'center';
+    ctx.fillText(card.currentAtk, x + (opts.field ? 12 : 15), statY + 4);
+
+    // HP (bottom-right)
+    const hpColor = card.currentHp < card.hp ? '#c62828' : '#2E7D32';
+    const hpBg = card.currentHp < card.hp ? '#ef5350' : '#66BB6A';
+    drawCircle(ctx, x + w - (opts.field ? 12 : 15), statY, opts.field ? 10 : 13, hpColor, hpBg);
+    ctx.fillStyle = '#fff';
+    ctx.fillText(card.currentHp, x + w - (opts.field ? 12 : 15), statY + 4);
+  } else {
+    // For spells/heals, show type indicator
+    const typeY = y + h - (opts.field ? 10 : 14);
+    ctx.fillStyle = card.type === CARD_TYPE.HEAL ? '#44ff88' : '#ff6644';
+    ctx.font = `bold ${opts.field ? 9 : 11}px Arial`;
+    ctx.textAlign = 'center';
+    const typeText = card.type === CARD_TYPE.HEAL ? `+${card.healAmount} HP` :
+      card.damage ? (card.target === 'all' ? `${card.damage} 全体` : `${card.damage} 伤害`) :
+        card.buffAtk ? `+${card.buffAtk} ATK` : `+${card.buffHp} HP`;
+    ctx.fillText(typeText, x + w / 2, typeY);
+  }
+
+  // Rarity gem
+  ctx.fillStyle = rarityColor;
+  ctx.beginPath();
+  ctx.arc(x + w / 2, y + h - 3, 3, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+function drawCircle(ctx, x, y, r, strokeColor, fillColor) {
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fillStyle = fillColor;
+  ctx.fill();
+  ctx.strokeStyle = strokeColor;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+}
+
+function adjustColor(hex, amount) {
+  const num = parseInt(hex.replace('#', ''), 16);
+  const r = Math.min(255, Math.max(0, (num >> 16) + amount));
+  const g = Math.min(255, Math.max(0, ((num >> 8) & 0xff) + amount));
+  const b = Math.min(255, Math.max(0, (num & 0xff) + amount));
+  return `rgb(${r},${g},${b})`;
+}
+
+// --- Mana Crystal Rendering ---
+
+function drawManaBar(ctx, x, y, current, max) {
+  const crystalSize = 12;
+  const gap = 4;
+  for (let i = 0; i < max; i++) {
+    const cx = x + i * (crystalSize * 2 + gap);
+    const filled = i < current;
+    drawCrystal(ctx, cx, y, crystalSize, filled);
+  }
+}
+
+function drawCrystal(ctx, x, y, size, filled) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(x, y - size);
+  ctx.lineTo(x + size * 0.6, y - size * 0.2);
+  ctx.lineTo(x + size * 0.4, y + size * 0.6);
+  ctx.lineTo(x - size * 0.4, y + size * 0.6);
+  ctx.lineTo(x - size * 0.6, y - size * 0.2);
+  ctx.closePath();
+
+  if (filled) {
+    const grad = ctx.createLinearGradient(x, y - size, x, y + size);
+    grad.addColorStop(0, '#64B5F6');
+    grad.addColorStop(0.5, '#1E88E5');
+    grad.addColorStop(1, '#0D47A1');
+    ctx.fillStyle = grad;
+    ctx.fill();
+    ctx.strokeStyle = '#90CAF9';
+  } else {
+    ctx.fillStyle = '#1a1a3a';
+    ctx.fill();
+    ctx.strokeStyle = '#3a3a5a';
+  }
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.restore();
+}
+
+// --- HP Bar ---
+
+function drawHpBar(ctx, x, y, w, hp, maxHp, label, isEnemy = false) {
+  const barH = 24;
+  const ratio = hp / maxHp;
+  const barColor = ratio > 0.6 ? '#4CAF50' : ratio > 0.3 ? '#FF9800' : '#F44336';
+
+  // Background
+  drawRoundedRect(ctx, x, y, w, barH, 6);
+  ctx.fillStyle = '#1a1a2e';
+  ctx.fill();
+  ctx.strokeStyle = '#444';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Fill
+  if (hp > 0) {
+    drawRoundedRect(ctx, x + 2, y + 2, (w - 4) * ratio, barH - 4, 4);
+    ctx.fillStyle = barColor;
+    ctx.fill();
+  }
+
+  // Text
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 13px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText(`${label}  ${hp}/${maxHp}`, x + w / 2, y + barH / 2 + 5);
+}
+
+// --- Card Tooltip ---
+
+function drawTooltip(ctx, card, x, y) {
+  if (!card) return;
+
+  const tw = 200;
+  const th = 120;
+  // Keep on screen
+  const tx = Math.min(x, ctx.canvas.width - tw - 10);
+  const ty = Math.max(10, y - th - 10);
+
+  ctx.save();
+  ctx.globalAlpha = 0.95;
+
+  drawRoundedRect(ctx, tx, ty, tw, th, 8);
+  ctx.fillStyle = '#1a1a2eee';
+  ctx.fill();
+  ctx.strokeStyle = RARITY_COLORS[card.rarity] || '#666';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Name
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 16px Arial';
+  ctx.textAlign = 'left';
+  ctx.fillText(`${card.name}  (${card.cost})`, tx + 12, ty + 25);
+
+  // Type
+  const typeNames = { [CARD_TYPE.CREATURE]: '生物', [CARD_TYPE.SPELL]: '法术', [CARD_TYPE.HEAL]: '治疗' };
+  ctx.fillStyle = '#aaa';
+  ctx.font = '12px Arial';
+  ctx.fillText(typeNames[card.type] || '', tx + 12, ty + 42);
+
+  // Description
+  ctx.fillStyle = '#ddd';
+  ctx.font = '12px Arial';
+  ctx.fillText(card.desc || '', tx + 12, ty + 60);
+
+  // Stats for creatures
+  if (card.type === CARD_TYPE.CREATURE) {
+    ctx.fillStyle = '#ff6666';
+    ctx.fillText(`攻击力: ${card.currentAtk}`, tx + 12, ty + 80);
+    ctx.fillStyle = '#66ff66';
+    ctx.fillText(`生命值: ${card.currentHp}`, tx + 12, ty + 96);
+  }
+
+  ctx.restore();
+}
+
+// --- Battle Field Layout ---
+
+function getFieldLayout(canvasW, canvasH) {
+  const fieldCenterY = canvasH * 0.45;
+  const handY = canvasH - CARD_HEIGHT - 20;
+  const enemyHandY = 10;
+
+  return {
+    playerHp: { x: 20, y: canvasH - 55, w: 160 },
+    aiHp: { x: 20, y: 10, w: 160 },
+    playerMana: { x: 20, y: canvasH - 28 },
+    aiMana: { x: 20, y: 40 },
+    playerDeck: { x: canvasW - 60, y: canvasH - 70 },
+    aiDeck: { x: canvasW - 60, y: 15 },
+    playerField: {
+      startX: (canvasW - (FIELD_CARD_WIDTH + 10) * 3) / 2,
+      y: fieldCenterY + 20,
+      gap: FIELD_CARD_WIDTH + 10,
+    },
+    aiField: {
+      startX: (canvasW - (FIELD_CARD_WIDTH + 10) * 3) / 2,
+      y: fieldCenterY - FIELD_CARD_HEIGHT - 30,
+      gap: FIELD_CARD_WIDTH + 10,
+    },
+    playerHand: {
+      startX: 0, // computed dynamically
+      y: handY,
+    },
+    aiHand: {
+      startX: 0,
+      y: enemyHandY,
+    },
+    turnBtn: { x: canvasW - 110, y: canvasH - 55, w: 90, h: 35 },
+    endBtn: { x: canvasW - 110, y: 15, w: 90, h: 35 }, // not used but keep
+  };
+}
+
+// --- Draw Battle Scene ---
+
+function drawBattleScene(ctx, state, layout, hoveredCard, selectedCard, selectedAttacker, pendingSpell) {
+  const { canvas } = ctx;
+  const cw = canvas.width;
+  const ch = canvas.height;
+
+  // Background
+  const bg = ctx.createLinearGradient(0, 0, 0, ch);
+  bg.addColorStop(0, '#0a0a1a');
+  bg.addColorStop(0.4, '#12122a');
+  bg.addColorStop(0.5, '#1a1a3a');
+  bg.addColorStop(0.6, '#12122a');
+  bg.addColorStop(1, '#0a0a1a');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, cw, ch);
+
+  // Field divider
+  ctx.strokeStyle = '#333366';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([8, 4]);
+  ctx.beginPath();
+  ctx.moveTo(40, ch * 0.45);
+  ctx.lineTo(cw - 40, ch * 0.45);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Field labels
+  ctx.fillStyle = '#444466';
+  ctx.font = '11px Arial';
+  ctx.textAlign = 'right';
+  ctx.fillText('敌方战场', cw - 20, ch * 0.45 - 8);
+  ctx.fillText('我方战场', cw - 20, ch * 0.45 + 14);
+
+  // HP bars
+  drawHpBar(ctx, layout.playerHp.x, layout.playerHp.y, layout.playerHp.w,
+    state.player.hp, 30, '我方');
+  drawHpBar(ctx, layout.aiHp.x, layout.aiHp.y, layout.aiHp.w,
+    state.ai.hp, 30, '敌方', true);
+
+  // Mana
+  ctx.fillStyle = '#888';
+  ctx.font = '10px Arial';
+  ctx.textAlign = 'left';
+  ctx.fillText('法力:', layout.playerMana.x, layout.playerMana.y - 2);
+  drawManaBar(ctx, layout.playerMana.x + 30, layout.playerMana.y,
+    state.player.mana, state.player.maxMana);
+
+  ctx.fillText('法力:', layout.aiMana.x, layout.aiMana.y - 2);
+  drawManaBar(ctx, layout.aiMana.x + 30, layout.aiMana.y,
+    state.ai.mana, state.ai.maxMana);
+
+  // Deck counts
+  ctx.fillStyle = '#666';
+  ctx.font = '11px Arial';
+  ctx.textAlign = 'center';
+  drawDeckPile(ctx, layout.playerDeck.x, layout.playerDeck.y, state.player.deck.length);
+  ctx.fillText(`${state.player.deck.length}`, layout.playerDeck.x, layout.playerDeck.y + 40);
+  drawDeckPile(ctx, layout.aiDeck.x, layout.aiDeck.y, state.ai.deck.length);
+  ctx.fillText(`${state.ai.deck.length}`, layout.aiDeck.x, layout.aiDeck.y + 40);
+
+  // AI field
+  for (let i = 0; i < state.ai.field.length; i++) {
+    const card = state.ai.field[i];
+    const cx = layout.aiField.startX + i * layout.aiField.gap;
+    drawCard(ctx, card, cx, layout.aiField.y, {
+      field: true,
+      hovered: hoveredCard === card.uid,
+      canAttack: card.canAttack && state.turn === 'ai',
+    });
+  }
+
+  // Player field
+  for (let i = 0; i < state.player.field.length; i++) {
+    const card = state.player.field[i];
+    const cx = layout.playerField.startX + i * layout.playerField.gap;
+    const isSelected = selectedAttacker === card.uid;
+    drawCard(ctx, card, cx, layout.playerField.y, {
+      field: true,
+      hovered: hoveredCard === card.uid,
+      canAttack: card.canAttack && state.turn === 'player',
+      selected: isSelected,
+    });
+  }
+
+  // Player hand
+  const handCount = state.player.hand.length;
+  const handTotalW = handCount * (CARD_WIDTH + 8);
+  const handStartX = (cw - handTotalW) / 2;
+  for (let i = 0; i < handCount; i++) {
+    const card = state.player.hand[i];
+    const cx = handStartX + i * (CARD_WIDTH + 8);
+    const isHovered = hoveredCard === card.uid;
+    const isPlayable = state.turn === 'player' && card.cost <= state.player.mana;
+    const isSelected = selectedCard === card.uid;
+    drawCard(ctx, card, cx, layout.playerHand.y, {
+      hovered: isHovered,
+      playable: isPlayable,
+      selected: isSelected,
+      scale: isHovered ? 1.08 : 1,
+    });
+  }
+
+  // AI hand (face down)
+  const aiHandCount = state.ai.hand.length;
+  const aiHandTotalW = aiHandCount * 35;
+  const aiHandStartX = (cw - aiHandTotalW) / 2;
+  for (let i = 0; i < aiHandCount; i++) {
+    const cx = aiHandStartX + i * 35;
+    drawCard(ctx, null, cx, layout.aiHand.y, { faceDown: true, field: true });
+  }
+
+  // Turn indicator
+  ctx.fillStyle = state.turn === 'player' ? '#4CAF50' : '#F44336';
+  ctx.font = 'bold 14px Arial';
+  ctx.textAlign = 'center';
+  const turnText = state.turn === 'player' ? '你的回合' : '对手回合';
+  ctx.fillText(turnText, cw / 2, ch * 0.45 + 2);
+
+  // End turn button (only during player turn)
+  if (state.turn === 'player') {
+    drawButton(ctx, layout.turnBtn.x, layout.turnBtn.y,
+      layout.turnBtn.w, layout.turnBtn.h, '结束回合');
+  }
+
+  // Phase indicator
+  if (state.phase === 'play') {
+    ctx.fillStyle = '#88ff88';
+    ctx.font = '11px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('出牌阶段 - 选择手牌打出或选择场上生物攻击', cw / 2, ch - 3);
+  } else if (state.phase === 'selectTarget') {
+    ctx.fillStyle = '#ffaa44';
+    ctx.font = '12px Arial';
+    ctx.textAlign = 'center';
+    const targetText = pendingSpell && pendingSpell.target === 'friendly'
+      ? '选择友方生物进行增益 (点击己方场上生物)'
+      : '选择目标 (点击敌方生物或敌方头像)';
+    ctx.fillText(targetText, cw / 2, ch - 3);
+  } else if (state.phase === 'selectAttackTarget') {
+    ctx.fillStyle = '#ffaa44';
+    ctx.font = '12px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('选择攻击目标 (点击敌方生物或敌方头像)', cw / 2, ch - 3);
+  }
+}
+
+function drawDeckPile(ctx, x, y, count) {
+  for (let i = Math.min(count, 3) - 1; i >= 0; i--) {
+    const ox = x + i * 2;
+    const oy = y + i * 2;
+    drawRoundedRect(ctx, ox - 15, oy, 30, 35, 3);
+    ctx.fillStyle = '#2a1a4a';
+    ctx.fill();
+    ctx.strokeStyle = '#5a3a8a';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+  if (count > 0) {
+    ctx.fillStyle = '#8a6acc';
+    ctx.font = '10px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('牌库', x, y + 22);
+  }
+}
+
+function drawButton(ctx, x, y, w, h, text) {
+  drawRoundedRect(ctx, x, y, w, h, 6);
+  const grad = ctx.createLinearGradient(x, y, x, y + h);
+  grad.addColorStop(0, '#4a2a8a');
+  grad.addColorStop(1, '#2a1a5a');
+  ctx.fillStyle = grad;
+  ctx.fill();
+  ctx.strokeStyle = '#7a5aba';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.fillStyle = '#e0d0ff';
+  ctx.font = 'bold 13px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText(text, x + w / 2, y + h / 2 + 5);
+}
+
+// --- Hit Testing ---
+
+function getCardAtPos(mx, my, state, layout) {
+  // Check player hand
+  const handCount = state.player.hand.length;
+  const handTotalW = handCount * (CARD_WIDTH + 8);
+  const handStartX = (canvasWidth - handTotalW) / 2;
+
+  for (let i = 0; i < handCount; i++) {
+    const card = state.player.hand[i];
+    const cx = handStartX + i * (CARD_WIDTH + 8);
+    if (mx >= cx && mx <= cx + CARD_WIDTH && my >= layout.playerHand.y && my <= layout.playerHand.y + CARD_HEIGHT) {
+      return { zone: 'hand', card, index: i };
+    }
+  }
+
+  // Check player field
+  for (let i = 0; i < state.player.field.length; i++) {
+    const card = state.player.field[i];
+    const cx = layout.playerField.startX + i * layout.playerField.gap;
+    if (mx >= cx && mx <= cx + FIELD_CARD_WIDTH && my >= layout.playerField.y && my <= layout.playerField.y + FIELD_CARD_HEIGHT) {
+      return { zone: 'playerField', card, index: i };
+    }
+  }
+
+  // Check AI field
+  for (let i = 0; i < state.ai.field.length; i++) {
+    const card = state.ai.field[i];
+    const cx = layout.aiField.startX + i * layout.aiField.gap;
+    if (mx >= cx && mx <= cx + FIELD_CARD_WIDTH && my >= layout.aiField.y && my <= layout.aiField.y + FIELD_CARD_HEIGHT) {
+      return { zone: 'aiField', card, index: i };
+    }
+  }
+
+  // Check AI face (for targeting)
+  if (mx >= layout.aiHp.x && mx <= layout.aiHp.x + layout.aiHp.w &&
+    my >= layout.aiHp.y && my <= layout.aiHp.y + 24) {
+    return { zone: 'aiFace' };
+  }
+
+  // Check end turn button
+  if (state.turn === 'player' &&
+    mx >= layout.turnBtn.x && mx <= layout.turnBtn.x + layout.turnBtn.w &&
+    my >= layout.turnBtn.y && my <= layout.turnBtn.y + layout.turnBtn.h) {
+    return { zone: 'endTurn' };
+  }
+
+  return null;
+}
+
+// Store canvas ref for hit testing
+let canvasWidth = 800;
+let canvasHeight = 600;
+function setCtxRef(ctx) {
+  if (ctx && ctx.canvas) {
+    canvasWidth = ctx.canvas.width;
+    canvasHeight = ctx.canvas.height;
+  }
+}
+function updateCanvasSize(w, h) {
+  canvasWidth = w;
+  canvasHeight = h;
+}
+
+// --- Start Overlay ---
+
+function drawStartOverlay(ctx) {
+  const { canvas } = ctx;
+  const cw = canvas.width;
+  const ch = canvas.height;
+
+  // Dark overlay
+  ctx.fillStyle = '#0a0a1acc';
+  ctx.fillRect(0, 0, cw, ch);
+
+  // Title card
+  const cardW = 400;
+  const cardH = 500;
+  const cx = (cw - cardW) / 2;
+  const cy = (ch - cardH) / 2;
+
+  drawRoundedRect(ctx, cx, cy, cardW, cardH, 16);
+  const grad = ctx.createLinearGradient(cx, cy, cx, cy + cardH);
+  grad.addColorStop(0, '#1a103a');
+  grad.addColorStop(0.5, '#2a1a5a');
+  grad.addColorStop(1, '#1a103a');
+  ctx.fillStyle = grad;
+  ctx.fill();
+  ctx.strokeStyle = '#7a5aba';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Title
+  ctx.fillStyle = '#e0d0ff';
+  ctx.font = 'bold 48px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText('卡牌战争', cx + cardW / 2, cy + 60);
+
+  // Subtitle
+  ctx.fillStyle = '#a090cc';
+  ctx.font = '16px Arial';
+  ctx.fillText('Card War', cx + cardW / 2, cy + 85);
+
+  // Decorative line
+  ctx.strokeStyle = '#6a4a9a';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(cx + 40, cy + 100);
+  ctx.lineTo(cx + cardW - 40, cy + 100);
+  ctx.stroke();
+
+  // Difficulty buttons
+  const difficulties = [
+    { key: 'easy', label: '简单', desc: 'AI随机出牌', color: '#4CAF50' },
+    { key: 'medium', label: '中等', desc: 'AI会评估交换', color: '#FF9800' },
+    { key: 'hard', label: '困难', desc: 'AI提前规划', color: '#F44336' },
+  ];
+
+  const btnW = 300;
+  const btnH = 55;
+  const btnStartY = cy + 130;
+
+  const buttons = [];
+  for (let i = 0; i < difficulties.length; i++) {
+    const d = difficulties[i];
+    const bx = cx + (cardW - btnW) / 2;
+    const by = btnStartY + i * 65;
+
+    drawRoundedRect(ctx, bx, by, btnW, btnH, 8);
+    const bGrad = ctx.createLinearGradient(bx, by, bx, by + btnH);
+    bGrad.addColorStop(0, d.color + '44');
+    bGrad.addColorStop(1, d.color + '22');
+    ctx.fillStyle = bGrad;
+    ctx.fill();
+    ctx.strokeStyle = d.color;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 20px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(d.label, bx + btnW / 2, by + 25);
+    ctx.fillStyle = '#aaa';
+    ctx.font = '12px Arial';
+    ctx.fillText(d.desc, bx + btnW / 2, by + 44);
+
+    buttons.push({ x: bx, y: by, w: btnW, h: btnH, key: d.key });
+  }
+
+  // Help text
+  ctx.fillStyle = '#888';
+  ctx.font = '11px Arial';
+  ctx.textAlign = 'center';
+  const helpY = cy + cardH - 100;
+  ctx.fillText('玩法说明:', cx + cardW / 2, helpY);
+  ctx.font = '10px Arial';
+  ctx.fillStyle = '#666';
+  ctx.fillText('点击手牌打出，点击场上生物选择攻击', cx + cardW / 2, helpY + 18);
+  ctx.fillText('每个生物每回合可攻击一次', cx + cardW / 2, helpY + 33);
+  ctx.fillText('消灭对手全部生命值即可获胜', cx + cardW / 2, helpY + 48);
+  ctx.fillText('最高连胜记录保存在本地', cx + cardW / 2, helpY + 63);
+
+  return buttons;
+}
+
+// --- Game Over Overlay ---
+
+function drawGameOverOverlay(ctx, won, stats) {
+  const { canvas } = ctx;
+  const cw = canvas.width;
+  const ch = canvas.height;
+
+  ctx.fillStyle = '#0a0a1acc';
+  ctx.fillRect(0, 0, cw, ch);
+
+  const cardW = 360;
+  const cardH = 320;
+  const cx = (cw - cardW) / 2;
+  const cy = (ch - cardH) / 2;
+
+  drawRoundedRect(ctx, cx, cy, cardW, cardH, 16);
+  const grad = ctx.createLinearGradient(cx, cy, cx, cy + cardH);
+  grad.addColorStop(0, won ? '#1a3a1a' : '#3a1a1a');
+  grad.addColorStop(1, won ? '#0a2a0a' : '#2a0a0a');
+  ctx.fillStyle = grad;
+  ctx.fill();
+  ctx.strokeStyle = won ? '#4CAF50' : '#F44336';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Title
+  ctx.fillStyle = won ? '#4CAF50' : '#F44336';
+  ctx.font = 'bold 36px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText(won ? '胜利!' : '失败', cx + cardW / 2, cy + 50);
+
+  // Stats
+  ctx.fillStyle = '#ccc';
+  ctx.font = '14px Arial';
+  const lines = [
+    `回合数: ${stats.turns}`,
+    `打出卡牌: ${stats.cardsPlayed}`,
+    `造成伤害: ${stats.damageDealt}`,
+    `承受伤害: ${stats.damageTaken}`,
+    `连胜: ${stats.streak}`,
+    `最高连胜: ${stats.bestStreak}`,
+  ];
+  for (let i = 0; i < lines.length; i++) {
+    ctx.fillText(lines[i], cx + cardW / 2, cy + 90 + i * 24);
+  }
+
+  // Restart button
+  const btnW = 200;
+  const btnH = 40;
+  const bx = cx + (cardW - btnW) / 2;
+  const by = cy + cardH - 65;
+
+  drawRoundedRect(ctx, bx, by, btnW, btnH, 8);
+  ctx.fillStyle = '#4a2a8a';
+  ctx.fill();
+  ctx.strokeStyle = '#7a5aba';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.fillStyle = '#e0d0ff';
+  ctx.font = 'bold 16px Arial';
+  ctx.fillText('再来一局', bx + btnW / 2, by + 26);
+
+  return { x: bx, y: by, w: btnW, h: btnH };
+}
+
+// === main.js ===
+// main.js - Game loop, state management, event handling
+
+const { FIELD_CARD_WIDTH, FIELD_CARD_HEIGHT } = GAME_CONFIG;
+
+// --- Game State ---
+let gameState = null;
+let canvas, ctx;
+let layout = {};
+let hoveredCard = null;
+let selectedCard = null; // for targeting spells
+let selectedAttacker = null; // for choosing attack target
+let pendingSpell = null;
+let difficulty = 'medium';
+let gameOverResult = null;
+let gameOverBtn = null;
+let startButtons = [];
+let screen = 'start'; // 'start', 'battle', 'gameover'
+let stats = {};
+let mouseX = 0, mouseY = 0;
+let aiActionQueue = [];
+let aiActionTimer = 0;
+let turnMessage = '';
+let turnMessageTimer = 0;
+let bestStreak = parseInt(localStorage.getItem('cardwar_best_streak') || '0');
+let currentStreak = parseInt(localStorage.getItem('cardwar_streak') || '0');
+
+function createPlayer() {
+  return {
+    hp: GAME_CONFIG.STARTING_HP,
+    mana: 0,
+    maxMana: 0,
+    deck: [],
+    hand: [],
+    field: [],
+  };
+}
+
+function initGame(diff) {
+  difficulty = diff;
+  Sound.init();
+
+  const player = createPlayer();
+  const ai = createPlayer();
+
+  player.deck = buildDeck();
+  ai.deck = buildAIDeck(difficulty);
+
+  // Draw initial hands
+  drawCards(player.deck, player.hand, GAME_CONFIG.HAND_SIZE);
+  drawCards(ai.deck, ai.hand, GAME_CONFIG.HAND_SIZE);
+
+  gameState = {
+    player,
+    ai,
+    turn: 'player',
+    phase: 'play', // 'play', 'selectTarget', 'selectAttackTarget'
+    turnNumber: 0,
+    gameOver: false,
+  };
+
+  stats = {
+    turns: 0,
+    cardsPlayed: 0,
+    damageDealt: 0,
+    damageTaken: 0,
+  };
+
+  selectedCard = null;
+  selectedAttacker = null;
+  pendingSpell = null;
+  hoveredCard = null;
+  aiActionQueue = [];
+  aiActionTimer = 0;
+  gameOverResult = null;
+  gameOverBtn = null;
+  screen = 'battle';
+
+  startPlayerTurn();
+}
+
+function startPlayerTurn() {
+  const { player } = gameState;
+  gameState.turn = 'player';
+  gameState.phase = 'play';
+  gameState.turnNumber++;
+  stats.turns = gameState.turnNumber;
+
+  // Increase mana
+  player.maxMana = Math.min(GAME_CONFIG.MAX_MANA, player.maxMana + 1);
+  player.mana = player.maxMana;
+
+  // Draw a card
+  const drawn = drawCards(player.deck, player.hand, 1);
+  if (drawn.length > 0) Sound.cardDraw();
+
+  // Reset creatures
+  resetCreaturesForTurn(player.field);
+
+  Sound.turnStart();
+  turnMessage = '你的回合';
+  turnMessageTimer = 1.5;
+}
+
+function startAITurn() {
+  const { ai } = gameState;
+  gameState.turn = 'ai';
+  gameState.phase = 'play';
+  selectedCard = null;
+  selectedAttacker = null;
+  pendingSpell = null;
+
+  // Increase mana
+  ai.maxMana = Math.min(GAME_CONFIG.MAX_MANA, ai.maxMana + 1);
+  ai.mana = ai.maxMana;
+
+  // Draw a card
+  const drawn = drawCards(ai.deck, ai.hand, 1);
+  if (drawn.length > 0) Sound.cardDraw();
+
+  // Reset creatures
+  resetCreaturesForTurn(ai.field);
+
+  turnMessage = '对手回合';
+  turnMessageTimer = 1;
+
+  // AI decides actions
+  aiActionQueue = aiDecideTurn(gameState);
+  aiActionTimer = 0.8; // delay before first action
+}
+
+// --- AI Action Execution ---
+
+function executeNextAIAction() {
+  if (aiActionQueue.length === 0) {
+    // AI turn done
+    setTimeout(() => startPlayerTurn(), 500);
+    return;
+  }
+
+  const action = aiActionQueue.shift();
+  const { ai, player } = gameState;
+
+  if (action.type === 'play') {
+    const card = ai.hand.find(c => c.uid === action.cardUid);
+    if (!card || card.cost > ai.mana) {
+      executeNextAIAction();
+      return;
+    }
+
+    // Play the card
+    removeFromHand(ai.hand, card.uid);
+    ai.mana -= card.cost;
+    stats.cardsPlayed++;
+
+    if (isCreature(card)) {
+      if (ai.field.length >= GAME_CONFIG.MAX_FIELD) {
+        executeNextAIAction();
+        return;
+      }
+      card.canAttack = false; // summoning sickness
+      card.hasAttacked = false;
+      ai.field.push(card);
+      Sound.cardPlay();
+    } else if (isSpell(card)) {
+      Sound.spellCast();
+      if (card.id === 'lightning' || card.id === 'inferno') {
+        Sound.lightning();
+      }
+      if (card.target === 'single') {
+        if (action.targetUid !== null) {
+          const target = player.field.find(c => c.uid === action.targetUid);
+          if (target) {
+            const dmgResult = playSpell(card, target, player.field, player, ai);
+            addDamageNumber(canvas.width / 2, canvas.height * 0.3, dmgResult.damage, '#ff4444');
+            stats.damageDealt += dmgResult.damage;
+            spawnSpellParticles(canvas.width / 2, canvas.height * 0.3, '#ff4444');
+          }
+        } else {
+          // Hit face
+          const faceResult = playSpell(card, null, [], player, ai);
+          if (faceResult.faceDamage) {
+            addDamageNumber(canvas.width / 2, 30, faceResult.faceDamage, '#ff4444');
+            stats.damageDealt += faceResult.faceDamage;
+            Sound.damageTaken();
+            spawnSpellParticles(canvas.width / 2, 30, '#ff4444');
+          }
+        }
+      } else if (card.target === 'all') {
+        const result = playSpell(card, null, player.field, player, ai);
+        spawnSpellParticles(canvas.width / 2, canvas.height * 0.35, '#ff6644');
+        stats.damageDealt += result.damage * result.targets.length;
+        const dead = removeDeadCreatures(player.field);
+        for (const d of dead) spawnDeathParticles(canvas.width / 2, canvas.height * 0.3);
+      } else if (card.target === 'friendly') {
+        const target = ai.field.find(c => c.uid === action.targetUid);
+        if (target) {
+          playSpell(card, target, player.field, player, ai);
+          addBuffNumber(canvas.width / 2, canvas.height * 0.3, card.buffAtk ? `+${card.buffAtk} ATK` : `+${card.buffHp} HP`);
+        }
+      }
+    } else if (isHeal(card)) {
+      Sound.heal();
+      playHeal(card, ai);
+      addHealNumber(canvas.width / 2, 40, card.healAmount);
+      spawnHealParticles(canvas.width / 2, 40);
+    }
+
+    // Remove dead from both sides
+    removeDeadCreatures(player.field);
+    removeDeadCreatures(ai.field);
+
+    if (checkGameOver()) return;
+
+    aiActionTimer = 0.6;
+  } else if (action.type === 'attack') {
+    const attacker = ai.field.find(c => c.uid === action.attackerUid);
+    if (!attacker || !attacker.canAttack) {
+      executeNextAIAction();
+      return;
+    }
+
+    Sound.creatureAttack();
+
+    if (action.targetUid === null) {
+      // Attack face
+      const result = executeCreatureAttack(attacker, null, player.field, player);
+      addDamageNumber(canvas.width / 2, canvas.height - 60, result.faceDamage, '#ff4444');
+      stats.damageTaken += result.faceDamage;
+      Sound.damageTaken();
+      spawnAttackParticles(canvas.width / 2, canvas.height - 60);
+    } else {
+      // Attack creature
+      const target = player.field.find(c => c.uid === action.targetUid);
+      if (target) {
+        const result = executeCreatureAttack(attacker, target, player.field, player);
+        const tx = canvas.width / 2;
+        const ty = canvas.height * 0.5;
+        addDamageNumber(tx, ty, result.targetDmg, '#ff4444');
+        spawnAttackParticles(tx, ty);
+        if (result.attackerDmg > 0) {
+          addDamageNumber(tx, ty - 20, result.attackerDmg, '#ff8844');
+        }
+        if (result.targetDied) {
+          Sound.creatureDeath();
+          spawnDeathParticles(tx, ty);
+        }
+        if (result.attackerDied) {
+          Sound.creatureDeath();
+          spawnDeathParticles(tx, ty - 30);
+        }
+      }
+    }
+
+    // Remove dead
+    const deadPlayer = removeDeadCreatures(player.field);
+    const deadAI = removeDeadCreatures(ai.field);
+    for (const d of deadPlayer) spawnDeathParticles(canvas.width / 2, canvas.height * 0.5);
+    for (const d of deadAI) spawnDeathParticles(canvas.width / 2, canvas.height * 0.35);
+
+    if (checkGameOver()) return;
+
+    aiActionTimer = 0.5;
+  }
+}
+
+function checkGameOver() {
+  const { player, ai } = gameState;
+  if (player.hp <= 0) {
+    endGame(false);
+    return true;
+  }
+  if (ai.hp <= 0) {
+    endGame(true);
+    return true;
+  }
+  return false;
+}
+
+function endGame(won) {
+  gameState.gameOver = true;
+  screen = 'gameover';
+
+  if (won) {
+    currentStreak++;
+    if (currentStreak > bestStreak) {
+      bestStreak = currentStreak;
+    }
+    Sound.gameWin();
+  } else {
+    currentStreak = 0;
+    Sound.gameLose();
+  }
+  localStorage.setItem('cardwar_streak', currentStreak.toString());
+  localStorage.setItem('cardwar_best_streak', bestStreak.toString());
+
+  gameOverResult = won;
+  stats.streak = currentStreak;
+  stats.bestStreak = bestStreak;
+}
+
+// --- Event Handlers ---
+
+function getMousePos(e) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  return {
+    x: (e.clientX - rect.left) * scaleX,
+    y: (e.clientY - rect.top) * scaleY,
+  };
+}
+
+function handleMouseMove(e) {
+  const pos = getMousePos(e);
+  mouseX = pos.x;
+  mouseY = pos.y;
+
+  if (screen !== 'battle' || !gameState) return;
+
+  const hit = getCardAtPos(pos.x, pos.y, gameState, layout);
+  hoveredCard = hit ? hit.card ? hit.card.uid : null : null;
+  canvas.style.cursor = hit ? 'pointer' : 'default';
+}
+
+function handleClick(e) {
+  const pos = getMousePos(e);
+  Sound.init();
+
+  if (screen === 'start') {
+    for (const btn of startButtons) {
+      if (pos.x >= btn.x && pos.x <= btn.x + btn.w && pos.y >= btn.y && pos.y <= btn.y + btn.h) {
+        Sound.click();
+        initGame(btn.key);
+        return;
+      }
+    }
+    return;
+  }
+
+  if (screen === 'gameover') {
+    if (gameOverBtn &&
+      pos.x >= gameOverBtn.x && pos.x <= gameOverBtn.x + gameOverBtn.w &&
+      pos.y >= gameOverBtn.y && pos.y <= gameOverBtn.y + gameOverBtn.h) {
+      Sound.click();
+      screen = 'start';
+      gameOverResult = null;
+      gameOverBtn = null;
+    }
+    return;
+  }
+
+  if (screen !== 'battle' || !gameState || gameState.gameOver) return;
+  if (gameState.turn !== 'player') return;
+  if (isAnimating()) return;
+
+  const hit = getCardAtPos(pos.x, pos.y, gameState, layout);
+  if (!hit) {
+    // Clicked empty space - deselect
+    selectedCard = null;
+    selectedAttacker = null;
+    pendingSpell = null;
+    gameState.phase = 'play';
+    return;
+  }
+
+  // --- Handle End Turn ---
+  if (hit.zone === 'endTurn') {
+    Sound.click();
+    selectedCard = null;
+    selectedAttacker = null;
+    pendingSpell = null;
+    startAITurn();
+    return;
+  }
+
+  // --- Select Attack Target ---
+  if (gameState.phase === 'selectAttackTarget') {
+    if (hit.zone === 'aiField') {
+      // Attack this creature
+      executePlayerAttack(selectedAttacker, hit.card);
+      return;
+    }
+    if (hit.zone === 'aiFace') {
+      // Attack face
+      executePlayerAttack(selectedAttacker, null);
+      return;
+    }
+    // Cancel
+    gameState.phase = 'play';
+    selectedAttacker = null;
+    return;
+  }
+
+  // --- Select Spell Target ---
+  if (gameState.phase === 'selectTarget') {
+    if (pendingSpell.target === 'single') {
+      if (hit.zone === 'aiField') {
+        executePlayerSpell(pendingSpell, hit.card);
+        return;
+      }
+      if (hit.zone === 'aiFace') {
+        executePlayerSpell(pendingSpell, null);
+        return;
+      }
+    } else if (pendingSpell.target === 'friendly') {
+      if (hit.zone === 'playerField') {
+        executePlayerSpell(pendingSpell, hit.card);
+        return;
+      }
+    }
+    // Cancel
+    gameState.phase = 'play';
+    selectedCard = null;
+    pendingSpell = null;
+    return;
+  }
+
+  // --- Play from hand ---
+  if (hit.zone === 'hand') {
+    const card = hit.card;
+    if (card.cost > gameState.player.mana) return; // Can't afford
+
+    if (isCreature(card)) {
+      if (gameState.player.field.length >= GAME_CONFIG.MAX_FIELD) return; // Field full
+      playCreatureCard(card);
+    } else if (isSpell(card)) {
+      if (card.target === 'all') {
+        executePlayerSpell(card, null);
+      } else if (card.target === 'single' || card.target === 'friendly') {
+        // Need target selection
+        selectedCard = card.uid;
+        pendingSpell = card;
+        gameState.phase = 'selectTarget';
+      }
+    } else if (isHeal(card)) {
+      executePlayerHeal(card);
+    }
+    return;
+  }
+
+  // --- Select creature to attack with ---
+  if (hit.zone === 'playerField') {
+    const creature = hit.card;
+    if (creature.canAttack && !creature.hasAttacked) {
+      selectedAttacker = creature.uid;
+      gameState.phase = 'selectAttackTarget';
+      Sound.click();
+    }
+    return;
+  }
+}
+
+function playCreatureCard(card) {
+  const { player } = gameState;
+  removeFromHand(player.hand, card.uid);
+  player.mana -= card.cost;
+  stats.cardsPlayed++;
+
+  card.canAttack = false; // summoning sickness
+  card.hasAttacked = false;
+  player.field.push(card);
+  Sound.cardPlay();
+}
+
+function executePlayerAttack(attackerUid, target) {
+  const { player, ai } = gameState;
+  const attacker = player.field.find(c => c.uid === attackerUid);
+  if (!attacker) return;
+
+  Sound.creatureAttack();
+
+  if (target === null) {
+    // Attack face
+    const result = executeCreatureAttack(attacker, null, ai.field, ai);
+    addDamageNumber(canvas.width / 2, 30, result.faceDamage, '#ff4444');
+    stats.damageDealt += result.faceDamage;
+    Sound.damageTaken();
+    spawnAttackParticles(canvas.width / 2, 30);
+  } else {
+    // Attack creature
+    const result = executeCreatureAttack(attacker, target, ai.field, ai);
+    const ty = layout.aiField.y + FIELD_CARD_HEIGHT / 2;
+    addDamageNumber(canvas.width / 2, ty, result.targetDmg, '#ff4444');
+    spawnAttackParticles(canvas.width / 2, ty);
+    if (result.attackerDmg > 0) {
+      addDamageNumber(canvas.width / 2, layout.playerField.y + FIELD_CARD_HEIGHT / 2, result.attackerDmg, '#ff8844');
+    }
+    if (result.targetDied) {
+      Sound.creatureDeath();
+      spawnDeathParticles(canvas.width / 2, ty);
+    }
+    if (result.attackerDied) {
+      Sound.creatureDeath();
+      spawnDeathParticles(canvas.width / 2, layout.playerField.y + FIELD_CARD_HEIGHT / 2);
+    }
+  }
+
+  // Remove dead
+  removeDeadCreatures(player.field);
+  removeDeadCreatures(ai.field);
+
+  selectedAttacker = null;
+  gameState.phase = 'play';
+
+  checkGameOver();
+}
+
+function executePlayerSpell(card, target) {
+  const { player, ai } = gameState;
+
+  removeFromHand(player.hand, card.uid);
+  player.mana -= card.cost;
+  stats.cardsPlayed++;
+
+  Sound.spellCast();
+  if (card.id === 'lightning' || card.id === 'inferno') Sound.lightning();
+
+  if (card.target === 'single') {
+    if (target === null) {
+      // Hit face
+      damageFace(ai, card.damage);
+      addDamageNumber(canvas.width / 2, 30, card.damage, '#ff4444');
+      stats.damageDealt += card.damage;
+      Sound.damageTaken();
+      spawnSpellParticles(canvas.width / 2, 30, '#ff4444');
+    } else {
+      const died = target.currentHp <= card.damage;
+      target.currentHp -= card.damage;
+      addDamageNumber(canvas.width / 2, layout.aiField.y + FIELD_CARD_HEIGHT / 2, card.damage, '#ff4444');
+      stats.damageDealt += card.damage;
+      spawnSpellParticles(canvas.width / 2, layout.aiField.y + FIELD_CARD_HEIGHT / 2, '#ff6644');
+      if (died) {
+        Sound.creatureDeath();
+        spawnDeathParticles(canvas.width / 2, layout.aiField.y + FIELD_CARD_HEIGHT / 2);
+      }
+    }
+  } else if (card.target === 'all') {
+    let totalDmg = 0;
+    for (const creature of [...ai.field]) {
+      creature.currentHp -= card.damage;
+      totalDmg += card.damage;
+      spawnSpellParticles(canvas.width / 2, layout.aiField.y + FIELD_CARD_HEIGHT / 2, '#ff6644');
+    }
+    stats.damageDealt += totalDmg;
+  } else if (card.target === 'friendly' && target) {
+    if (card.buffAtk) {
+      target.currentAtk += card.buffAtk;
+      target.buffAtk += card.buffAtk;
+    }
+    if (card.buffHp) {
+      target.currentHp += card.buffHp;
+      target.buffHp += card.buffHp;
+    }
+    const tx = layout.playerField.startX + player.field.indexOf(target) * layout.playerField.gap + FIELD_CARD_WIDTH / 2;
+    addBuffNumber(tx, layout.playerField.y, card.buffAtk ? `+${card.buffAtk} ATK` : `+${card.buffHp} HP`);
+    spawnSpellParticles(tx, layout.playerField.y + FIELD_CARD_HEIGHT / 2, '#44ff88');
+  }
+
+  // Remove dead
+  removeDeadCreatures(ai.field);
+  removeDeadCreatures(player.field);
+
+  selectedCard = null;
+  pendingSpell = null;
+  gameState.phase = 'play';
+
+  checkGameOver();
+}
+
+function executePlayerHeal(card) {
+  const { player } = gameState;
+  removeFromHand(player.hand, card.uid);
+  player.mana -= card.cost;
+  stats.cardsPlayed++;
+
+  Sound.heal();
+  const oldHp = player.hp;
+  player.hp = Math.min(GAME_CONFIG.STARTING_HP + 10, player.hp + card.healAmount);
+  const healed = player.hp - oldHp;
+  addHealNumber(canvas.width / 2, canvas.height - 60, healed);
+  spawnHealParticles(canvas.width / 2, canvas.height - 60);
+}
+
+// --- Game Loop ---
+
+let lastTime = 0;
+
+function gameLoop(timestamp) {
+  const dt = Math.min((timestamp - lastTime) / 1000, 0.05);
+  lastTime = timestamp;
+
+  // Update
+  updateAnimations(dt);
+
+  if (turnMessageTimer > 0) {
+    turnMessageTimer -= dt;
+  }
+
+  // AI action timer
+  if (screen === 'battle' && gameState && gameState.turn === 'ai' && !gameState.gameOver && !isAnimating()) {
+    aiActionTimer -= dt;
+    if (aiActionTimer <= 0) {
+      executeNextAIAction();
+    }
+  }
+
+  // Render
+  if (screen === 'start') {
+    startButtons = drawStartOverlay(ctx);
+  } else if (screen === 'battle' && gameState) {
+    drawBattleScene(ctx, gameState, layout, hoveredCard, selectedCard, selectedAttacker, pendingSpell);
+    renderEffects(ctx);
+
+    // Draw tooltip for hovered card
+    if (hoveredCard && gameState.turn === 'player') {
+      const allCards = [
+        ...gameState.player.hand,
+        ...gameState.player.field,
+        ...gameState.ai.field,
+      ];
+      const card = allCards.find(c => c.uid === hoveredCard);
+      if (card) {
+        drawTooltip(ctx, card, mouseX + 15, mouseY);
+      }
+    }
+
+    // Turn message
+    if (turnMessageTimer > 0) {
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, turnMessageTimer);
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 28px Arial';
+      ctx.textAlign = 'center';
+      ctx.shadowColor = '#000';
+      ctx.shadowBlur = 10;
+      ctx.fillText(turnMessage, canvas.width / 2, canvas.height * 0.45 - 20);
+      ctx.restore();
+    }
+  } else if (screen === 'gameover') {
+    // Draw battle scene underneath
+    drawBattleScene(ctx, gameState, layout, null, null, null, null);
+    renderEffects(ctx);
+    gameOverBtn = drawGameOverOverlay(ctx, gameOverResult, stats);
+  }
+
+  requestAnimationFrame(gameLoop);
+}
+
+// --- Initialization ---
+
+function resizeCanvas() {
+  const container = canvas.parentElement;
+  canvas.width = container.clientWidth;
+  canvas.height = container.clientHeight;
+  layout = getFieldLayout(canvas.width, canvas.height);
+  updateCanvasSize(canvas.width, canvas.height);
+}
+
+function startGame() {
+  canvas = document.getElementById('gameCanvas');
+  ctx = canvas.getContext('2d');
+  setCtxRef(ctx);
+
+  resizeCanvas();
+  window.addEventListener('resize', resizeCanvas);
+  canvas.addEventListener('mousemove', handleMouseMove);
+  canvas.addEventListener('click', handleClick);
+
+  // Prevent context menu
+  canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+  screen = 'start';
+  lastTime = performance.now();
+  requestAnimationFrame(gameLoop);
+}
+
+// Expose to window
+window.startGame = startGame;
+
+        window.addEventListener('DOMContentLoaded', () => {
+      startGame();
+    });
+  
+</script>
+
+</body>
+</html>
