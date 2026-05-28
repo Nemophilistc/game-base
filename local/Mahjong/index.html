@@ -1,0 +1,1433 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>麻将连连看 - Mahjong Link</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      background: #0d0d1a;
+      font-family: "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "SimHei", sans-serif;
+      color: #e8dcc8;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    #gameCanvas {
+      display: block;
+      width: 100%; height: 100%;
+    }
+
+    /* HUD */
+    #hud {
+      position: fixed; top: 0; left: 0; right: 0;
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 8px 16px;
+      background: linear-gradient(180deg, rgba(13,13,26,0.95) 0%, rgba(13,13,26,0.7) 80%, transparent 100%);
+      z-index: 10;
+      pointer-events: none;
+    }
+    #hud > * { pointer-events: auto; }
+
+    .hud-left, .hud-center, .hud-right {
+      display: flex; align-items: center; gap: 16px;
+    }
+    .hud-item {
+      display: flex; align-items: center; gap: 4px;
+      font-size: 14px; color: #b0a080;
+    }
+    .hud-item .val {
+      color: #f5c842; font-weight: bold; font-size: 16px;
+      min-width: 30px; text-align: center;
+    }
+    .hud-item .label { font-size: 12px; opacity: 0.7; }
+
+    .hud-btn {
+      padding: 5px 14px;
+      border: 1px solid rgba(245,200,66,0.4);
+      background: rgba(245,200,66,0.1);
+      color: #f5c842;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: inherit;
+    }
+    .hud-btn:hover:not(:disabled) {
+      background: rgba(245,200,66,0.25);
+      border-color: #f5c842;
+    }
+    .hud-btn:disabled {
+      opacity: 0.35; cursor: not-allowed;
+    }
+
+    /* Overlay */
+    #overlay {
+      position: fixed; inset: 0;
+      display: flex; justify-content: center; align-items: center;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(8px);
+      z-index: 100;
+      transition: opacity 0.3s;
+    }
+    #overlay.hidden {
+      opacity: 0; pointer-events: none;
+    }
+
+    .glass-panel {
+      background: rgba(20,20,40,0.92);
+      border: 1px solid rgba(245,200,66,0.25);
+      border-radius: 16px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05);
+      backdrop-filter: blur(12px);
+    }
+
+    .overlay-panel {
+      padding: 36px 44px;
+      text-align: center;
+      max-width: 460px;
+      width: 90vw;
+    }
+
+    .title {
+      font-size: 42px;
+      font-weight: 900;
+      background: linear-gradient(135deg, #f5c842 0%, #ff9500 50%, #f5c842 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      letter-spacing: 8px;
+      margin-bottom: 4px;
+      text-shadow: none;
+    }
+    .win-title {
+      background: linear-gradient(135deg, #4ade80 0%, #22d3ee 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+    }
+    .lose-title {
+      background: linear-gradient(135deg, #f87171 0%, #fb923c 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+    }
+    .subtitle {
+      font-size: 14px; color: #888; margin-bottom: 24px;
+    }
+
+    .option-group {
+      margin: 18px 0;
+    }
+    .option-group label {
+      display: block; font-size: 14px; color: #a09070;
+      margin-bottom: 8px; letter-spacing: 2px;
+    }
+    .btn-row {
+      display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
+    }
+    .opt-btn {
+      padding: 8px 20px;
+      border: 1px solid rgba(245,200,66,0.3);
+      background: rgba(245,200,66,0.05);
+      color: #b0a080;
+      border-radius: 8px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: inherit;
+    }
+    .opt-btn:hover { border-color: #f5c842; color: #f5c842; }
+    .opt-btn.active {
+      background: rgba(245,200,66,0.2);
+      border-color: #f5c842;
+      color: #f5c842;
+      font-weight: bold;
+    }
+
+    .start-btn {
+      display: inline-block;
+      margin-top: 24px;
+      padding: 12px 48px;
+      background: linear-gradient(135deg, #f5c842 0%, #e6a817 100%);
+      color: #1a1a2e;
+      border: none;
+      border-radius: 10px;
+      font-size: 18px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.25s;
+      letter-spacing: 4px;
+      font-family: inherit;
+    }
+    .start-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(245,200,66,0.4);
+    }
+
+    .help-box {
+      margin-top: 24px;
+      padding: 14px 18px;
+      background: rgba(0,0,0,0.3);
+      border-radius: 10px;
+      border: 1px solid rgba(245,200,66,0.1);
+      font-size: 13px;
+      line-height: 1.8;
+      color: #888;
+      text-align: left;
+    }
+    .help-box b { color: #b0a080; }
+    .gold { color: #f5c842 !important; -webkit-text-fill-color: #f5c842 !important; }
+
+    .stats-grid {
+      display: flex; justify-content: center; gap: 32px;
+      margin: 24px 0;
+    }
+    .stat-item {
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .stat-label {
+      font-size: 12px; color: #888; letter-spacing: 1px;
+    }
+    .stat-value {
+      font-size: 28px; font-weight: bold; color: #e8dcc8;
+    }
+
+    /* Mobile adjustments */
+    @media (max-width: 480px) {
+      .title { font-size: 28px; letter-spacing: 4px; }
+      .overlay-panel { padding: 24px 20px; }
+      .hud-item { font-size: 12px; }
+      .hud-item .val { font-size: 14px; }
+      .hud-btn { padding: 4px 10px; font-size: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="hud">
+    <div class="hud-left">
+      <div class="hud-item"><span class="label">分数</span><span class="val" id="hudScore">0</span></div>
+      <div class="hud-item"><span class="label">剩余</span><span class="val" id="hudPairs">0</span><span class="label">对</span></div>
+      <div class="hud-item"><span class="val" id="hudCombo"></span></div>
+    </div>
+    <div class="hud-center">
+      <div class="hud-item"><span class="label">时间</span><span class="val" id="hudTime">0:00</span></div>
+    </div>
+    <div class="hud-right">
+      <button class="hud-btn" id="hintBtn">提示 (3)</button>
+      <button class="hud-btn" id="shuffleBtn">重排 (2)</button>
+    </div>
+  </div>
+
+  <canvas id="gameCanvas"></canvas>
+
+  <div id="overlay" class="hidden"></div>
+
+  <script>
+// === ./config.js ===
+// config.js - Game configuration constants
+
+const TILE_W = 48;
+const TILE_H = 60;
+const TILE_GAP = 2;
+
+const DIFFICULTY = {
+  easy:   { types: 9,  pairs: 18, label: '简单' },
+  medium: { types: 18, pairs: 36, label: '中等' },
+  hard:   { types: 27, pairs: 54, label: '困难' }
+};
+
+const LAYOUTS = {
+  pyramid:  { label: '金字塔' },
+  turtle:   { label: '乌龟' },
+  diamond:  { label: '菱形' },
+  random:   { label: '随机' }
+};
+
+const HINTS_MAX = 3;
+const SHUFFLES_MAX = 2;
+
+const COLORS = {
+  gold:      '#f5c842',
+  amber:     '#ffbf00',
+  bg:        '#0d0d1a',
+  panelBg:   'rgba(30,30,50,0.85)',
+  tileFace:  '#e8dcc8',
+  tileEdge:  '#b0a080',
+  tileText:  '#2a1a0a',
+  selected:  '#f5c842',
+  matched:   '#4ade80',
+  pathLine:  '#f5c842',
+  dim:       'rgba(0,0,0,0.6)'
+};
+
+// === ./sound.js ===
+// sound.js - Web Audio API sound effects
+
+let audioCtx = null;
+
+function getCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+
+function playTone(freq, duration, type = 'sine', vol = 0.15) {
+  try {
+    const ctx = getCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(vol, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + duration);
+  } catch(e) {}
+}
+
+function playNoise(duration, vol = 0.08) {
+  try {
+    const ctx = getCtx();
+    const bufferSize = ctx.sampleRate * duration;
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(vol, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'highpass';
+    filter.frequency.value = 2000;
+    src.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+    src.start();
+  } catch(e) {}
+}
+
+const Sound = {
+  select() {
+    playTone(800, 0.08, 'sine', 0.12);
+  },
+  match() {
+    playTone(523, 0.1, 'sine', 0.15);
+    setTimeout(() => playTone(659, 0.1, 'sine', 0.15), 80);
+    setTimeout(() => playTone(784, 0.15, 'sine', 0.15), 160);
+  },
+  invalid() {
+    playTone(200, 0.15, 'square', 0.1);
+    setTimeout(() => playTone(180, 0.15, 'square', 0.1), 100);
+  },
+  shuffle() {
+    playNoise(0.3, 0.1);
+    setTimeout(() => playTone(400, 0.2, 'triangle', 0.08), 100);
+  },
+  hint() {
+    playTone(880, 0.08, 'sine', 0.1);
+    setTimeout(() => playTone(1100, 0.12, 'sine', 0.12), 60);
+  },
+  complete() {
+    const notes = [523, 659, 784, 1047];
+    notes.forEach((n, i) => setTimeout(() => playTone(n, 0.25, 'sine', 0.15), i * 120));
+  },
+  gameOver() {
+    playTone(400, 0.3, 'sawtooth', 0.08);
+    setTimeout(() => playTone(300, 0.3, 'sawtooth', 0.08), 200);
+    setTimeout(() => playTone(200, 0.5, 'sawtooth', 0.08), 400);
+  }
+};
+
+// === ./tiles.js ===
+// tiles.js - Tile definitions, matching logic, layout generation
+
+
+// Mahjong tile definitions
+const TILE_DEFS = [
+  { cat: '万', val: '1万' }, { cat: '万', val: '2万' }, { cat: '万', val: '3万' },
+  { cat: '万', val: '4万' }, { cat: '万', val: '5万' }, { cat: '万', val: '6万' },
+  { cat: '万', val: '7万' }, { cat: '万', val: '8万' }, { cat: '万', val: '9万' },
+  { cat: '条', val: '1条' }, { cat: '条', val: '2条' }, { cat: '条', val: '3条' },
+  { cat: '条', val: '4条' }, { cat: '条', val: '5条' }, { cat: '条', val: '6条' },
+  { cat: '条', val: '7条' }, { cat: '条', val: '8条' }, { cat: '条', val: '9条' },
+  { cat: '筒', val: '1筒' }, { cat: '筒', val: '2筒' }, { cat: '筒', val: '3筒' },
+  { cat: '筒', val: '4筒' }, { cat: '筒', val: '5筒' }, { cat: '筒', val: '6筒' },
+  { cat: '筒', val: '7筒' }, { cat: '筒', val: '8筒' }, { cat: '筒', val: '9筒' },
+  { cat: '风', val: '东' },   { cat: '风', val: '南' },   { cat: '风', val: '西' },
+  { cat: '风', val: '北' },
+  { cat: '箭', val: '中' },   { cat: '箭', val: '发' },   { cat: '箭', val: '白' },
+];
+
+const CAT_COLORS = {
+  '万': '#c0392b', '条': '#27ae60', '筒': '#2980b9',
+  '风': '#8e44ad', '箭': '#d35400'
+};
+
+// --- Shuffle helper ---
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+// --- Layout generators ---
+// Each returns: { positions: [{r,c}...], cols, rows }
+// positions count must be >= pairs * 2 (each pair = 2 tiles at DIFFERENT positions)
+
+function layoutPyramid(numPairs) {
+  // Scale grid based on needed pairs
+  const cols = numPairs <= 20 ? 10 : numPairs <= 40 ? 14 : 18;
+  const rows = numPairs <= 20 ? 8  : numPairs <= 40 ? 10 : 12;
+  const positions = [];
+  const cx = (cols - 1) / 2;
+  const cy = (rows - 1) / 2;
+  const maxDist = Math.min(cx, cy) + 0.5;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const dr = Math.abs(r - cy) / maxDist;
+      const dc = Math.abs(c - cx) / maxDist;
+      if (dr + dc <= 1.0) {
+        positions.push({ r, c });
+      }
+    }
+  }
+  return trimPositions(positions, numPairs, cols, rows);
+}
+
+function layoutTurtle(numPairs) {
+  const cols = numPairs <= 20 ? 10 : numPairs <= 40 ? 14 : 18;
+  const rows = numPairs <= 20 ? 8  : numPairs <= 40 ? 10 : 12;
+  const positions = [];
+  const cx = (cols - 1) / 2;
+  const cy = (rows - 1) / 2;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const dr = (r - cy) / (rows / 2);
+      const dc = (c - cx) / (cols / 2);
+      const dist = dr * dr + dc * dc;
+      if (dist < 0.82) positions.push({ r, c });
+    }
+  }
+  // Add head bumps
+  const headC = Math.floor(cols / 2);
+  positions.push({ r: 0, c: headC - 1 }, { r: 0, c: headC }, { r: 0, c: headC + 1 });
+  positions.push({ r: rows - 1, c: headC - 1 }, { r: rows - 1, c: headC }, { r: rows - 1, c: headC + 1 });
+  // Deduplicate
+  const seen = new Set();
+  const unique = positions.filter(p => {
+    const k = `${p.r},${p.c}`;
+    if (seen.has(k)) return false;
+    seen.add(k); return true;
+  });
+  return trimPositions(unique, numPairs, cols, rows);
+}
+
+function layoutDiamond(numPairs) {
+  const cols = numPairs <= 20 ? 10 : numPairs <= 40 ? 14 : 18;
+  const rows = numPairs <= 20 ? 8  : numPairs <= 40 ? 10 : 12;
+  const positions = [];
+  const cx = (cols - 1) / 2;
+  const cy = (rows - 1) / 2;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const dr = Math.abs(r - cy) / (rows / 2);
+      const dc = Math.abs(c - cx) / (cols / 2);
+      if (dr + dc <= 0.95) positions.push({ r, c });
+    }
+  }
+  return trimPositions(positions, numPairs, cols, rows);
+}
+
+function layoutRandom(numPairs) {
+  const cols = numPairs <= 20 ? 10 : numPairs <= 40 ? 14 : 18;
+  const rows = numPairs <= 20 ? 8  : numPairs <= 40 ? 10 : 12;
+  const positions = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (Math.random() < 0.78) positions.push({ r, c });
+    }
+  }
+  // Ensure enough
+  while (positions.length < numPairs * 2) {
+    const r = Math.floor(Math.random() * rows);
+    const c = Math.floor(Math.random() * cols);
+    if (!positions.some(p => p.r === r && p.c === c)) {
+      positions.push({ r, c });
+    }
+  }
+  return trimPositions(positions, numPairs, cols, rows);
+}
+
+function trimPositions(positions, numPairs, cols, rows) {
+  shuffle(positions);
+  // Need numPairs * 2 positions (each pair gets 2 distinct cells)
+  const needed = numPairs * 2;
+  if (positions.length < needed) {
+    // Should not happen with correct grid sizing, but pad just in case
+    const used = new Set(positions.map(p => `${p.r},${p.c}`));
+    while (positions.length < needed) {
+      const r = Math.floor(Math.random() * rows);
+      const c = Math.floor(Math.random() * cols);
+      const k = `${r},${c}`;
+      if (!used.has(k)) {
+        positions.push({ r, c });
+        used.add(k);
+      }
+    }
+  }
+  return { positions: positions.slice(0, needed), cols, rows };
+}
+
+// --- Generate grid ---
+
+function generateGrid(layoutName, diffName) {
+  const diff = DIFFICULTY[diffName];
+  const numPairs = diff.pairs;
+  const numTypes = diff.types;
+
+  let result;
+  switch (layoutName) {
+    case 'pyramid': result = layoutPyramid(numPairs); break;
+    case 'turtle':  result = layoutTurtle(numPairs); break;
+    case 'diamond': result = layoutDiamond(numPairs); break;
+    default:        result = layoutRandom(numPairs); break;
+  }
+
+  const { positions, cols, rows } = result;
+  const actualPairs = numPairs;
+
+  // Select tile types and create pair definitions
+  const selectedDefs = TILE_DEFS.slice(0, Math.min(numTypes, TILE_DEFS.length));
+  const pairDefs = [];
+  for (let i = 0; i < actualPairs; i++) {
+    pairDefs.push(selectedDefs[i % selectedDefs.length]);
+  }
+
+  // Create flat tile list: each pair gets 2 consecutive positions
+  const tiles = [];
+  for (let i = 0; i < actualPairs; i++) {
+    const def = pairDefs[i];
+    const pos1 = positions[i * 2];
+    const pos2 = positions[i * 2 + 1];
+    tiles.push({
+      id: i * 2, def,
+      r: pos1.r, c: pos1.c,
+      removed: false, selected: false, hinted: false,
+      animAlpha: 1, animScale: 1,
+      removing: false, removeTime: 0
+    });
+    tiles.push({
+      id: i * 2 + 1, def,
+      r: pos2.r, c: pos2.c,
+      removed: false, selected: false, hinted: false,
+      animAlpha: 1, animScale: 1,
+      removing: false, removeTime: 0
+    });
+  }
+
+  return { tiles, cols, rows };
+}
+
+// --- Path finding (max 2 turns) ---
+
+function isLineClear(r1, c1, r2, c2, tiles) {
+  if (r1 === r2) {
+    const minC = Math.min(c1, c2);
+    const maxC = Math.max(c1, c2);
+    for (const t of tiles) {
+      if (t.removed || t.removing) continue;
+      if (t.r === r1 && t.c > minC && t.c < maxC) return false;
+    }
+    return true;
+  }
+  if (c1 === c2) {
+    const minR = Math.min(r1, r2);
+    const maxR = Math.max(r1, r2);
+    for (const t of tiles) {
+      if (t.removed || t.removing) continue;
+      if (t.c === c1 && t.r > minR && t.r < maxR) return false;
+    }
+    return true;
+  }
+  return false;
+}
+
+function isPointOccupied(r, c, tiles) {
+  return tiles.some(t => !t.removed && !t.removing && t.r === r && t.c === c);
+}
+
+function findPath(tile1, tile2, tiles, gridCols, gridRows) {
+  if (tile1.id === tile2.id) return null;
+  if (tile1.def.val !== tile2.def.val) return null;
+
+  const r1 = tile1.r, c1 = tile1.c;
+  const r2 = tile2.r, c2 = tile2.c;
+
+  // 0 turns
+  if ((r1 === r2 || c1 === c2) && isLineClear(r1, c1, r2, c2, tiles)) {
+    return [{ r: r1, c: c1 }, { r: r2, c: c2 }];
+  }
+
+  // 1 turn at (r1, c2)
+  if (!isPointOccupied(r1, c2, tiles) &&
+      isLineClear(r1, c1, r1, c2, tiles) &&
+      isLineClear(r1, c2, r2, c2, tiles)) {
+    return [{ r: r1, c: c1 }, { r: r1, c: c2 }, { r: r2, c: c2 }];
+  }
+  // 1 turn at (r2, c1)
+  if (!isPointOccupied(r2, c1, tiles) &&
+      isLineClear(r1, c1, r2, c1, tiles) &&
+      isLineClear(r2, c1, r2, c2, tiles)) {
+    return [{ r: r1, c: c1 }, { r: r2, c: c1 }, { r: r2, c: c2 }];
+  }
+
+  // 2 turns - horizontal sweep
+  for (let c = -1; c <= gridCols; c++) {
+    if (c === c1 && c === c2) continue;
+    // Path: (r1,c1)->(r1,c)->(r2,c)->(r2,c2)
+    const mid1Free = c === c1 || !isPointOccupied(r1, c, tiles);
+    const mid2Free = c === c2 || !isPointOccupied(r2, c, tiles);
+    if (mid1Free && mid2Free &&
+        isLineClear(r1, c1, r1, c, tiles) &&
+        isLineClear(r1, c, r2, c, tiles) &&
+        isLineClear(r2, c, r2, c2, tiles)) {
+      // Build path with deduplication
+      const pts = [{ r: r1, c: c1 }];
+      if (c !== c1) pts.push({ r: r1, c });
+      if (r2 !== r1) pts.push({ r: r2, c });
+      if (c2 !== c) pts.push({ r: r2, c: c2 });
+      if (pts.length >= 2) return pts;
+    }
+  }
+
+  // 2 turns - vertical sweep
+  for (let r = -1; r <= gridRows; r++) {
+    if (r === r1 && r === r2) continue;
+    // Path: (r1,c1)->(r,c1)->(r,c2)->(r2,c2)
+    const mid1Free = r === r1 || !isPointOccupied(r, c1, tiles);
+    const mid2Free = r === r2 || !isPointOccupied(r, c2, tiles);
+    if (mid1Free && mid2Free &&
+        isLineClear(r1, c1, r, c1, tiles) &&
+        isLineClear(r, c1, r, c2, tiles) &&
+        isLineClear(r, c2, r2, c2, tiles)) {
+      // Build path with deduplication
+      const pts = [{ r: r1, c: c1 }];
+      if (r !== r1) pts.push({ r, c: c1 });
+      if (c2 !== c1) pts.push({ r, c: c2 });
+      if (r2 !== r) pts.push({ r: r2, c: c2 });
+      if (pts.length >= 2) return pts;
+    }
+  }
+
+  return null;
+}
+
+function findHintPair(tiles, gridCols, gridRows) {
+  const active = tiles.filter(t => !t.removed && !t.removing);
+  for (let i = 0; i < active.length; i++) {
+    for (let j = i + 1; j < active.length; j++) {
+      if (active[i].def.val === active[j].def.val) {
+        const path = findPath(active[i], active[j], tiles, gridCols, gridRows);
+        if (path) return { t1: active[i], t2: active[j], path };
+      }
+    }
+  }
+  return null;
+}
+
+function shuffleTiles(tiles) {
+  const active = tiles.filter(t => !t.removed && !t.removing);
+  if (active.length === 0) return;
+  const defs = active.map(t => t.def);
+  shuffle(defs);
+  active.forEach((t, i) => {
+    t.def = defs[i];
+    t.hinted = false;
+  });
+}
+
+function hasValidMoves(tiles, gridCols, gridRows) {
+  return findHintPair(tiles, gridCols, gridRows) !== null;
+}
+
+// === ./effects.js ===
+// effects.js - Visual effects: match particles, path animation, shuffle
+
+class EffectManager {
+  constructor() {
+    this.particles = [];
+    this.pathLines = [];
+    this.floatingTexts = [];
+    this.shakeAmount = 0;
+    this.shuffleAnim = null; // { tiles, startTime, duration }
+  }
+
+  update(dt) {
+    // Update particles
+    for (let i = this.particles.length - 1; i >= 0; i--) {
+      const p = this.particles[i];
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vy += 200 * dt; // gravity
+      p.life -= dt;
+      p.alpha = Math.max(0, p.life / p.maxLife);
+      p.size *= 0.98;
+      if (p.life <= 0) this.particles.splice(i, 1);
+    }
+
+    // Update path lines
+    for (let i = this.pathLines.length - 1; i >= 0; i--) {
+      const l = this.pathLines[i];
+      l.life -= dt;
+      l.alpha = Math.max(0, l.life / l.maxLife);
+      if (l.life <= 0) this.pathLines.splice(i, 1);
+    }
+
+    // Update floating texts
+    for (let i = this.floatingTexts.length - 1; i >= 0; i--) {
+      const ft = this.floatingTexts[i];
+      ft.y -= 60 * dt;
+      ft.life -= dt;
+      ft.alpha = Math.max(0, ft.life / ft.maxLife);
+      if (ft.life <= 0) this.floatingTexts.splice(i, 1);
+    }
+
+    // Shake decay
+    if (this.shakeAmount > 0) this.shakeAmount *= 0.9;
+    if (this.shakeAmount < 0.5) this.shakeAmount = 0;
+  }
+
+  emitMatchParticles(x, y, color) {
+    const count = 20;
+    for (let i = 0; i < count; i++) {
+      const angle = (Math.PI * 2 * i) / count + Math.random() * 0.3;
+      const speed = 80 + Math.random() * 160;
+      this.particles.push({
+        x, y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        size: 3 + Math.random() * 5,
+        color,
+        life: 0.5 + Math.random() * 0.5,
+        maxLife: 1.0,
+        alpha: 1
+      });
+    }
+  }
+
+  showPath(points, tileW, tileH, offsetX, offsetY) {
+    if (!points || points.length < 2) return;
+    const screenPoints = points.map(p => ({
+      x: offsetX + p.c * tileW + tileW / 2,
+      y: offsetY + p.r * tileH + tileH / 2
+    }));
+    this.pathLines.push({
+      points: screenPoints,
+      life: 0.6,
+      maxLife: 0.6,
+      alpha: 1,
+      width: 3
+    });
+  }
+
+  addFloatingText(x, y, text, color = '#f5c842', size = 20) {
+    this.floatingTexts.push({
+      x, y, text, color, size,
+      life: 1.2,
+      maxLife: 1.2,
+      alpha: 1
+    });
+  }
+
+  triggerShake(amount = 5) {
+    this.shakeAmount = amount;
+  }
+
+  startShuffleAnim() {
+    this.shuffleAnim = { startTime: performance.now(), duration: 400 };
+  }
+
+  getShuffleOffset() {
+    if (!this.shuffleAnim) return 0;
+    const elapsed = performance.now() - this.shuffleAnim.startTime;
+    if (elapsed >= this.shuffleAnim.duration) {
+      this.shuffleAnim = null;
+      return 0;
+    }
+    const t = elapsed / this.shuffleAnim.duration;
+    return Math.sin(t * Math.PI * 4) * 6 * (1 - t);
+  }
+
+  draw(ctx) {
+    // Draw path lines
+    for (const l of this.pathLines) {
+      ctx.save();
+      ctx.globalAlpha = l.alpha;
+      ctx.strokeStyle = '#f5c842';
+      ctx.lineWidth = l.width;
+      ctx.shadowColor = '#f5c842';
+      ctx.shadowBlur = 10;
+      ctx.beginPath();
+      ctx.moveTo(l.points[0].x, l.points[0].y);
+      for (let i = 1; i < l.points.length; i++) {
+        ctx.lineTo(l.points[i].x, l.points[i].y);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Draw particles
+    for (const p of this.particles) {
+      ctx.save();
+      ctx.globalAlpha = p.alpha;
+      ctx.fillStyle = p.color;
+      ctx.shadowColor = p.color;
+      ctx.shadowBlur = 6;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // Draw floating texts
+    for (const ft of this.floatingTexts) {
+      ctx.save();
+      ctx.globalAlpha = ft.alpha;
+      ctx.fillStyle = ft.color;
+      ctx.font = `bold ${ft.size}px "Microsoft YaHei", sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.shadowColor = ft.color;
+      ctx.shadowBlur = 8;
+      ctx.fillText(ft.text, ft.x, ft.y);
+      ctx.restore();
+    }
+  }
+}
+
+// === ./ui.js ===
+// ui.js - UI overlays and HUD
+
+
+class UI {
+  constructor(canvas) {
+    this.canvas = canvas;
+    this.overlayEl = document.getElementById('overlay');
+    this.hudEl = document.getElementById('hud');
+    this.hintBtn = document.getElementById('hintBtn');
+    this.shuffleBtn = document.getElementById('shuffleBtn');
+    this.onHint = null;
+    this.onShuffle = null;
+    this._bindButtons();
+  }
+
+  _bindButtons() {
+    if (this.hintBtn) {
+      this.hintBtn.addEventListener('click', () => {
+        if (this.onHint) this.onHint();
+      });
+    }
+    if (this.shuffleBtn) {
+      this.shuffleBtn.addEventListener('click', () => {
+        if (this.onShuffle) this.onShuffle();
+      });
+    }
+  }
+
+  showStartOverlay(onStart) {
+    this.overlayEl.innerHTML = `
+      <div class="overlay-panel glass-panel">
+        <h1 class="title">麻 将 连 连 看</h1>
+        <p class="subtitle">Mahjong Link</p>
+
+        <div class="option-group">
+          <label>布局选择</label>
+          <div class="btn-row" id="layoutRow">
+            ${Object.entries(LAYOUTS).map(([k, v], i) =>
+              `<button class="opt-btn ${i === 0 ? 'active' : ''}" data-val="${k}">${v.label}</button>`
+            ).join('')}
+          </div>
+        </div>
+
+        <div class="option-group">
+          <label>难度选择</label>
+          <div class="btn-row" id="diffRow">
+            ${Object.entries(DIFFICULTY).map(([k, v], i) =>
+              `<button class="opt-btn ${i === 0 ? 'active' : ''}" data-val="${k}">${v.label}</button>`
+            ).join('')}
+          </div>
+        </div>
+
+        <button class="start-btn" id="startBtn">开始游戏</button>
+
+        <div class="help-box">
+          <p><b>玩法说明：</b></p>
+          <p>点击两个相同的麻将牌进行消除。</p>
+          <p>连接路径最多拐弯两次，且不能穿过其他牌。</p>
+          <p>提示 <span class="gold">x${HINTS_MAX}</span> | 重排 <span class="gold">x${SHUFFLES_MAX}</span></p>
+        </div>
+      </div>
+    `;
+    this.overlayEl.classList.remove('hidden');
+
+    let selectedLayout = 'pyramid';
+    let selectedDiff = 'easy';
+
+    this.overlayEl.querySelectorAll('#layoutRow .opt-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.overlayEl.querySelectorAll('#layoutRow .opt-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        selectedLayout = btn.dataset.val;
+      });
+    });
+    this.overlayEl.querySelectorAll('#diffRow .opt-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.overlayEl.querySelectorAll('#diffRow .opt-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        selectedDiff = btn.dataset.val;
+      });
+    });
+    this.overlayEl.querySelector('#startBtn').addEventListener('click', () => {
+      this.overlayEl.classList.add('hidden');
+      onStart(selectedLayout, selectedDiff);
+    });
+  }
+
+  showWinOverlay(score, time, combo) {
+    const mins = Math.floor(time / 60);
+    const secs = Math.floor(time % 60);
+    this.overlayEl.innerHTML = `
+      <div class="overlay-panel glass-panel">
+        <h1 class="title win-title">恭喜过关！</h1>
+        <div class="stats-grid">
+          <div class="stat-item">
+            <span class="stat-label">得分</span>
+            <span class="stat-value gold">${score}</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">用时</span>
+            <span class="stat-value">${mins}:${secs.toString().padStart(2, '0')}</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">最高连击</span>
+            <span class="stat-value gold">x${combo}</span>
+          </div>
+        </div>
+        <button class="start-btn" id="restartBtn">再来一局</button>
+      </div>
+    `;
+    this.overlayEl.classList.remove('hidden');
+    this.overlayEl.querySelector('#restartBtn').addEventListener('click', () => {
+      window.startGame();
+    });
+  }
+
+  showGameOverOverlay(score, reason) {
+    this.overlayEl.innerHTML = `
+      <div class="overlay-panel glass-panel">
+        <h1 class="title lose-title">游戏结束</h1>
+        <p class="subtitle">${reason || '没有可消除的牌了'}</p>
+        <div class="stats-grid">
+          <div class="stat-item">
+            <span class="stat-label">最终得分</span>
+            <span class="stat-value gold">${score}</span>
+          </div>
+        </div>
+        <button class="start-btn" id="restartBtn">再来一局</button>
+      </div>
+    `;
+    this.overlayEl.classList.remove('hidden');
+    this.overlayEl.querySelector('#restartBtn').addEventListener('click', () => {
+      window.startGame();
+    });
+  }
+
+  updateHUD(score, time, hintsLeft, shufflesLeft, pairsLeft, combo) {
+    const mins = Math.floor(time / 60);
+    const secs = Math.floor(time % 60);
+    document.getElementById('hudScore').textContent = score;
+    document.getElementById('hudTime').textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+    document.getElementById('hudPairs').textContent = pairsLeft;
+    document.getElementById('hudCombo').textContent = combo > 1 ? `x${combo}` : '';
+
+    if (this.hintBtn) {
+      this.hintBtn.textContent = `提示 (${hintsLeft})`;
+      this.hintBtn.disabled = hintsLeft <= 0;
+    }
+    if (this.shuffleBtn) {
+      this.shuffleBtn.textContent = `重排 (${shufflesLeft})`;
+      this.shuffleBtn.disabled = shufflesLeft <= 0;
+    }
+  }
+}
+
+// === main.js ===
+// main.js - Game loop, rendering, and main logic
+
+
+class MahjongGame {
+  constructor() {
+    this.canvas = document.getElementById('gameCanvas');
+    this.ctx = this.canvas.getContext('2d');
+    this.effects = new EffectManager();
+    this.ui = new UI(this.canvas);
+
+    this.state = 'menu';
+    this.tiles = [];
+    this.gridCols = 0;
+    this.gridRows = 0;
+    this.offsetX = 0;
+    this.offsetY = 0;
+    this.selectedTile = null;
+    this.hintPair = null;
+    this.hintPath = null;
+    this.hintsLeft = HINTS_MAX;
+    this.shufflesLeft = SHUFFLES_MAX;
+    this.score = 0;
+    this.combo = 0;
+    this.maxCombo = 0;
+    this.elapsed = 0;
+    this.pairsLeft = 0;
+    this.tileScale = 1;
+    this.lastTime = 0;
+    this.needCheckMoves = false;
+
+    this._resize();
+    window.addEventListener('resize', () => this._resize());
+    this.canvas.addEventListener('click', (e) => this._onClick(e));
+    this.ui.onHint = () => this._doHint();
+    this.ui.onShuffle = () => {
+      if (this.state !== 'playing' || this.shufflesLeft <= 0) return;
+      this.shufflesLeft--;
+      this._doShuffle();
+    };
+
+    this._raf = this._raf.bind(this);
+    requestAnimationFrame(this._raf);
+    this.ui.showStartOverlay((layout, diff) => this.startGame(layout, diff));
+  }
+
+  _resize() {
+    const dpr = window.devicePixelRatio || 1;
+    this.canvas.width = this.canvas.clientWidth * dpr;
+    this.canvas.height = this.canvas.clientHeight * dpr;
+    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    this.screenW = this.canvas.clientWidth;
+    this.screenH = this.canvas.clientHeight;
+    this._recalcLayout();
+  }
+
+  _recalcLayout() {
+    if (this.gridCols === 0) return;
+    const padX = 40, padY = 70;
+    const maxW = this.screenW - padX;
+    const maxH = this.screenH - padY;
+    const scaleW = maxW / (this.gridCols * TILE_W);
+    const scaleH = maxH / (this.gridRows * TILE_H);
+    this.tileScale = Math.min(scaleW, scaleH, 1.3);
+    const totalW = this.gridCols * TILE_W * this.tileScale;
+    const totalH = this.gridRows * TILE_H * this.tileScale;
+    this.offsetX = (this.screenW - totalW) / 2;
+    this.offsetY = (this.screenH - totalH) / 2 + 25;
+  }
+
+  startGame(layoutName, diffName) {
+    const result = generateGrid(layoutName, diffName);
+    this.tiles = result.tiles;
+    this.gridCols = result.cols;
+    this.gridRows = result.rows;
+    this.selectedTile = null;
+    this.hintPair = null;
+    this.hintPath = null;
+    this.hintsLeft = HINTS_MAX;
+    this.shufflesLeft = SHUFFLES_MAX;
+    this.score = 0;
+    this.combo = 0;
+    this.maxCombo = 0;
+    this.elapsed = 0;
+    this.pairsLeft = this.tiles.length / 2;
+    this.state = 'playing';
+    this.effects = new EffectManager();
+    this._recalcLayout();
+
+    // Ensure initial solvability
+    if (!hasValidMoves(this.tiles, this.gridCols, this.gridRows)) {
+      this._doShuffle();
+    }
+  }
+
+  _onClick(e) {
+    if (this.state !== 'playing') return;
+
+    const rect = this.canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left - this.offsetX;
+    const my = e.clientY - rect.top - this.offsetY;
+    const tw = TILE_W * this.tileScale;
+    const th = TILE_H * this.tileScale;
+
+    // Find clicked tile (topmost - highest index at same cell)
+    let clicked = null;
+    for (let i = this.tiles.length - 1; i >= 0; i--) {
+      const t = this.tiles[i];
+      if (t.removed || t.removing) continue;
+      const tx = t.c * tw;
+      const ty = t.r * th;
+      if (mx >= tx && mx < tx + tw && my >= ty && my < ty + th) {
+        clicked = t;
+        break;
+      }
+    }
+
+    if (!clicked) return;
+
+    if (!this.selectedTile) {
+      clicked.selected = true;
+      this.selectedTile = clicked;
+      Sound.select();
+    } else if (this.selectedTile.id === clicked.id) {
+      clicked.selected = false;
+      this.selectedTile = null;
+    } else {
+      const path = findPath(this.selectedTile, clicked, this.tiles, this.gridCols, this.gridRows);
+      if (path) {
+        this._matchTiles(this.selectedTile, clicked, path);
+      } else {
+        Sound.invalid();
+        this.effects.triggerShake(4);
+        this.combo = 0;
+        this.selectedTile.selected = false;
+        clicked.selected = true;
+        this.selectedTile = clicked;
+      }
+    }
+  }
+
+  _matchTiles(t1, t2, path) {
+    t1.selected = false;
+    t2.selected = false;
+    t1.removing = true;
+    t2.removing = true;
+    t1.removeTime = 0.35;
+    t2.removeTime = 0.35;
+    this.selectedTile = null;
+    this.hintPair = null;
+    this.hintPath = null;
+
+    const tw = TILE_W * this.tileScale;
+    const th = TILE_H * this.tileScale;
+    this.effects.showPath(path, tw, th, this.offsetX, this.offsetY);
+
+    this.combo++;
+    if (this.combo > this.maxCombo) this.maxCombo = this.combo;
+    const baseScore = 100;
+    const comboBonus = Math.min(this.combo - 1, 10) * 25;
+    const timeBonus = Math.max(0, Math.floor((300 - this.elapsed) / 3));
+    const gained = baseScore + comboBonus + timeBonus;
+    this.score += gained;
+
+    const cx1 = this.offsetX + t1.c * tw + tw / 2;
+    const cy1 = this.offsetY + t1.r * th + th / 2;
+    const cx2 = this.offsetX + t2.c * tw + tw / 2;
+    const cy2 = this.offsetY + t2.r * th + th / 2;
+    const color = CAT_COLORS[t1.def.cat] || COLORS.gold;
+    this.effects.emitMatchParticles(cx1, cy1, color);
+    this.effects.emitMatchParticles(cx2, cy2, color);
+    this.effects.addFloatingText((cx1 + cx2) / 2, Math.min(cy1, cy2) - 15, `+${gained}`, COLORS.gold, 20);
+    if (this.combo > 1) {
+      this.effects.addFloatingText((cx1 + cx2) / 2, Math.min(cy1, cy2) - 42, `${this.combo}连击!`, '#ff6b6b', 16);
+    }
+
+    Sound.match();
+    this.pairsLeft--;
+  }
+
+  _doShuffle() {
+    shuffleTiles(this.tiles);
+    this.effects.startShuffleAnim();
+    Sound.shuffle();
+    if (this.selectedTile) {
+      this.selectedTile.selected = false;
+      this.selectedTile = null;
+    }
+    this.hintPair = null;
+    this.hintPath = null;
+    this.needCheckMoves = true;
+  }
+
+  _doHint() {
+    if (this.hintsLeft <= 0) return;
+    const hint = findHintPair(this.tiles, this.gridCols, this.gridRows);
+    if (hint) {
+      this.hintsLeft--;
+      this.hintPair = [hint.t1, hint.t2];
+      this.hintPath = hint.path;
+      hint.t1.hinted = true;
+      hint.t2.hinted = true;
+      Sound.hint();
+      setTimeout(() => {
+        if (this.hintPair) {
+          this.hintPair[0].hinted = false;
+          this.hintPair[1].hinted = false;
+          this.hintPair = null;
+          this.hintPath = null;
+        }
+      }, 2500);
+    }
+  }
+
+  _raf(now) {
+    requestAnimationFrame(this._raf);
+    if (this.lastTime === 0) this.lastTime = now;
+    const dt = Math.min((now - this.lastTime) / 1000, 0.1);
+    this.lastTime = now;
+
+    if (this.state === 'playing') {
+      this.elapsed += dt;
+      this._update(dt);
+    }
+    this._draw();
+  }
+
+  _update(dt) {
+    this.effects.update(dt);
+
+    for (const t of this.tiles) {
+      if (t.removing) {
+        t.removeTime -= dt;
+        t.animAlpha = Math.max(0, t.removeTime / 0.35);
+        t.animScale = 1 + (1 - t.animAlpha) * 0.25;
+        if (t.removeTime <= 0) {
+          t.removed = true;
+          t.removing = false;
+          t.animAlpha = 0;
+          this.needCheckMoves = true;
+        }
+      }
+    }
+
+    this.ui.updateHUD(this.score, this.elapsed, this.hintsLeft, this.shufflesLeft, this.pairsLeft, this.combo);
+
+    // Check win
+    const allGone = this.tiles.every(t => t.removed || t.removing);
+    if (this.pairsLeft <= 0 && allGone) {
+      this.state = 'win';
+      Sound.complete();
+      this._saveHighScore();
+      setTimeout(() => this.ui.showWinOverlay(this.score, this.elapsed, this.maxCombo), 600);
+      return;
+    }
+
+    // Check no moves (only after tile state changes)
+    if (this.needCheckMoves) {
+      this.needCheckMoves = false;
+      const active = this.tiles.filter(t => !t.removed && !t.removing);
+      if (active.length > 0 && !hasValidMoves(this.tiles, this.gridCols, this.gridRows)) {
+        if (this.shufflesLeft > 0) {
+          this.shufflesLeft--;
+          this._doShuffle();
+        } else {
+          this.state = 'gameover';
+          Sound.gameOver();
+          this._saveHighScore();
+          setTimeout(() => this.ui.showGameOverOverlay(this.score, '没有可消除的牌了'), 600);
+        }
+      }
+    }
+  }
+
+  _saveHighScore() {
+    const key = 'mahjong_high_score';
+    const prev = parseInt(localStorage.getItem(key) || '0');
+    if (this.score > prev) localStorage.setItem(key, this.score);
+  }
+
+  _draw() {
+    const ctx = this.ctx;
+    ctx.fillStyle = COLORS.bg;
+    ctx.fillRect(0, 0, this.screenW, this.screenH);
+
+    // Subtle background pattern
+    ctx.save();
+    ctx.globalAlpha = 0.025;
+    ctx.fillStyle = COLORS.gold;
+    for (let i = 0; i < this.screenW; i += 50) {
+      for (let j = 0; j < this.screenH; j += 50) {
+        if ((i + j) % 100 === 0) ctx.fillRect(i, j, 25, 25);
+      }
+    }
+    ctx.restore();
+
+    if (this.state === 'menu') return;
+
+    ctx.save();
+    if (this.effects.shakeAmount > 0) {
+      ctx.translate(
+        (Math.random() - 0.5) * this.effects.shakeAmount * 2,
+        (Math.random() - 0.5) * this.effects.shakeAmount * 2
+      );
+    }
+
+    const tw = TILE_W * this.tileScale;
+    const th = TILE_H * this.tileScale;
+    const shuffleOff = this.effects.getShuffleOffset();
+
+    for (const t of this.tiles) {
+      if (t.removed) continue;
+      if (t.removing && t.animAlpha <= 0) continue;
+      this._drawTile(ctx, t, tw, th, shuffleOff);
+    }
+
+    // Draw hint path directly (not through effects, to avoid stacking)
+    if (this.hintPath && this.hintPath.length >= 2) {
+      ctx.save();
+      ctx.strokeStyle = '#60a5fa';
+      ctx.lineWidth = 3;
+      ctx.shadowColor = '#60a5fa';
+      ctx.shadowBlur = 12;
+      ctx.setLineDash([8, 4]);
+      ctx.lineDashOffset = -performance.now() / 50;
+      ctx.beginPath();
+      const hp = this.hintPath;
+      ctx.moveTo(this.offsetX + hp[0].c * tw + tw / 2, this.offsetY + hp[0].r * th + th / 2);
+      for (let i = 1; i < hp.length; i++) {
+        ctx.lineTo(this.offsetX + hp[i].c * tw + tw / 2, this.offsetY + hp[i].r * th + th / 2);
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+
+    ctx.restore();
+    this.effects.draw(ctx);
+  }
+
+  _drawTile(ctx, tile, tw, th, shuffleOff) {
+    const x = this.offsetX + tile.c * tw + shuffleOff;
+    const y = this.offsetY + tile.r * th + shuffleOff;
+
+    ctx.save();
+
+    if (tile.removing) {
+      ctx.globalAlpha = tile.animAlpha;
+      const cx = x + tw / 2, cy = y + th / 2;
+      ctx.translate(cx, cy);
+      ctx.scale(tile.animScale, tile.animScale);
+      ctx.translate(-cx, -cy);
+    }
+
+    // Shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    this._roundRect(ctx, x + 2, y + 3, tw - 2, th - 2, 5);
+    ctx.fill();
+
+    // Face gradient
+    const grad = ctx.createLinearGradient(x, y, x, y + th);
+    if (tile.selected) {
+      grad.addColorStop(0, '#fff8e0');
+      grad.addColorStop(1, '#ffe080');
+    } else if (tile.hinted) {
+      grad.addColorStop(0, '#e0f0ff');
+      grad.addColorStop(1, '#a0d0ff');
+    } else {
+      grad.addColorStop(0, '#f5eed8');
+      grad.addColorStop(1, '#d8ccaa');
+    }
+    ctx.fillStyle = grad;
+    this._roundRect(ctx, x + 1, y + 1, tw - 3, th - 3, 5);
+    ctx.fill();
+
+    // Top highlight
+    ctx.save();
+    ctx.globalAlpha = 0.4;
+    ctx.fillStyle = '#fff';
+    this._roundRect(ctx, x + 2, y + 2, tw - 5, th * 0.15, 3);
+    ctx.fill();
+    ctx.restore();
+
+    // Border
+    const borderColor = tile.selected ? COLORS.selected : tile.hinted ? '#60a5fa' : '#a09070';
+    ctx.strokeStyle = borderColor;
+    ctx.lineWidth = tile.selected ? 2.5 : 1.5;
+    this._roundRect(ctx, x + 1, y + 1, tw - 3, th - 3, 5);
+    ctx.stroke();
+
+    // Glow
+    if (tile.selected || tile.hinted) {
+      ctx.save();
+      ctx.shadowColor = tile.selected ? COLORS.selected : '#60a5fa';
+      ctx.shadowBlur = 14;
+      ctx.strokeStyle = tile.selected ? COLORS.selected : '#60a5fa';
+      ctx.lineWidth = 2;
+      this._roundRect(ctx, x, y, tw, th, 6);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Category color wash
+    const catColor = CAT_COLORS[tile.def.cat] || '#555';
+    ctx.save();
+    ctx.globalAlpha = 0.1;
+    ctx.fillStyle = catColor;
+    this._roundRect(ctx, x + 3, y + 3, tw - 7, th - 7, 4);
+    ctx.fill();
+    ctx.restore();
+
+    // Text rendering
+    const def = tile.def;
+    const isWind = def.cat === '风' || def.cat === '箭';
+
+    // Category label (top)
+    ctx.fillStyle = catColor;
+    ctx.font = `bold ${Math.max(9, tw * 0.2)}px "Microsoft YaHei", "SimHei", sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(def.cat, x + tw / 2, y + th * 0.22);
+
+    // Main character
+    ctx.fillStyle = COLORS.tileText;
+    if (isWind) {
+      ctx.font = `bold ${Math.max(14, tw * 0.42)}px "Microsoft YaHei", "SimHei", sans-serif`;
+      ctx.fillText(def.val, x + tw / 2, y + th * 0.58);
+    } else {
+      const num = def.val.charAt(0);
+      ctx.font = `bold ${Math.max(16, tw * 0.45)}px "Microsoft YaHei", "SimHei", sans-serif`;
+      ctx.fillText(num, x + tw / 2, y + th * 0.53);
+      ctx.font = `${Math.max(9, tw * 0.2)}px "Microsoft YaHei", "SimHei", sans-serif`;
+      ctx.fillText(def.cat, x + tw / 2, y + th * 0.8);
+    }
+
+    ctx.restore();
+  }
+
+  _roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+  }
+}
+
+// Init
+const game = new MahjongGame();
+window.startGame = function() {
+  game.ui.showStartOverlay((layout, diff) => game.startGame(layout, diff));
+};
+
+
+</script>
+
+</body>
+</html>
