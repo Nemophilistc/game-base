@@ -147,4 +147,11 @@ export class WaveManager {
       this.betweenWaveTimer = 0;
     }
   }
+
+  forceNextWave() {
+    if (this.betweenWaves && !this.allWavesComplete) {
+      return this.startNextWave();
+    }
+    return null;
+  }
 }

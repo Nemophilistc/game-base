@@ -10,7 +10,6 @@ export const CANVAS_HEIGHT = GRID_ROWS * CELL_SIZE;
 // 游戏初始资源
 export const INITIAL_GOLD = 500;
 export const INITIAL_LIVES = 20;
-export const PASSIVE_INCOME = 5; // 每秒被动收入
 
 // 多地图路径定义
 export const MAPS = [

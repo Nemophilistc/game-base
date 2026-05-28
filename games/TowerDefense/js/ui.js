@@ -25,7 +25,8 @@ export const uiState = {
   enemyCount: 0,
   killCount: 0,
   towerCount: 0,
-  selectedMapIndex: 0        // 选中的地图
+  selectedMapIndex: 0,       // 选中的地图
+  betweenWaves: false        // 是否在波次间隔中
 };
 
 // ---- 事件回调 ----
@@ -201,17 +202,29 @@ function drawHUD(ctx) {
   // 存储
   uiState._pauseRect = { x: pauseX, y: pauseY, w: pauseW, h: pauseH };
 
-  // 下一波按钮
-  const nextX = CANVAS_WIDTH - 170;
-  const nextW = 80;
-  ctx.fillStyle = 'rgba(46,204,113,0.8)';
-  ctx.fillRect(nextX, pauseY, nextW, pauseH);
+  // 下一波按钮（更大更醒目）
+  const nextX = CANVAS_WIDTH - 180;
+  const nextW = 95;
+  const nextH = 28;
+  // 脉动效果
+  const pulse = 0.8 + Math.sin(Date.now() * 0.005) * 0.2;
+  ctx.fillStyle = `rgba(46,204,113,${pulse})`;
+  ctx.beginPath();
+  if (ctx.roundRect) {
+    ctx.roundRect(nextX, pauseY, nextW, nextH, 4);
+  } else {
+    ctx.rect(nextX, pauseY, nextW, nextH);
+  }
+  ctx.fill();
   ctx.strokeStyle = '#2ecc71';
-  ctx.strokeRect(nextX, pauseY, nextW, pauseH);
+  ctx.lineWidth = 2;
+  ctx.strokeRect(nextX, pauseY, nextW, nextH);
   ctx.fillStyle = '#fff';
-  ctx.font = '11px Arial';
-  ctx.fillText('下一波', nextX + nextW / 2, y);
-  uiState._nextWaveRect = { x: nextX, y: pauseY, w: nextW, h: pauseH };
+  ctx.font = 'bold 13px Arial';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('▶ 下一波', nextX + nextW / 2, pauseY + nextH / 2);
+  uiState._nextWaveRect = { x: nextX, y: pauseY, w: nextW, h: nextH };
 }
 
 // ---- 塔信息面板（选中已建造的塔时） ----
@@ -523,8 +536,14 @@ function handleClick(mx, my) {
     return;
   }
 
-  // 下一波按钮
+  // 下一波按钮（顶部小按钮）
   if (uiState._nextWaveRect && hitTest(mx, my, uiState._nextWaveRect)) {
+    onSkipWait?.();
+    return;
+  }
+
+  // 下一波按钮（中央大按钮）
+  if (uiState._nextWaveBigRect && hitTest(mx, my, uiState._nextWaveBigRect)) {
     onSkipWait?.();
     return;
   }
@@ -614,12 +633,53 @@ function drawHoverInfo(ctx) {
   }
 }
 
+// ---- 波次间隔大按钮 ----
+function drawNextWaveOverlay(ctx) {
+  if (!uiState.betweenWaves) return;
+
+  const btnW = 200;
+  const btnH = 50;
+  const btnX = CANVAS_WIDTH / 2 - btnW / 2;
+  const btnY = CANVAS_HEIGHT / 2 - btnH / 2;
+  const pulse = 0.7 + Math.sin(Date.now() * 0.006) * 0.3;
+
+  // 半透明背景
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.fillRect(0, CANVAS_HEIGHT / 2 - 40, CANVAS_WIDTH, 80);
+
+  // 按钮
+  ctx.fillStyle = `rgba(46,204,113,${pulse})`;
+  ctx.beginPath();
+  if (ctx.roundRect) {
+    ctx.roundRect(btnX, btnY, btnW, btnH, 10);
+  } else {
+    ctx.rect(btnX, btnY, btnW, btnH);
+  }
+  ctx.fill();
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(btnX, btnY, btnW, btnH);
+
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 20px Arial';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('▶ 下一波', btnX + btnW / 2, btnY + btnH / 2);
+
+  uiState._nextWaveBigRect = { x: btnX, y: btnY, w: btnW, h: btnH };
+}
+
 // ---- 主绘制 ----
 export function drawUI(ctx) {
   drawHUD(ctx);
   drawTowerPanel(ctx);
   drawTowerInfo(ctx);
   drawHoverInfo(ctx);
+
+  // 波次间隔期间显示大按钮
+  if (!uiState.showStartMenu && !uiState.showGameOver && !uiState.showVictory && uiState.isRunning && !uiState.isPaused) {
+    drawNextWaveOverlay(ctx);
+  }
 
   if (uiState.showStartMenu) {
     drawStartMenu(ctx);
