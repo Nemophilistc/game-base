@@ -19,3 +19,5 @@ node_modules/
 *.tmp
 *.log
 scripts/
+local/
+build_local.py
