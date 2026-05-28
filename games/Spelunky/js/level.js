@@ -194,14 +194,21 @@ export class Level {
             this.items.push({ type: 'chest', x: ix, y: iy });
         }
 
+        // Player spawn tile coords (for spike safety check)
+        const spawnCol = Math.floor(this.playerStart.x / TILE);
+        const spawnRow = Math.floor(this.playerStart.y / TILE);
+
         // Place traps
         for (const room of rooms) {
-            // Spike pits
+            // Spike pits (skip starting room and area near player spawn)
+            if (room === topRoom) continue;
             if (room.w >= 5 && rng.chance(0.25)) {
                 const sy = room.y + room.h - 1;
                 const sx = room.x + rng.int(1, room.w - 3);
                 const sw = rng.int(2, 3);
                 for (let x = sx; x < sx + sw && x < this.cols; x++) {
+                    // Don't place spikes within 2 tiles of player spawn
+                    if (Math.abs(x - spawnCol) <= 2 && Math.abs(sy - spawnRow) <= 2) continue;
                     if (grid[sy][x] === T.AIR) {
                         grid[sy][x] = T.SPIKE;
                     }

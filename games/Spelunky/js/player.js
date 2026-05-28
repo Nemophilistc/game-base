@@ -96,6 +96,8 @@ export class Player {
                     if (action === 'bomb') this.input.bombPressed = true;
                     if (action === 'rope') this.input.ropePressed = true;
                     if (action === 'whip') this.input.whipPressed = true;
+                    // ArrowUp/KeyW also trigger jump
+                    if (action === 'up') this.input.jumpPressed = true;
                 }
                 this.input[action] = true;
             }
@@ -154,6 +156,7 @@ export class Player {
 
         // Ladder climbing
         if (this.onLadder && (this.input.up || this.input.down)) {
+            if (!this.climbing) this.jumpBuffer = 0; // Prevent jump-off when first grabbing ladder
             this.climbing = true;
         }
         if (this.climbing && !this.onLadder) {
