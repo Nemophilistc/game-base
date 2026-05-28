@@ -1,0 +1,690 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>俄罗斯方块</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{background:#0a0a0a;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'Segoe UI',Tahoma,sans-serif;overflow:hidden;color:#fff}
+        .game-wrap{display:flex;gap:20px;align-items:flex-start}
+        #board{border:2px solid #333;border-radius:4px;box-shadow:0 0 30px rgba(156,39,176,0.3);background:#111}
+        .side-panel{display:flex;flex-direction:column;gap:12px;width:140px}
+        .panel-box{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:10px;text-align:center}
+        .panel-label{font-size:11px;color:#888;margin-bottom:6px}
+        .panel-val{font-size:20px;font-weight:bold;color:#ce93d8}
+        #nextCanvas,#holdCanvas{display:block;margin:0 auto}
+        .controls-info{font-size:11px;color:#555;line-height:1.6}
+        .restart-btn{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:8px;text-align:center;font-size:12px;color:#888;cursor:pointer;transition:all 0.2s}
+        .restart-btn:hover{background:rgba(156,39,176,0.3);color:#ce93d8;border-color:#9c27b0}
+        .overlay{position:fixed;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100;background:rgba(0,0,0,0.8)}
+        .overlay.hidden{display:none}
+        .overlay-title{font-size:48px;color:#ce93d8;text-shadow:0 0 20px rgba(156,39,176,0.5);margin-bottom:15px}
+        .menu-btn{background:linear-gradient(135deg,#9c27b0 0%,#7b1fa2 100%);border:none;padding:14px 40px;font-size:18px;color:#fff;border-radius:8px;cursor:pointer;transition:all 0.3s;margin:6px}
+        .menu-btn:hover{transform:scale(1.08);box-shadow:0 0 25px rgba(156,39,176,0.5)}
+        .stats{font-size:20px;color:#aaa;margin-bottom:20px;text-align:center;line-height:1.6}
+        .help-box{margin-top:10px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:14px 20px;max-width:350px;text-align:left;font-size:13px;color:#aaa;line-height:1.8;backdrop-filter:blur(5px)}
+        .help-box h3{color:#ce93d8;font-size:14px;margin-bottom:6px;text-align:center}
+    </style>
+</head>
+<body>
+    <div class="game-wrap">
+        <canvas id="board"></canvas>
+        <div class="side-panel">
+            <div class="panel-box"><div class="panel-label">分数</div><div class="panel-val" id="score">0</div></div>
+            <div class="panel-box"><div class="panel-label">等级</div><div class="panel-val" id="level">1</div></div>
+            <div class="panel-box"><div class="panel-label">消行</div><div class="panel-val" id="lines">0</div></div>
+            <div class="panel-box"><div class="panel-label">下一个</div><canvas id="nextCanvas" width="80" height="80"></canvas></div>
+            <div class="panel-box"><div class="panel-label">暂存 (C)</div><canvas id="holdCanvas" width="80" height="80"></canvas></div>
+            <div class="panel-box"><div class="panel-label">最高分</div><div class="panel-val" id="high">0</div></div>
+            <div class="controls-info">← → 移动<br>↑ 旋转<br>↓ 软降<br>空格 硬降<br>C 暂存<br>P 暂停<br>R 重新开始</div>
+            <div class="restart-btn" onclick="startGame()" title="重新开始 (R)">↺ 重新开始</div>
+        </div>
+    </div>
+
+    <div id="startOverlay" class="overlay">
+        <div class="overlay-title">俄罗斯方块</div>
+        <button class="menu-btn" onclick="startGame()">开始游戏</button>
+        <div class="help-box">
+            <h3>🎮 操作说明</h3>
+            <div>← → 或 A/D：左右移动</div>
+            <div>↑ 或 W：旋转方块</div>
+            <div>↓ 或 S：软降（加速下落）</div>
+            <div>空格：硬降（直接落底）</div>
+            <div>C：暂存当前方块</div>
+            <div>P：暂停/继续</div>
+            <div>R：重新开始</div>
+            <h3 style="margin-top:8px">🎯 游戏规则</h3>
+            <div>填满一行消除得分 | 同时消多行有额外奖励</div>
+            <div>每消10行升一级 | 等级越高速度越快</div>
+        </div>
+    </div>
+
+    <div id="gameOverOverlay" class="overlay hidden">
+        <div class="overlay-title" style="color:#f44336;text-shadow:0 0 20px rgba(244,67,54,0.5)">游戏结束</div>
+        <div id="goStats" class="stats"></div>
+        <button class="menu-btn" onclick="startGame()">再来一局</button>
+    </div>
+
+<script>
+// === ./sound.js ===
+// Web Audio API 音效模块
+const Sound = {
+    ctx: null,
+
+    init() {
+        if (!this.ctx) {
+            this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+    },
+
+    play(type) {
+        if (!this.ctx) return;
+        const c = this.ctx;
+        const o = c.createOscillator();
+        const g = c.createGain();
+        o.connect(g);
+        g.connect(c.destination);
+        const t = c.currentTime;
+
+        switch (type) {
+            case 'move':
+                o.type = 'sine';
+                o.frequency.value = 200;
+                g.gain.setValueAtTime(0.04, t);
+                g.gain.exponentialRampToValueAtTime(0.001, t + 0.03);
+                o.start(t); o.stop(t + 0.03);
+                break;
+            case 'rotate':
+                o.type = 'sine';
+                o.frequency.value = 400;
+                g.gain.setValueAtTime(0.06, t);
+                g.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+                o.start(t); o.stop(t + 0.05);
+                break;
+            case 'drop':
+                o.type = 'square';
+                o.frequency.setValueAtTime(150, t);
+                o.frequency.exponentialRampToValueAtTime(80, t + 0.1);
+                g.gain.setValueAtTime(0.08, t);
+                g.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+                o.start(t); o.stop(t + 0.1);
+                break;
+            case 'clear':
+                o.type = 'sine';
+                o.frequency.setValueAtTime(500, t);
+                o.frequency.setValueAtTime(700, t + 0.05);
+                o.frequency.setValueAtTime(1000, t + 0.1);
+                g.gain.setValueAtTime(0.1, t);
+                g.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+                o.start(t); o.stop(t + 0.2);
+                break;
+            case 'tetris':
+                o.type = 'sine';
+                o.frequency.setValueAtTime(600, t);
+                o.frequency.setValueAtTime(800, t + 0.05);
+                o.frequency.setValueAtTime(1000, t + 0.1);
+                o.frequency.setValueAtTime(1200, t + 0.15);
+                g.gain.setValueAtTime(0.12, t);
+                g.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+                o.start(t); o.stop(t + 0.3);
+                break;
+            case 'gameover':
+                o.type = 'sawtooth';
+                o.frequency.setValueAtTime(300, t);
+                o.frequency.exponentialRampToValueAtTime(50, t + 0.5);
+                g.gain.setValueAtTime(0.12, t);
+                g.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+                o.start(t); o.stop(t + 0.5);
+                break;
+        }
+    }
+};
+
+// === ./config.js ===
+// 常量配置
+const COLS = 10;
+const ROWS = 20;
+const CELL = 28;
+
+const PIECES = {
+    I: { shape: [[1,1,1,1]],             color: '#00bcd4' },
+    O: { shape: [[1,1],[1,1]],           color: '#ffeb3b' },
+    T: { shape: [[0,1,0],[1,1,1]],       color: '#9c27b0' },
+    S: { shape: [[0,1,1],[1,1,0]],       color: '#4caf50' },
+    Z: { shape: [[1,1,0],[0,1,1]],       color: '#f44336' },
+    J: { shape: [[1,0,0],[1,1,1]],       color: '#2196f3' },
+    L: { shape: [[0,0,1],[1,1,1]],       color: '#ff9800' }
+};
+
+const PIECE_NAMES = Object.keys(PIECES);
+
+// 锁定延迟相关常量（毫秒）
+const LOCK_DELAY_MS = 500;   // 0.5 秒
+const MAX_LOCK_RESETS = 15;  // 最多重置锁定15次
+
+// 消行动画时长（毫秒）
+const CLEAR_ANIM_DURATION = 200;
+
+// === ./tetromino.js ===
+// 方块模块：创建、旋转、碰撞检测
+
+/**
+ * 创建新方块
+ * @param {string|null} forceName - 强制指定方块名（用于hold）
+ * @param {string|null} nextName  - 预览队列中的下一个方块名
+ * @returns {{ name, shape, color, x, y }}
+ */
+function createPiece(forceName, nextName) {
+    const name = forceName || nextName || PIECE_NAMES[Math.floor(Math.random() * PIECE_NAMES.length)];
+    const p = PIECES[name];
+    return {
+        name,
+        shape: p.shape.map(r => [...r]),
+        color: p.color,
+        x: Math.floor((COLS - p.shape[0].length) / 2),
+        y: 0
+    };
+}
+
+/**
+ * 随机获取下一个方块名
+ */
+function randomPieceName() {
+    return PIECE_NAMES[Math.floor(Math.random() * PIECE_NAMES.length)];
+}
+
+/**
+ * 顺时针旋转形状矩阵
+ */
+function rotate(shape) {
+    const rows = shape.length;
+    const cols = shape[0].length;
+    const res = Array.from({ length: cols }, () => Array(rows).fill(0));
+    for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+            res[c][rows - 1 - r] = shape[r][c];
+        }
+    }
+    return res;
+}
+
+/**
+ * 碰撞检测：shape 在 (px, py) 是否合法
+ * @param {number[][]} shape
+ * @param {number} px
+ * @param {number} py
+ * @param {(number|string|null)[][]} board
+ */
+function fits(shape, px, py, board) {
+    for (let r = 0; r < shape.length; r++) {
+        for (let c = 0; c < shape[r].length; c++) {
+            if (!shape[r][c]) continue;
+            const nx = px + c;
+            const ny = py + r;
+            if (nx < 0 || nx >= COLS || ny >= ROWS) return false;
+            if (ny >= 0 && board[ny][nx]) return false;
+        }
+    }
+    return true;
+}
+
+/**
+ * 计算幽灵方块的 Y 坐标（硬降目标位置）
+ */
+function getGhostY(piece, board) {
+    let gy = piece.y;
+    while (fits(piece.shape, piece.x, gy + 1, board)) {
+        gy++;
+    }
+    return gy;
+}
+
+// === ./board.js ===
+// 游戏板模块：消行、锁定、状态管理
+
+/**
+ * 创建空棋盘
+ */
+function createBoard() {
+    return Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+}
+
+/**
+ * 游戏状态对象
+ */
+function createGameState() {
+    return {
+        board: createBoard(),
+        current: null,
+        next: null,
+        hold: null,
+        canHold: true,
+        score: 0,
+        level: 1,
+        lines: 0,
+        highScore: parseInt(localStorage.getItem('tetris_high')) || 0,
+        gameActive: false,
+        paused: false,
+        dropTimer: 0,
+        dropInterval: 500,
+        lockTimer: 0,
+        lockResets: 0,       // Bug fix: 锁定重置次数计数
+        lastTime: 0,
+        clearAnim: null      // { elapsed: number } 纯视觉消行动画
+    };
+}
+
+/**
+ * 生成新方块并检查游戏结束
+ */
+function spawnNewPiece(state) {
+    const nextName = state.next || randomPieceName();
+    state.next = randomPieceName();
+    state.current = createPiece(null, nextName);
+    state.lockTimer = 0;
+    state.lockResets = 0;
+
+    if (!fits(state.current.shape, state.current.x, state.current.y, state.board)) {
+        return false; // 游戏结束
+    }
+    return true;
+}
+
+/**
+ * 锁定当前方块到棋盘
+ * Bug fix: 同步消行，不再用 setTimeout 延迟
+ */
+function lockPiece(state) {
+    const cur = state.current;
+    for (let r = 0; r < cur.shape.length; r++) {
+        for (let c = 0; c < cur.shape[r].length; c++) {
+            if (!cur.shape[r][c]) continue;
+            const ny = cur.y + r;
+            if (ny < 0) return 'gameover';
+            state.board[ny][cur.x + c] = cur.color;
+        }
+    }
+
+    // Bug fix: 同步消行（棋盘数据立即更新），不再用 setTimeout
+    const clearedCount = clearLinesSync(state);
+    if (clearedCount > 0) {
+        // 纯视觉动画，棋盘数据已更新
+        state.clearAnim = { elapsed: 0 };
+        Sound.play(clearedCount >= 4 ? 'tetris' : 'clear');
+    }
+
+    state.canHold = true;
+
+    // 消行后立即生成新方块（棋盘已是最新状态）
+    if (!spawnNewPiece(state)) {
+        return 'gameover';
+    }
+    return 'ok';
+}
+
+/**
+ * 同步消除已满行，返回消除行数
+ * Bug fix: 替代原来的 setTimeout 延迟消行
+ */
+function clearLinesSync(state) {
+    let cleared = 0;
+    for (let r = ROWS - 1; r >= 0; r--) {
+        if (state.board[r].every(c => c)) {
+            state.board.splice(r, 1);
+            state.board.unshift(Array(COLS).fill(null));
+            cleared++;
+            r++; // 回退一行检查（splice 后上面的行下移了）
+        }
+    }
+
+    if (cleared > 0) {
+        const pts = [0, 100, 300, 500, 800][cleared] || 800;
+        state.score += pts * state.level;
+        state.lines += cleared;
+        state.level = Math.floor(state.lines / 10) + 1;
+        state.dropInterval = Math.max(50, 500 - (state.level - 1) * 40);
+    }
+
+    return cleared;
+}
+
+/**
+ * 暂存操作
+ */
+function doHold(state) {
+    if (!state.canHold) return;
+    state.canHold = false;
+    if (state.hold) {
+        const tmp = state.hold;
+        state.hold = state.current.name;
+        state.current = createPiece(tmp);
+    } else {
+        state.hold = state.current.name;
+        state.current = createPiece(null, state.next);
+        state.next = randomPieceName();
+    }
+    state.lockTimer = 0;
+    state.lockResets = 0;
+}
+
+/**
+ * 重置锁定计时器（移动/旋转时调用）
+ * Bug fix: 增加最大重置次数限制（15次），超过后强制锁定
+ * @returns {boolean} 是否成功重置
+ */
+function resetLockTimer(state) {
+    if (state.lockResets < MAX_LOCK_RESETS) {
+        state.lockTimer = 0;
+        state.lockResets++;
+        return true;
+    }
+    return false; // 超过最大重置次数，不再重置
+}
+
+// === ./ui.js ===
+// UI 模块：HUD、绘图、预览
+
+const canvas = document.getElementById('board');
+const ctx = canvas.getContext('2d');
+canvas.width = COLS * CELL;
+canvas.height = ROWS * CELL;
+
+const nextCanvas = document.getElementById('nextCanvas');
+const nextCtx = nextCanvas.getContext('2d');
+const holdCanvas = document.getElementById('holdCanvas');
+const holdCtx = holdCanvas.getContext('2d');
+
+/**
+ * 绘制单个格子（带立体效果）
+ */
+function drawCell(c, x, y, color) {
+    c.fillStyle = color;
+    c.fillRect(x * CELL + 1, y * CELL + 1, CELL - 2, CELL - 2);
+    c.fillStyle = 'rgba(255,255,255,0.15)';
+    c.fillRect(x * CELL + 1, y * CELL + 1, CELL - 2, (CELL - 2) / 2);
+    c.fillStyle = 'rgba(0,0,0,0.2)';
+    c.fillRect(x * CELL + 1, y * CELL + (CELL / 2), CELL - 2, (CELL - 2) / 2);
+}
+
+/**
+ * 绘制预览方块（next / hold）
+ */
+function drawPreview(pctx, pcanvas, name) {
+    pctx.fillStyle = '#1a1a1a';
+    pctx.fillRect(0, 0, pcanvas.width, pcanvas.height);
+    if (!name) return;
+    const p = PIECES[name];
+    const s = p.shape;
+    const cs = 16;
+    const ox = (pcanvas.width - s[0].length * cs) / 2;
+    const oy = (pcanvas.height - s.length * cs) / 2;
+    s.forEach((row, r) => row.forEach((v, c) => {
+        if (v) {
+            pctx.fillStyle = p.color;
+            pctx.fillRect(ox + c * cs, oy + r * cs, cs - 1, cs - 1);
+            pctx.fillStyle = 'rgba(255,255,255,0.15)';
+            pctx.fillRect(ox + c * cs, oy + r * cs, cs - 1, cs / 2);
+        }
+    }));
+}
+
+/**
+ * 主绘制函数
+ */
+function draw(state) {
+    // 背景
+    ctx.fillStyle = '#111';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // 网格线
+    ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+    for (let c = 0; c <= COLS; c++) {
+        ctx.beginPath();
+        ctx.moveTo(c * CELL, 0);
+        ctx.lineTo(c * CELL, canvas.height);
+        ctx.stroke();
+    }
+    for (let r = 0; r <= ROWS; r++) {
+        ctx.beginPath();
+        ctx.moveTo(0, r * CELL);
+        ctx.lineTo(canvas.width, r * CELL);
+        ctx.stroke();
+    }
+
+    // 已锁定方块
+    for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+            if (state.board[r][c]) drawCell(ctx, c, r, state.board[r][c]);
+        }
+    }
+
+    // 消行动画：全屏闪烁（纯视觉效果，棋盘数据已同步更新）
+    if (state.clearAnim) {
+        const progress = Math.min(state.clearAnim.elapsed / 200, 1);
+        const alpha = Math.sin(progress * Math.PI * 3) * 0.4 + 0.1;
+        ctx.fillStyle = `rgba(255,255,255,${Math.max(0, alpha)})`;
+        ctx.fillRect(0, 0, COLS * CELL, ROWS * CELL);
+    }
+
+    // 幽灵方块
+    if (state.current && state.gameActive) {
+        const gy = getGhostY(state.current, state.board);
+        state.current.shape.forEach((row, r) => row.forEach((v, c) => {
+            if (v) {
+                ctx.fillStyle = state.current.color + '30';
+                ctx.fillRect((state.current.x + c) * CELL, (gy + r) * CELL, CELL, CELL);
+                ctx.strokeStyle = state.current.color + '60';
+                ctx.strokeRect((state.current.x + c) * CELL, (gy + r) * CELL, CELL, CELL);
+            }
+        }));
+    }
+
+    // 当前方块
+    if (state.current && state.gameActive) {
+        state.current.shape.forEach((row, r) => row.forEach((v, c) => {
+            if (v) drawCell(ctx, state.current.x + c, state.current.y + r, state.current.color);
+        }));
+    }
+
+    // 侧边预览
+    drawPreview(nextCtx, nextCanvas, state.next);
+    drawPreview(holdCtx, holdCanvas, state.hold);
+}
+
+/**
+ * 更新 HUD 数值
+ */
+function updateHUD(state) {
+    document.getElementById('score').textContent = state.score;
+    document.getElementById('level').textContent = state.level;
+    document.getElementById('lines').textContent = state.lines;
+    document.getElementById('high').textContent = Math.max(state.highScore, state.score);
+}
+
+/**
+ * 初始化最高分显示
+ */
+function initHUD(highScore) {
+    document.getElementById('high').textContent = highScore;
+}
+
+// === main.js ===
+// 游戏主循环、初始化、事件监听
+
+let state = createGameState();
+initHUD(state.highScore);
+
+// ========== 游戏启动 ==========
+
+function startGame() {
+    Sound.init();
+    document.getElementById('startOverlay').classList.add('hidden');
+    document.getElementById('gameOverOverlay').classList.add('hidden');
+
+    state = createGameState();
+    state.gameActive = true;
+    state.highScore = parseInt(localStorage.getItem('tetris_high')) || 0;
+
+    spawnNewPiece(state);
+    updateHUD(state);
+}
+
+// 暴露给 HTML onclick + 绑定事件（双重保险）
+window.startGame = startGame;
+document.getElementById('startOverlay').querySelector('.menu-btn').addEventListener('click', startGame);
+document.getElementById('gameOverOverlay').querySelector('.menu-btn').addEventListener('click', startGame);
+document.querySelector('.restart-btn').addEventListener('click', startGame);
+
+// ========== 游戏结束 ==========
+
+function endGame() {
+    state.gameActive = false;
+    Sound.play('gameover');
+    state.highScore = Math.max(state.highScore, state.score);
+    localStorage.setItem('tetris_high', state.highScore);
+
+    setTimeout(() => {
+        document.getElementById('goStats').innerHTML =
+            `分数: ${state.score}<br>等级: ${state.level}<br>消行: ${state.lines}<br>最高: ${state.highScore}`;
+        document.getElementById('gameOverOverlay').classList.remove('hidden');
+    }, 500);
+}
+
+// ========== 锁定处理（含 Bug fix）==========
+
+function handleLock() {
+    const result = lockPiece(state);
+    if (result === 'gameover') {
+        endGame();
+    }
+    state.dropTimer = 0;
+}
+
+// ========== 键盘事件 ==========
+
+window.addEventListener('keydown', e => {
+    if (e.code === 'KeyP' && state.gameActive) {
+        state.paused = !state.paused;
+        return;
+    }
+    if (e.code === 'KeyR') {
+        startGame();
+        return;
+    }
+    if (!state.gameActive || state.paused) return;
+
+    const cur = state.current;
+    if (!cur) return;
+
+    switch (e.code) {
+        case 'ArrowLeft': case 'KeyA':
+            if (fits(cur.shape, cur.x - 1, cur.y, state.board)) {
+                cur.x--;
+                Sound.play('move');
+                resetLockTimer(state);
+            }
+            e.preventDefault();
+            break;
+
+        case 'ArrowRight': case 'KeyD':
+            if (fits(cur.shape, cur.x + 1, cur.y, state.board)) {
+                cur.x++;
+                Sound.play('move');
+                resetLockTimer(state);
+            }
+            e.preventDefault();
+            break;
+
+        case 'ArrowDown': case 'KeyS':
+            if (fits(cur.shape, cur.x, cur.y + 1, state.board)) {
+                cur.y++;
+                state.score += 1;
+                state.dropTimer = 0;
+            }
+            e.preventDefault();
+            break;
+
+        case 'ArrowUp': case 'KeyW': {
+            const rotated = rotate(cur.shape);
+            for (const dx of [0, -1, 1, -2, 2]) {
+                if (fits(rotated, cur.x + dx, cur.y, state.board)) {
+                    cur.shape = rotated;
+                    cur.x += dx;
+                    Sound.play('rotate');
+                    resetLockTimer(state);
+                    break;
+                }
+            }
+            e.preventDefault();
+            break;
+        }
+
+        case 'Space': {
+            const ghostY = getGhostY(cur, state.board);
+            state.score += (ghostY - cur.y) * 2;
+            cur.y = ghostY;
+            handleLock();
+            Sound.play('drop');
+            e.preventDefault();
+            break;
+        }
+
+        case 'KeyC':
+            doHold(state);
+            break;
+    }
+});
+
+// ========== 游戏主循环 ==========
+
+function gameLoop(time) {
+    requestAnimationFrame(gameLoop);
+    if (!state.gameActive || state.paused) return;
+
+    // 跳过首帧
+    if (state.lastTime === 0) {
+        state.lastTime = time;
+        return;
+    }
+    const dt = time - state.lastTime;
+    state.lastTime = time;
+
+    // 消行动画计时（纯视觉效果，棋盘数据已同步更新）
+    if (state.clearAnim) {
+        state.clearAnim.elapsed = (state.clearAnim.elapsed || 0) + dt;
+        if (state.clearAnim.elapsed >= CLEAR_ANIM_DURATION) {
+            state.clearAnim = null;
+        }
+    }
+
+    state.dropTimer += dt;
+
+    // 锁定延迟逻辑（含 Bug fix: 最大重置次数）
+    if (fits(state.current.shape, state.current.x, state.current.y + 1, state.board)) {
+        // 还能下落，重置锁定计时（不消耗重置次数——只有主动移动/旋转才消耗）
+        state.lockTimer = 0;
+        if (state.dropTimer >= state.dropInterval) {
+            state.dropTimer = 0;
+            state.current.y++;
+        }
+    } else {
+        // 不能下落，开始锁定倒计时
+        state.lockTimer += dt;
+        if (state.lockTimer >= LOCK_DELAY_MS) {
+            handleLock();
+        }
+    }
+
+    draw(state);
+    updateHUD(state);
+}
+
+// ========== 启动 ==========
+requestAnimationFrame(gameLoop);
+
+
+</script>
+
+</body>
+</html>

@@ -737,7 +737,7 @@
             const visual = card.querySelector('.card-visual');
             visual.style.background = `linear-gradient(135deg, ${g.clr}15, ${g.clr}30)`;
 
-            card.onclick = () => { window.location.href = 'games/' + g.folder + '/index.html'; };
+            card.onclick = () => { window.location.href = g.folder + '/index.html'; };
             grid.appendChild(card);
         });
     }
