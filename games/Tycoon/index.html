@@ -135,7 +135,7 @@
     <div class="emoji-bg">&#x1F37D;&#xFE0F;</div>
     <h1>MIMO 餐厅大亨</h1>
     <p class="subtitle">经营你的梦想餐厅</p>
-    <button id="startBtn" onclick="startGame()">&#x1F525; 开始经营</button>
+    <button id="startBtn">&#x1F525; 开始经营</button>
     <div class="tip">
       <span>[1]</span> 菜单 <span>[2]</span> 员工 <span>[3]</span> 装修 <span>[4]</span> 厨房 <span>[空格]</span> 加速
     </div>
@@ -146,18 +146,8 @@
     <canvas id="gameCanvas"></canvas>
   </div>
 
-  <script>
-    function startGame() {
-      var splash = document.getElementById('splash');
-      splash.classList.add('hidden');
-      setTimeout(function() { splash.style.display = 'none'; }, 600);
-
-      // 动态加载游戏模块
-      var script = document.createElement('script');
-      script.type = 'module';
-      script.src = 'js/main.js';
-      document.body.appendChild(script);
-    }
+  <script type="module">
+    import './js/main.js';
   </script>
 
 </body>

@@ -139,18 +139,25 @@ class Game {
         this.difficulty = difficulty;
         const cfg = DIFFICULTY[difficulty];
 
-        // Generate maze
-        this.maze = new Maze(cfg.rows, cfg.cols);
-        this.maze.placeDoors(cfg.keys);
+        // Generate solvable maze (retry if layout is unsolvable)
+        let solvable = false;
+        for (let attempt = 0; attempt < 50 && !solvable; attempt++) {
+            this.maze = new Maze(cfg.rows, cfg.cols);
+            this.maze.placeDoors(cfg.keys);
+            this.itemMgr.spawn(this.maze, cfg.keys);
+
+            const keyPositions = this.itemMgr.items
+                .filter(i => i.type === 'key')
+                .map(i => ({ row: i.row, col: i.col }));
+
+            solvable = this.maze.validateSolvability(keyPositions);
+        }
 
         // Player
         this.player = new Player(0, 0);
 
-        // Enemies
+        // Enemies (placed after maze is finalized)
         this.enemyMgr.spawn(this.maze, cfg.enemies, 0, 0);
-
-        // Items
-        this.itemMgr.spawn(this.maze, cfg.keys);
 
         // State
         this.time = 0;

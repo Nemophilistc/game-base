@@ -81,6 +81,19 @@ export function drawParticles(ctx, particles) {
     ctx.globalAlpha = p.life;
     if (p.type === 'star') {
       drawStar(ctx, p.x, p.y, p.radius, p.color);
+    } else if (p.type === 'ember') {
+      // Soft glowing ember
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+      ctx.fillStyle = p.color;
+      ctx.fill();
+      // Outer glow
+      ctx.globalAlpha = p.life * 0.25;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.radius * 3, 0, Math.PI * 2);
+      ctx.fillStyle = p.color;
+      ctx.fill();
+      ctx.globalAlpha = p.life;
     } else if (p.type === 'fire') {
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
@@ -114,6 +127,48 @@ function drawStar(ctx, x, y, r, color) {
   ctx.closePath();
   ctx.fillStyle = color;
   ctx.fill();
+}
+
+// Game over: dramatic explosion of dark red / orange / gold particles
+export function createGameOverParticles(cx, cy, count = 50) {
+  const particles = [];
+  const colors = ['#FF2200', '#FF4400', '#FF6600', '#FF8800', '#FFAA00', '#FFCC00', '#FF0044'];
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 1 + Math.random() * 6;
+    particles.push({
+      x: cx + (Math.random() - 0.5) * 60,
+      y: cy + (Math.random() - 0.5) * 60,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - 2, // bias upward
+      radius: 3 + Math.random() * 5,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      life: 1,
+      decay: 0.005 + Math.random() * 0.01,
+      type: 'fire',
+    });
+  }
+  return particles;
+}
+
+// Slow-floating ember particles that drift upward during game-over screen
+export function createGameOverEmbers(canvasW, canvasH, count = 20) {
+  const particles = [];
+  const colors = ['#FF4400', '#FF6600', '#FF8800', '#FFAA00', '#FF2200'];
+  for (let i = 0; i < count; i++) {
+    particles.push({
+      x: Math.random() * canvasW,
+      y: canvasH + Math.random() * 100,
+      vx: (Math.random() - 0.5) * 0.8,
+      vy: -(0.5 + Math.random() * 1.5),
+      radius: 2 + Math.random() * 3,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      life: 1,
+      decay: 0.003 + Math.random() * 0.005,
+      type: 'ember',
+    });
+  }
+  return particles;
 }
 
 export function createPopAnimation(x, y, color) {

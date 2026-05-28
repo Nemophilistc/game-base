@@ -296,7 +296,9 @@ class Game {
 
     // 消除动画后下落
     this.state = STATE.DESTROYING;
-    this._startAnim(300, () => {
+    this._startAnim(400, () => {
+      // 动画播放完毕，现在真正移除matched宝石
+      this.board.finalizeClear();
       this._doGravity();
     });
   }

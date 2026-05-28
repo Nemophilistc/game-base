@@ -10,8 +10,10 @@ export const COLOR_NAMES = [
 
 export const LEVELS = [];
 for (let i = 0; i < 60; i++) {
-  const colorCount = Math.min(3 + Math.floor(i / 5), 12);
-  const emptyTubes = i < 10 ? 2 : i < 30 ? 2 : 3;
+  // Progressive color scaling: starts at 3, grows 1 color every ~10 levels, caps at 12
+  const colorCount = Math.min(3 + Math.floor(i / 10), 12);
+  // Progressive empty tube scaling: 2 early -> 3 mid -> 4 -> 5 later
+  const emptyTubes = 2 + Math.floor(i / 15);
   LEVELS.push({ colorCount, emptyTubes });
 }
 

@@ -298,7 +298,7 @@ export class UI {
         ctx.strokeRect(viewW / 2 - btnW / 2, btnY, btnW, btnH);
         ctx.fillStyle = COLORS.gold;
         ctx.font = 'bold 18px monospace';
-        ctx.fillText('按 SPACE 开始', viewW / 2, btnY + 26);
+        ctx.fillText('点击或按 SPACE 开始', viewW / 2, btnY + 26);
 
         // Help box
         const helpY = btnY + 60;
@@ -373,7 +373,7 @@ export class UI {
         ctx.strokeRect(viewW / 2 - 120, btnY, 240, 36);
         ctx.fillStyle = COLORS.gold;
         ctx.font = 'bold 14px monospace';
-        ctx.fillText('按 SPACE 重新开始', viewW / 2, btnY + 24);
+        ctx.fillText('点击或按 SPACE 重新开始', viewW / 2, btnY + 24);
 
         ctx.textAlign = 'left';
     }

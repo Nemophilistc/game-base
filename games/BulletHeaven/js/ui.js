@@ -73,7 +73,7 @@ export class UI {
             const cw = this.canvas.width;
             const ch = this.canvas.height;
             const btnX = cw / 2 - 100;
-            const btnY = ch / 2 + 120;
+            const btnY = ch / 2 + 60;
             if (mx >= btnX && mx <= btnX + 200 && my >= btnY && my <= btnY + 50) {
                 return 'restart';
             }
@@ -96,8 +96,10 @@ export class UI {
         const cw = this.canvas.width;
         const ch = this.canvas.height;
 
-        // HUD
-        this._drawHUD(ctx, player, gameTime, enemyCount, cw, ch, weaponSystem);
+        // HUD (only draw when player exists - skip on start screen)
+        if (player) {
+            this._drawHUD(ctx, player, gameTime, enemyCount, cw, ch, weaponSystem);
+        }
 
         // 升级选择界面
         if (this.showingUpgrades) {

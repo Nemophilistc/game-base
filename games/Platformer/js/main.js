@@ -63,6 +63,7 @@ class Game {
         if (KEYS.JUMP.includes(k)) this.input.jump = down;
         if (KEYS.DASH.includes(k)) this.input.dashPressed = down;
         if (down && KEYS.PAUSE.includes(k)) this._handlePause();
+        if (down && k === 'Enter' && this.state === ST.DEAD) this._restartFromDead('retry');
     }
 
     _click(e) {
@@ -113,6 +114,12 @@ class Game {
     _handlePause() {
         if (this.state === ST.PLAY) this.state = ST.PAUSE;
         else if (this.state === ST.PAUSE) this.state = ST.PLAY;
+        else if (this.state === ST.DEAD) this._restartFromDead('menu');
+    }
+
+    _restartFromDead(action) {
+        if (action === 'retry') this._startLevel(this.currentWorld, this.currentLevel);
+        else if (action === 'menu') this.state = ST.MENU;
     }
 
     _startLevel(world, level) {
@@ -228,8 +235,8 @@ class Game {
             this.winTimer = 0;
         }
 
-        // Lava death
-        if (this.level.checkLavaDeath(this.player)) {
+        // Lava death (only trigger once)
+        if (this.player.alive && this.level.checkLavaDeath(this.player)) {
             this.player.health = 0;
             this.player.alive = false;
             Sound.die();
@@ -242,8 +249,8 @@ class Game {
             if (this.deathTimer > 90) this.state = ST.DEAD;
         }
 
-        // Fall off map
-        if (this.player.y > this.level.rows * TILE + 100) {
+        // Fall off map (only trigger once — without guard, deathTimer resets every frame and the game freezes)
+        if (this.player.alive && this.player.y > this.level.rows * TILE + 100) {
             this.player.health = 0;
             this.player.alive = false;
             Sound.die();

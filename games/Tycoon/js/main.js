@@ -517,9 +517,21 @@ function initGame() {
   game.loop(performance.now());
 }
 
-// 如果文档已加载，立即初始化；否则等待DOMContentLoaded
+// 等待开始按钮点击
+function setupStart() {
+  var btn = document.getElementById('startBtn');
+  if (btn) {
+    btn.addEventListener('click', function() {
+      var splash = document.getElementById('splash');
+      splash.classList.add('hidden');
+      setTimeout(function() { splash.style.display = 'none'; }, 600);
+      initGame();
+    });
+  }
+}
+
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initGame);
+  document.addEventListener('DOMContentLoaded', setupStart);
 } else {
-  initGame();
+  setupStart();
 }

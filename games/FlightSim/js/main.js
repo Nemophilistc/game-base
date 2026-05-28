@@ -154,6 +154,13 @@ function setupTouchControls() {
 }
 
 function startGame() {
+    // Resume AudioContext before any sound calls (browser may have suspended it)
+    sound.init();
+    sound.resume();
+
+    // Clear stale input state from previous game
+    keys = {};
+
     plane.reset();
     effects.reset();
     score = 0;
@@ -163,6 +170,11 @@ function startGame() {
     terrain = new Terrain(canvas.width, canvas.height);
     obstacles = new ObstacleManager(canvas.width, canvas.height, terrain.getGroundY());
     collectibles = new CollectibleManager(canvas.width, canvas.height, terrain.getGroundY());
+
+    // Clear UI state from previous game
+    ui.screenShake = 0;
+    ui.messages = [];
+
     gameState = STATE.PLAYING;
     ui.showMessage('起飞!', 90, '#44ff44');
 }

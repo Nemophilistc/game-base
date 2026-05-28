@@ -394,6 +394,18 @@ class Game {
 }
 
 // ===== 启动游戏 =====
-document.addEventListener('DOMContentLoaded', () => {
-  new Game();
-});
+// Module scripts are deferred, so DOM is ready when this executes.
+// Use readyState check as a robust fallback.
+function initGame() {
+  try {
+    new Game();
+  } catch (e) {
+    console.error('Game initialization failed:', e);
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initGame);
+} else {
+  initGame();
+}

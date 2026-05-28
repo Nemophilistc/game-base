@@ -412,6 +412,9 @@ class ArcheryGame {
   render() {
     const ctx = this.ctx;
 
+    // Clear entire canvas each frame to prevent visual accumulation
+    ctx.clearRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
+
     ctx.save();
 
     // Screen shake

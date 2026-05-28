@@ -375,3 +375,6 @@ function gameLoop(timestamp) {
 
 // Expose for HTML
 window.startGame = init;
+
+// Module scripts are deferred, so DOM is ready — call init directly
+init();

@@ -67,31 +67,57 @@ class Game {
     }
 
     _setupStartInput() {
-        const handler = (e) => {
+        const keyHandler = (e) => {
             if (e.code === 'Space' && this.state === 'start') {
                 e.preventDefault();
-                window.removeEventListener('keydown', handler);
+                window.removeEventListener('keydown', keyHandler);
+                this.canvas.removeEventListener('click', clickHandler);
                 Sound.jump();
                 this.ui.transition(() => {
                     this.startGame();
                 });
             }
         };
-        window.addEventListener('keydown', handler);
+        const clickHandler = (e) => {
+            if (this.state === 'start') {
+                e.preventDefault();
+                window.removeEventListener('keydown', keyHandler);
+                this.canvas.removeEventListener('click', clickHandler);
+                Sound.jump();
+                this.ui.transition(() => {
+                    this.startGame();
+                });
+            }
+        };
+        window.addEventListener('keydown', keyHandler);
+        this.canvas.addEventListener('click', clickHandler);
     }
 
     _setupGameOverInput() {
-        const handler = (e) => {
+        const keyHandler = (e) => {
             if (e.code === 'Space' && this.state === 'gameover') {
                 e.preventDefault();
-                window.removeEventListener('keydown', handler);
+                window.removeEventListener('keydown', keyHandler);
+                this.canvas.removeEventListener('click', clickHandler);
                 Sound.jump();
                 this.ui.transition(() => {
                     this.startGame();
                 });
             }
         };
-        window.addEventListener('keydown', handler);
+        const clickHandler = (e) => {
+            if (this.state === 'gameover') {
+                e.preventDefault();
+                window.removeEventListener('keydown', keyHandler);
+                this.canvas.removeEventListener('click', clickHandler);
+                Sound.jump();
+                this.ui.transition(() => {
+                    this.startGame();
+                });
+            }
+        };
+        window.addEventListener('keydown', keyHandler);
+        this.canvas.addEventListener('click', clickHandler);
     }
 
     _setupShopInput() {

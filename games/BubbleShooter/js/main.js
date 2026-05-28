@@ -8,7 +8,7 @@ import {
   initGrid, shootBubble, updateFlying, updateFallingBubbles,
   drawGrid, drawShooter, drawFallingBubbles, addNewRow, checkGameOver,
 } from './bubbles.js';
-import { updateParticles, drawParticles, updatePopAnimations, drawPopAnimations } from './effects.js';
+import { updateParticles, drawParticles, updatePopAnimations, drawPopAnimations, createGameOverParticles, createGameOverEmbers } from './effects.js';
 import { drawHUD, drawBackground, drawStartOverlay, drawGameOverOverlay } from './ui.js';
 
 let canvas, ctx;
@@ -50,6 +50,7 @@ function startGame() {
   state.shooter.next = getRandomBubble(state);
   newRowCooldown = 10000; // 10 seconds before first new row
   levelUpTimer = 0;
+  gameOverEmberCooldown = 0;
   resumeAudio();
 }
 
@@ -127,7 +128,24 @@ function gameLoop(timestamp) {
   requestAnimationFrame(gameLoop);
 }
 
+let gameOverEmberCooldown = 0;
+
 function update(dt) {
+  // Always update particles (so game-over embers keep rendering)
+  updateParticles(state.particles, dt);
+  updatePopAnimations(state.popAnimations, dt);
+
+  if (state.state === 'gameover') {
+    state.gameOverTimer += dt;
+    // Spawn ember particles periodically during game over
+    gameOverEmberCooldown -= dt;
+    if (gameOverEmberCooldown <= 0) {
+      state.particles.push(...createGameOverEmbers(CANVAS_WIDTH, CANVAS_HEIGHT, 3));
+      gameOverEmberCooldown = 0.4 + Math.random() * 0.3;
+    }
+    return;
+  }
+
   if (state.state !== 'playing') return;
 
   // Update flying bubble
@@ -136,10 +154,6 @@ function update(dt) {
     // Check level progression
     checkLevelUp();
   }
-
-  // Update particles
-  updateParticles(state.particles, dt);
-  updatePopAnimations(state.popAnimations, dt);
 
   // Update falling bubbles
   updateFallingBubbles(state, dt);
@@ -183,10 +197,13 @@ function checkLevelUp() {
 
 function gameOver() {
   state.state = 'gameover';
+  state.gameOverTimer = 0;
   if (state.score > state.highScore) {
     state.highScore = state.score;
     localStorage.setItem('bubbleShooterHighScore', String(state.score));
   }
+  // Spawn dramatic burst particles at center
+  state.particles.push(...createGameOverParticles(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 40, 60));
   playGameOver();
 }
 
@@ -228,7 +245,9 @@ function render() {
   }
 
   if (state.state === 'gameover') {
-    drawGameOverOverlay(ctx, state);
+    drawGameOverOverlay(ctx, state, state.gameOverTimer);
+    // Draw ember particles on top of the overlay
+    drawParticles(ctx, state.particles);
   }
 }
 

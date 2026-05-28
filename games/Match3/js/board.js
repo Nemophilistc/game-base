@@ -255,10 +255,14 @@ export class Board {
       }
     }
 
-    // 清除宝石
+    // 标记宝石为matched（不立即移除，等动画播放完再清除）
     for (const key of toClear) {
       const [r, c] = key.split(',').map(Number);
-      this.grid[r][c] = null;
+      const gem = this.grid[r][c];
+      if (gem) {
+        gem.matched = true;
+        gem.matchTime = Date.now();
+      }
     }
 
     const multiplier = CHAIN_MULTIPLIERS[Math.min(this.chainLevel, CHAIN_MULTIPLIERS.length - 1)];
@@ -339,7 +343,7 @@ export class Board {
         }
       }
     }
-    // 清除
+    // 标记为matched（不立即移除，等动画播放完再清除）
     const cleared = [];
     for (const key of toClear) {
       const [cr, cc] = key.split(',').map(Number);
@@ -347,10 +351,11 @@ export class Board {
       if (gem) {
         this.clearStats[gem.type] = (this.clearStats[gem.type] || 0) + 1;
         cleared.push({ r: cr, c: cc, color: gem.color, type: gem.type });
+        gem.matched = true;
+        gem.matchTime = Date.now();
       } else {
         cleared.push({ r: cr, c: cc, color: '#fff', type: 0 });
       }
-      this.grid[cr][cc] = null;
     }
     const multiplier = CHAIN_MULTIPLIERS[Math.min(this.chainLevel, CHAIN_MULTIPLIERS.length - 1)];
     const totalScore = cleared.length * BASE_SCORE_PER_GEM * multiplier;
@@ -441,6 +446,18 @@ export class Board {
       }
     }
     return false;
+  }
+
+  // 最终清除已标记matched的宝石（动画播放完后调用）
+  finalizeClear() {
+    for (let r = 0; r < GRID_ROWS; r++) {
+      for (let c = 0; c < GRID_COLS; c++) {
+        const gem = this.grid[r][c];
+        if (gem && gem.matched) {
+          this.grid[r][c] = null;
+        }
+      }
+    }
   }
 
   // 重置连锁等级

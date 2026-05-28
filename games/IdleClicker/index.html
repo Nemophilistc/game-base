@@ -936,6 +936,7 @@
         <button class="tab-btn" data-tab="achievements">成就</button>
         <button class="tab-btn" data-tab="stats">统计</button>
         <button class="tab-btn" data-tab="settings">设置</button>
+        <button class="tab-btn" data-tab="help">玩法说明</button>
       </div>
 
       <!-- 建筑标签页 -->
@@ -1002,6 +1003,44 @@
           <button class="settings-btn" id="import-btn">导入存档</button>
           <input type="file" id="import-file" accept=".json" style="display: none;">
           <button class="settings-btn danger" id="reset-btn">重置游戏</button>
+        </div>
+      </div>
+
+      <!-- 玩法说明标签页 -->
+      <div class="tab-content" id="help-tab">
+        <div style="line-height: 1.8; font-size: 15px;">
+          <h3 style="color: #ffd700; font-size: 20px; margin-bottom: 15px; text-align: center;">
+            欢迎来到放置挂机大亨！
+          </h3>
+
+          <div style="background: rgba(255, 215, 0, 0.1); border-left: 3px solid #ffd700; padding: 12px 16px; border-radius: 0 8px 8px 0; margin-bottom: 15px;">
+            <strong style="color: #ffd700;">基本操作</strong><br>
+            点击左侧的金币按钮即可赚取金币。你的点击价值会随着升级而提高，每次点击赚取更多金币！
+          </div>
+
+          <div style="background: rgba(74, 222, 128, 0.1); border-left: 3px solid #4ade80; padding: 12px 16px; border-radius: 0 8px 8px 0; margin-bottom: 15px;">
+            <strong style="color: #4ade80;">购买建筑</strong><br>
+            在「建筑」标签页中购买各种建筑。每种建筑每秒都会自动为你产出金币。拥有的建筑越多，产出越高。建筑左绿色边框表示买得起，红色则需要攒更多金币。
+          </div>
+
+          <div style="background: rgba(168, 85, 247, 0.1); border-left: 3px solid #a855f7; padding: 12px 16px; border-radius: 0 8px 8px 0; margin-bottom: 15px;">
+            <strong style="color: #a855f7;">升级强化</strong><br>
+            在「升级」标签页中解锁各种升级。升级可以大幅提升建筑产出效率、增加点击价值，甚至解锁全新功能。
+          </div>
+
+          <div style="background: rgba(255, 165, 0, 0.1); border-left: 3px solid #ffa500; padding: 12px 16px; border-radius: 0 8px 8px 0; margin-bottom: 15px;">
+            <strong style="color: #ffa500;">成就奖励</strong><br>
+            在「成就」标签页中查看所有成就。达成成就可以获得永久加成，提升所有金币产出。完成越多成就，收益越高！
+          </div>
+
+          <div style="background: rgba(96, 165, 250, 0.1); border-left: 3px solid #60a5fa; padding: 12px 16px; border-radius: 0 8px 8px 0; margin-bottom: 15px;">
+            <strong style="color: #60a5fa;">离线收益</strong><br>
+            关闭游戏后再次打开，你会获得离线期间积累的金币收益，不用担心错过任何产出。
+          </div>
+
+          <div style="background: rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 12px 16px; text-align: center; color: #aaa; margin-top: 20px;">
+            提示：善用 x1/x10/x100 批量购买功能，可以更高效地管理你的金币投资。
+          </div>
         </div>
       </div>
     </div>

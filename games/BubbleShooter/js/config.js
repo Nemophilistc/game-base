@@ -63,6 +63,7 @@ export function createGameState() {
     shakeTimer: 0,
     highScore: parseInt(localStorage.getItem('bubbleShooterHighScore') || '0'),
     colorCount: 4,     // starts with 4 colors, increases with level
+    gameOverTimer: 0,  // time since game over (seconds), for fade-in animation
   };
 }
 

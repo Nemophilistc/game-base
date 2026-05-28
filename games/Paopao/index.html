@@ -67,6 +67,84 @@
             text-align: center;
         }
 
+        /* ===== 菜单覆盖层 ===== */
+        #ui {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 500;
+        }
+        #ui.active {
+            display: flex;
+        }
+        .menu {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+            padding: 40px 50px;
+            background: rgba(15, 25, 60, 0.95);
+            border: 2px solid #00d4ff;
+            border-radius: 16px;
+            box-shadow: 0 0 40px rgba(0, 212, 255, 0.4);
+            backdrop-filter: blur(12px);
+            min-width: 280px;
+        }
+        .menu.show {
+            display: flex;
+        }
+        .menu h2 {
+            color: #00d4ff;
+            font-size: 32px;
+            margin-bottom: 8px;
+            text-shadow: 0 0 15px rgba(0, 212, 255, 0.6);
+        }
+        .menu p {
+            color: #ccc;
+            font-size: 16px;
+        }
+        .menu button {
+            padding: 12px 36px;
+            font-size: 18px;
+            color: #fff;
+            background: linear-gradient(135deg, #0077cc, #00aaff);
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: transform 0.15s, box-shadow 0.15s;
+            box-shadow: 0 0 12px rgba(0, 170, 255, 0.4);
+            min-width: 180px;
+        }
+        .menu button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(0, 170, 255, 0.7);
+        }
+        .difficulty {
+            display: flex;
+            gap: 10px;
+            margin: 8px 0;
+        }
+        .diff-btn {
+            padding: 8px 18px !important;
+            font-size: 14px !important;
+            min-width: auto !important;
+            background: rgba(0, 100, 180, 0.4) !important;
+            border: 1px solid rgba(0, 212, 255, 0.3) !important;
+            border-radius: 8px !important;
+            box-shadow: none !important;
+        }
+        .diff-btn.selected {
+            background: linear-gradient(135deg, #0077cc, #00aaff) !important;
+            border-color: #00d4ff !important;
+            box-shadow: 0 0 12px rgba(0, 170, 255, 0.5) !important;
+        }
+
         #loading {
             position: fixed;
             top: 0;
@@ -110,14 +188,42 @@
     </div>
 
     <div id="gameContainer">
-        <div id="hud">
-            <div class="hud-item">❤️ <span id="lives">3</span></div>
-            <div class="hud-item">💣 <span id="bombs">1</span></div>
-            <div class="hud-item">🔥 <span id="fire">1</span></div>
-            <div class="hud-item">⚡ <span id="speed">1</span></div>
-            <div class="hud-item">🏆 <span id="score">0</span></div>
+        <div id="hud" style="display:none;">
+            <div class="hud-item"><span id="hudLives"></span></div>
+            <div class="hud-item">🏆 <span id="hudScore">得分: 0</span></div>
+            <div class="hud-item">👾 <span id="hudEnemies">敌人: 3</span></div>
         </div>
         <canvas id="gameCanvas"></canvas>
+    </div>
+
+    <!-- 菜单覆盖层 -->
+    <div id="ui">
+        <div id="startMenu" class="menu show">
+            <h2>泡泡堂</h2>
+            <div class="difficulty">
+                <button class="diff-btn selected" data-diff="easy">简单</button>
+                <button class="diff-btn" data-diff="normal">普通</button>
+                <button class="diff-btn" data-diff="hard">困难</button>
+            </div>
+            <button id="btnStart">开始游戏</button>
+        </div>
+        <div id="pauseMenu" class="menu">
+            <h2>暂停</h2>
+            <button id="btnResume">继续游戏</button>
+            <button id="btnQuit">返回菜单</button>
+        </div>
+        <div id="winMenu" class="menu">
+            <h2>胜利!</h2>
+            <p id="winMsg"></p>
+            <button id="btnNext">下一关</button>
+            <button id="btnWinMenu">返回菜单</button>
+        </div>
+        <div id="loseMenu" class="menu">
+            <h2>失败</h2>
+            <p id="loseMsg"></p>
+            <button id="btnRetry">重试</button>
+            <button id="btnLoseMenu">返回菜单</button>
+        </div>
     </div>
 
     <div id="controls">

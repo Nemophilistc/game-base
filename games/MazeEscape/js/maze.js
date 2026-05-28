@@ -191,6 +191,106 @@ export class Maze {
         }
     }
 
+    // Validate that the maze is solvable: player can reach exit by collecting keys and unlocking doors
+    validateSolvability(keyPositions) {
+        const exitRow = this.rows - 1;
+        const exitCol = this.cols - 1;
+        const keySet = new Set(keyPositions.map(p => `${p.row},${p.col}`));
+        const collectedKeyPositions = new Set();
+        const unlockedDoorIndices = new Set();
+
+        for (let iter = 0; iter <= this.doors.length + 1; iter++) {
+            // BFS from start with currently unlocked doors
+            const reachable = this._bfsReachable(0, 0, unlockedDoorIndices);
+
+            // Check if exit is reachable
+            if (reachable.has(`${exitRow},${exitCol}`)) return true;
+
+            // Collect keys in reachable area
+            let foundNewKey = false;
+            for (const k of keySet) {
+                if (reachable.has(k) && !collectedKeyPositions.has(k)) {
+                    collectedKeyPositions.add(k);
+                    foundNewKey = true;
+                }
+            }
+
+            // Try to unlock doors we can reach (if we have spare keys)
+            let unlockedNew = false;
+            for (let i = 0; i < this.doors.length; i++) {
+                if (unlockedDoorIndices.has(i)) continue;
+                if (collectedKeyPositions.size - unlockedDoorIndices.size <= 0) break;
+
+                const d = this.doors[i];
+                if (reachable.has(`${d.row},${d.col}`)) {
+                    unlockedDoorIndices.add(i);
+                    unlockedNew = true;
+                }
+            }
+
+            // No progress possible = unsolvable
+            if (!foundNewKey && !unlockedNew) return false;
+        }
+
+        return false;
+    }
+
+    // BFS from start, treating locked (not-yet-unlocked) doors as walls
+    _bfsReachable(startRow, startCol, unlockedDoorIndices) {
+        const reachable = new Set();
+        const queue = [[startRow, startCol]];
+        reachable.add(`${startRow},${startCol}`);
+
+        const allDirs = [
+            { dir: 'N', dr: -1, dc: 0 },
+            { dir: 'S', dr: 1, dc: 0 },
+            { dir: 'E', dr: 0, dc: 1 },
+            { dir: 'W', dr: 0, dc: -1 },
+        ];
+        const opp = { N: 'S', S: 'N', E: 'W', W: 'E' };
+
+        while (queue.length > 0) {
+            const [row, col] = queue.shift();
+            const cell = this.getCell(row, col);
+
+            for (const { dir, dr, dc } of allDirs) {
+                if (cell.walls[dir]) continue;
+
+                // Check for locked door on current cell
+                if (cell.doorDir === dir && cell.locked) {
+                    const doorIdx = this._findDoorIndex(row, col, dir);
+                    if (doorIdx === -1 || !unlockedDoorIndices.has(doorIdx)) continue;
+                }
+
+                const nr = row + dr;
+                const nc = col + dc;
+
+                // Check for locked door on adjacent cell (approaching from other side)
+                const adj = this.getCell(nr, nc);
+                if (adj && adj.doorDir === opp[dir] && adj.locked) {
+                    const doorIdx = this._findDoorIndex(nr, nc, opp[dir]);
+                    if (doorIdx === -1 || !unlockedDoorIndices.has(doorIdx)) continue;
+                }
+
+                const key = `${nr},${nc}`;
+                if (!reachable.has(key)) {
+                    reachable.add(key);
+                    queue.push([nr, nc]);
+                }
+            }
+        }
+
+        return reachable;
+    }
+
+    _findDoorIndex(row, col, dir) {
+        for (let i = 0; i < this.doors.length; i++) {
+            const d = this.doors[i];
+            if (d.row === row && d.col === col && d.dir === dir) return i;
+        }
+        return -1;
+    }
+
     _shuffle(arr) {
         for (let i = arr.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));

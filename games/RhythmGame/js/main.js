@@ -68,6 +68,11 @@ class RhythmGame {
       if (e.repeat) return;
       const key = e.key.toLowerCase();
 
+      // 阻止游戏按键触发浏览器默认行为（如书签、地址栏等）
+      if (CONFIG.KEYS.includes(key)) {
+        e.preventDefault();
+      }
+
       // 菜单状态
       if (this.state === 'menu') {
         if (key === '1') this._startGame('easy');

@@ -192,10 +192,25 @@ export class UI {
           scale = 0.3 + Math.sin(time * 0.01) * 0.1;
         }
 
+        // matched宝石：闪烁+缩小动画
+        let matchAlpha = 1;
+        let matchScale = 1;
+        let matchGlowBoost = 0;
+        if (gem.matched) {
+          const elapsed = time - (gem.matchTime || time);
+          const t = Math.min(elapsed / 400, 1); // 400ms动画
+          // 快速闪烁
+          matchGlowBoost = (0.5 + Math.sin(elapsed * 0.03) * 0.5) * 20;
+          // 逐渐缩小并淡出
+          matchScale = 1 - t * 0.5;
+          matchAlpha = 1 - t * 0.6;
+          scale = matchScale;
+        }
+
         ctx.save();
         ctx.translate(cx, cy);
         ctx.scale(scale, scale);
-        ctx.globalAlpha = gem.alpha;
+        ctx.globalAlpha = gem.alpha * matchAlpha;
 
         // 发光背景
         const glowGrad = ctx.createRadialGradient(0, 0, radius * 0.3, 0, 0, radius * 1.2);
@@ -207,9 +222,9 @@ export class UI {
         ctx.fill();
 
         // 宝石主体 - 圆角矩形
-        ctx.fillStyle = gem.color;
-        ctx.shadowColor = gem.glow;
-        ctx.shadowBlur = gem.selected ? 15 : 8;
+        ctx.fillStyle = gem.matched ? '#fff' : gem.color;
+        ctx.shadowColor = gem.matched ? '#fff' : gem.glow;
+        ctx.shadowBlur = (gem.selected ? 15 : 8) + matchGlowBoost;
         ctx.beginPath();
         ctx.roundRect(-radius, -radius, radius * 2, radius * 2, radius * 0.4);
         ctx.fill();

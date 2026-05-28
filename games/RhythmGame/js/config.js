@@ -2,8 +2,8 @@
 export const CONFIG = {
   // 轨道设置
   LANE_COUNT: 4,
-  KEYS: ['d', 'f', 'j', 'k'],
-  KEY_LABELS: ['D', 'F', 'J', 'K'],
+  KEYS: ['s', 'f', 'j', 'k'],
+  KEY_LABELS: ['S', 'F', 'J', 'K'],
 
   // 轨道颜色
   LANE_COLORS: ['#ff4488', '#44aaff', '#44ff88', '#ffaa44'],

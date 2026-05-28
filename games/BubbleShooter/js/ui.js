@@ -171,57 +171,172 @@ export function drawStartOverlay(ctx, state) {
   ctx.fillText('v1.0 | ES Modules', CANVAS_WIDTH / 2, CANVAS_HEIGHT - 20);
 }
 
-export function drawGameOverOverlay(ctx, state) {
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+export function drawGameOverOverlay(ctx, state, timer) {
+  const t = timer || 0;
+  const fadeDuration = 0.8;
+  const overlayAlpha = Math.min(0.85, (t / fadeDuration) * 0.85);
+  const flashAlpha = t < 0.3 ? Math.max(0, (0.3 - t) / 0.3) * 0.35 : 0;
+
+  // Dark overlay with fade-in
+  ctx.globalAlpha = overlayAlpha;
+  ctx.fillStyle = '#0a0008';
   ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+  ctx.globalAlpha = 1;
 
-  drawGlassPanel(ctx, CANVAS_WIDTH / 2 - 170, 140, 340, 380);
-
-  ctx.fillStyle = '#FF4444';
-  ctx.font = 'bold 44px "Microsoft YaHei", Arial';
-  ctx.textAlign = 'center';
-  ctx.fillText('游戏结束', CANVAS_WIDTH / 2, 220);
-
-  // Stats
-  ctx.fillStyle = '#FFD700';
-  ctx.font = 'bold 28px "Microsoft YaHei", Arial';
-  ctx.fillText(`最终得分`, CANVAS_WIDTH / 2, 275);
-
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = 'bold 40px Arial';
-  ctx.fillText(`${state.score}`, CANVAS_WIDTH / 2, 325);
-
-  ctx.fillStyle = '#FF8800';
-  ctx.font = '18px "Microsoft YaHei", Arial';
-  ctx.fillText(`到达第 ${state.level} 关`, CANVAS_WIDTH / 2, 365);
-
-  // New high score
-  if (state.score >= state.highScore && state.score > 0) {
-    ctx.fillStyle = '#FF4444';
-    ctx.font = 'bold 20px "Microsoft YaHei", Arial';
-    const pulse = 0.7 + Math.sin(Date.now() / 200) * 0.3;
-    ctx.globalAlpha = pulse;
-    ctx.fillText('新纪录!', CANVAS_WIDTH / 2, 400);
+  // Red flash burst (brief)
+  if (flashAlpha > 0) {
+    ctx.globalAlpha = flashAlpha;
+    const flashGrad = ctx.createRadialGradient(
+      CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2, 0,
+      CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2, CANVAS_WIDTH * 0.7
+    );
+    flashGrad.addColorStop(0, '#FF2200');
+    flashGrad.addColorStop(0.6, '#880000');
+    flashGrad.addColorStop(1, 'transparent');
+    ctx.fillStyle = flashGrad;
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
     ctx.globalAlpha = 1;
-  } else {
-    ctx.fillStyle = '#888';
-    ctx.font = '16px "Microsoft YaHei", Arial';
-    ctx.fillText(`最高分: ${state.highScore}`, CANVAS_WIDTH / 2, 400);
   }
 
-  // Restart button
-  const btnX = CANVAS_WIDTH / 2 - 80;
-  const btnY = 430;
-  const btnGrad = ctx.createLinearGradient(btnX, btnY, btnX, btnY + 50);
-  btnGrad.addColorStop(0, '#FF6600');
-  btnGrad.addColorStop(1, '#CC3300');
-  ctx.fillStyle = btnGrad;
-  ctx.beginPath();
-  ctx.roundRect(btnX, btnY, 160, 50, 12);
-  ctx.fill();
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = 'bold 22px "Microsoft YaHei", Arial';
-  ctx.fillText('重新开始', CANVAS_WIDTH / 2, btnY + 33);
+  // Dark vignette (always on after overlay fades in)
+  if (overlayAlpha > 0.3) {
+    const vigAlpha = Math.min(0.5, (overlayAlpha - 0.3) * 0.8);
+    ctx.globalAlpha = vigAlpha;
+    const vignette = ctx.createRadialGradient(
+      CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2, CANVAS_WIDTH * 0.15,
+      CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2, CANVAS_WIDTH * 0.65
+    );
+    vignette.addColorStop(0, 'transparent');
+    vignette.addColorStop(1, '#000000');
+    ctx.fillStyle = vignette;
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    ctx.globalAlpha = 1;
+  }
+
+  // === Staggered content: each element fades in with a delay ===
+
+  // Glass panel (appears at t=0.2)
+  const panelAlpha = clamp01((t - 0.2) / 0.4);
+  if (panelAlpha > 0) {
+    ctx.globalAlpha = panelAlpha;
+    drawGlassPanel(ctx, CANVAS_WIDTH / 2 - 170, 140, 340, 380);
+    ctx.globalAlpha = 1;
+  }
+
+  // "游戏结束" title (appears at t=0.3, slides down)
+  const titleAlpha = clamp01((t - 0.3) / 0.4);
+  if (titleAlpha > 0) {
+    const titleSlide = (1 - titleAlpha) * -30;
+    ctx.globalAlpha = titleAlpha;
+    ctx.fillStyle = '#FF3333';
+    ctx.font = 'bold 48px "Microsoft YaHei", Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('游戏结束', CANVAS_WIDTH / 2, 220 + titleSlide);
+
+    // Red glow behind title
+    ctx.globalAlpha = titleAlpha * 0.15;
+    ctx.shadowColor = '#FF0000';
+    ctx.shadowBlur = 30;
+    ctx.fillText('游戏结束', CANVAS_WIDTH / 2, 220 + titleSlide);
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+  }
+
+  // Score label (appears at t=0.5)
+  const scoreLabelAlpha = clamp01((t - 0.5) / 0.3);
+  if (scoreLabelAlpha > 0) {
+    ctx.globalAlpha = scoreLabelAlpha;
+    ctx.fillStyle = '#FFD700';
+    ctx.font = 'bold 24px "Microsoft YaHei", Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('最终得分', CANVAS_WIDTH / 2, 275);
+    ctx.globalAlpha = 1;
+  }
+
+  // Score number (appears at t=0.6, scales up)
+  const scoreAlpha = clamp01((t - 0.6) / 0.35);
+  if (scoreAlpha > 0) {
+    const scaleUp = 0.5 + scoreAlpha * 0.5; // scales from 0.5 to 1.0
+    ctx.save();
+    ctx.globalAlpha = scoreAlpha;
+    ctx.translate(CANVAS_WIDTH / 2, 325);
+    ctx.scale(scaleUp, scaleUp);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 44px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(`${state.score}`, 0, 0);
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  }
+
+  // Level reached (appears at t=0.75)
+  const levelAlpha = clamp01((t - 0.75) / 0.3);
+  if (levelAlpha > 0) {
+    ctx.globalAlpha = levelAlpha;
+    ctx.fillStyle = '#FF8800';
+    ctx.font = '18px "Microsoft YaHei", Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(`到达第 ${state.level} 关`, CANVAS_WIDTH / 2, 365);
+    ctx.globalAlpha = 1;
+  }
+
+  // High score / New record (appears at t=0.9)
+  const hsAlpha = clamp01((t - 0.9) / 0.3);
+  if (hsAlpha > 0) {
+    ctx.globalAlpha = hsAlpha;
+    if (state.score >= state.highScore && state.score > 0) {
+      ctx.fillStyle = '#FF4444';
+      ctx.font = 'bold 22px "Microsoft YaHei", Arial';
+      const pulse = 0.6 + Math.sin(Date.now() / 200) * 0.4;
+      ctx.globalAlpha = hsAlpha * pulse;
+      ctx.fillText('新纪录!', CANVAS_WIDTH / 2, 400);
+    } else {
+      ctx.fillStyle = '#888';
+      ctx.font = '16px "Microsoft YaHei", Arial';
+      ctx.fillText(`最高分: ${state.highScore}`, CANVAS_WIDTH / 2, 400);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // Restart button (appears at t=1.2, with glow pulse)
+  const btnAlpha = clamp01((t - 1.2) / 0.4);
+  if (btnAlpha > 0) {
+    const btnX = CANVAS_WIDTH / 2 - 80;
+    const btnY = 430;
+    const btnW = 160;
+    const btnH = 50;
+    const glowPulse = 0.4 + Math.sin(Date.now() / 400) * 0.3;
+
+    // Outer glow
+    ctx.globalAlpha = btnAlpha * glowPulse;
+    ctx.shadowColor = '#FF6600';
+    ctx.shadowBlur = 20;
+    ctx.fillStyle = '#FF6600';
+    ctx.beginPath();
+    ctx.roundRect(btnX - 3, btnY - 3, btnW + 6, btnH + 6, 14);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+
+    // Button body
+    ctx.globalAlpha = btnAlpha;
+    const btnGrad = ctx.createLinearGradient(btnX, btnY, btnX, btnY + btnH);
+    btnGrad.addColorStop(0, '#FF7700');
+    btnGrad.addColorStop(1, '#CC3300');
+    ctx.fillStyle = btnGrad;
+    ctx.beginPath();
+    ctx.roundRect(btnX, btnY, btnW, btnH, 12);
+    ctx.fill();
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 22px "Microsoft YaHei", Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('重新开始', CANVAS_WIDTH / 2, btnY + 33);
+    ctx.globalAlpha = 1;
+  }
+}
+
+function clamp01(v) {
+  return Math.max(0, Math.min(1, v));
 }
 
 function drawGlassPanel(ctx, x, y, w, h) {

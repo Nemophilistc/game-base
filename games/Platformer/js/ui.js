@@ -263,6 +263,9 @@ export class UI {
         ctx.fillText('游戏结束', W / 2, H / 2 - 40);
         this._drawBtn(ctx, W / 2, H / 2 + 20, 180, 44, '重试', '#FF9800', '#FFA726');
         this._drawBtn(ctx, W / 2, H / 2 + 80, 180, 44, '返回菜单', '#F44336', '#EF5350');
+        ctx.font = '14px "Microsoft YaHei", sans-serif';
+        ctx.fillStyle = '#AAA';
+        ctx.fillText('按 Enter 重试 | ESC 返回菜单', W / 2, H / 2 + 125);
         ctx.textAlign = 'left';
     }
 

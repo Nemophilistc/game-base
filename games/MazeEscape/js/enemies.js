@@ -220,12 +220,12 @@ export class EnemyManager {
 
     _findPositions(maze, count, playerRow, playerCol) {
         const positions = [];
-        const minDist = Math.floor(maze.rows * 0.4);
+        const minDist = Math.max(4, Math.floor(maze.rows * 0.3));
 
         for (let r = 0; r < maze.rows; r++) {
             for (let c = 0; c < maze.cols; c++) {
-                const dist = Math.abs(r - playerRow) + Math.abs(c - playerCol);
-                if (dist >= minDist && dist > 3) {
+                const eucDist = Math.sqrt((r - playerRow) ** 2 + (c - playerCol) ** 2);
+                if (eucDist >= minDist) {
                     positions.push({ row: r, col: c });
                 }
             }

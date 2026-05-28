@@ -132,7 +132,7 @@ export class CombatSystem {
     let atk = this.getEnemyAttack();
 
     if (this._isDefending) {
-      atk = Math.floor(atk * CONFIG.COMBAT.DEFENSE_DEF_MULTIPLIER);
+      atk = Math.floor(atk * CONFIG.COMBAT.DEFENSE_MULTIPLIER);
       this._isDefending = false;
       msgs.push(`🛡️ 防御减伤！${this.enemy.name} 的攻击被削弱了。`);
     }
