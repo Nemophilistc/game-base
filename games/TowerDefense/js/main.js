@@ -2,7 +2,7 @@
 
 import {
   CANVAS_WIDTH, CANVAS_HEIGHT,
-  TOWER_TYPES, MAPS
+  TOWER_TYPES, MAPS, PASSIVE_INCOME
 } from './config.js';
 import { initAudio, playBuild, playUpgrade, playSell, playWaveStart, playVictory, playDefeat, playEnemyDeath } from './sound.js';
 import { initMap, drawMap, canBuild, placeTower, removeTower, selectMap } from './map.js';
@@ -20,6 +20,7 @@ let particles = [];
 let waveManager;
 let lastTime = 0;
 let gameStarted = false;
+let passiveTimer = 0;
 
 // ---- 粒子效果 ----
 class Particle {
@@ -261,6 +262,13 @@ function update(dt) {
 
       playWaveStart();
     }
+  }
+
+  // 被动收入
+  passiveTimer += dt;
+  if (passiveTimer >= 1) {
+    passiveTimer -= 1;
+    uiState.gold += PASSIVE_INCOME;
   }
 
   // 更新UI状态

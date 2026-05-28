@@ -8,8 +8,9 @@ export const CANVAS_WIDTH = GRID_COLS * CELL_SIZE;
 export const CANVAS_HEIGHT = GRID_ROWS * CELL_SIZE;
 
 // 游戏初始资源
-export const INITIAL_GOLD = 300;
+export const INITIAL_GOLD = 500;
 export const INITIAL_LIVES = 20;
+export const PASSIVE_INCOME = 5; // 每秒被动收入
 
 // 多地图路径定义
 export const MAPS = [
@@ -136,61 +137,61 @@ export const TOWER_TYPES = {
 // 敌人类型定义
 export const ENEMY_TYPES = {
   normal: {
-    name: '普通',
+    name: '步兵',
     hp: 80,
     speed: 1.0,
-    reward: 25,
+    reward: 50,
     color: '#e74c3c',
-    size: 0.6,
+    size: 0.7,
     armor: 0
   },
   fast: {
-    name: '快速',
+    name: '刺客',
     hp: 50,
     speed: 2.0,
-    reward: 30,
+    reward: 60,
     color: '#f39c12',
-    size: 0.5,
+    size: 0.6,
     armor: 0
   },
   flying: {
-    name: '飞行',
+    name: '飞龙',
     hp: 60,
     speed: 1.2,
-    reward: 35,
+    reward: 70,
     color: '#9b59b6',
-    size: 0.55,
+    size: 0.65,
     armor: 0,
     flying: true
   },
   armored: {
-    name: '装甲',
+    name: '重甲',
     hp: 200,
     speed: 0.7,
-    reward: 40,
+    reward: 80,
     color: '#7f8c8d',
-    size: 0.75,
+    size: 0.85,
     armor: 15
   },
   healer: {
-    name: '治疗',
+    name: '萨满',
     hp: 100,
     speed: 0.9,
-    reward: 50,
+    reward: 100,
     color: '#2ecc71',
-    size: 0.6,
+    size: 0.7,
     armor: 0,
     healAmount: 5,
     healRange: 2,
     healInterval: 1.5
   },
   boss: {
-    name: 'Boss',
+    name: '魔王',
     hp: 800,
     speed: 0.5,
-    reward: 200,
+    reward: 400,
     color: '#c0392b',
-    size: 1.0,
+    size: 1.2,
     armor: 10
   }
 };

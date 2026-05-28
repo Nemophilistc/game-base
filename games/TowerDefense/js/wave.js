@@ -51,7 +51,7 @@ function generateWaveConfigs() {
       number: w,
       enemies,
       hpMultiplier: hpMult,
-      bonusGold: w * 15
+      bonusGold: w * 40
     });
   }
 
