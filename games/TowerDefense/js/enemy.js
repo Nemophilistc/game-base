@@ -43,6 +43,21 @@ export class Enemy {
     this.healInterval = def.healInterval || 0;
     this.healCooldown = 0;
 
+    // 新敌人类型属性
+    this.stealth = def.stealth || false;
+    this.stealthAlpha = this.stealth ? 0.15 : 1;
+    this.summonType = def.summonType || null;
+    this.summonInterval = def.summonInterval || 0;
+    this.summonCooldown = def.summonInterval || 0;
+    this.maxSummons = def.maxSummons || 0;
+    this.summonCount = 0;
+    this.shieldHp = def.shieldHp || 0;
+    this.maxShieldHp = def.shieldHp || 0;
+    this.shieldRegen = def.shieldRegen || 0;
+    this.explosionDamage = def.explosionDamage || 0;
+    this.explosionRadius = (def.explosionRadius || 0) * CELL_SIZE;
+    this.exploded = false;
+
     this.alive = true;
     this.reachedEnd = false;
 
@@ -103,6 +118,26 @@ export class Enemy {
       }
     }
 
+    // 隐身闪烁
+    if (this.stealth) {
+      this.stealthAlpha = 0.1 + Math.sin(Date.now() * 0.005) * 0.05;
+    }
+
+    // 盾卫护盾回复
+    if (this.maxShieldHp > 0 && this.shieldHp < this.maxShieldHp) {
+      this.shieldHp = Math.min(this.maxShieldHp, this.shieldHp + this.shieldRegen * dt);
+    }
+
+    // 召唤师召唤
+    if (this.summonType && this.summonCount < this.maxSummons) {
+      this.summonCooldown -= dt;
+      if (this.summonCooldown <= 0) {
+        this.summonCooldown = this.summonInterval;
+        this.summonCount++;
+        this._shouldSummon = true;
+      }
+    }
+
     // 沿路径移动
     if (this.pathIndex < pathPixels.length - 1) {
       const target = pathPixels[this.pathIndex + 1];
@@ -152,9 +187,27 @@ export class Enemy {
   }
 
   takeDamage(amount, ignoreArmor = false) {
+    // 隐身被攻击时短暂现身
+    if (this.stealth) {
+      this.stealthAlpha = 0.8;
+      this._revealTimer = 1.5;
+    }
+
+    // 护盾先承受伤害
     let dmg = amount;
+    if (this.shieldHp > 0) {
+      if (dmg <= this.shieldHp) {
+        this.shieldHp -= dmg;
+        this.hitFlash = 1;
+        return;
+      } else {
+        dmg -= this.shieldHp;
+        this.shieldHp = 0;
+      }
+    }
+
     if (!ignoreArmor && this.armor > 0) {
-      dmg = Math.max(1, amount - this.armor);
+      dmg = Math.max(1, dmg - this.armor);
     }
     this.hp -= dmg;
     this.hitFlash = 1;
@@ -241,6 +294,16 @@ export class Enemy {
     const flash = this.hitFlash > 0;
     const bob = Math.sin(this.walkCycle) * 2;
 
+    // 隐身透明度
+    if (this.stealth) {
+      if (this._revealTimer > 0) {
+        this._revealTimer -= 1 / 60;
+        ctx.globalAlpha = 0.8;
+      } else {
+        ctx.globalAlpha = this.stealthAlpha;
+      }
+    }
+
     // 按类型绘制
     switch (this.type) {
       case 'normal': this._drawSoldier(ctx, s, flash, now, bob); break;
@@ -249,10 +312,16 @@ export class Enemy {
       case 'armored': this._drawTank(ctx, s, flash, now, bob); break;
       case 'healer': this._drawPriest(ctx, s, flash, now, bob); break;
       case 'boss': this._drawDemon(ctx, s, flash, now); break;
+      case 'assassin': this._drawAssassin(ctx, s, flash, now, bob); break;
+      case 'summoner': this._drawSummoner(ctx, s, flash, now, bob); break;
+      case 'shield': this._drawShieldGuard(ctx, s, flash, now, bob); break;
+      case 'bomber': this._drawBomber(ctx, s, flash, now, bob); break;
       default:
         ctx.fillStyle = flash ? '#fff' : this.color;
         ctx.beginPath(); ctx.arc(0, 0, s / 2, 0, Math.PI * 2); ctx.fill();
     }
+
+    ctx.globalAlpha = 1;
 
     // 减速视觉效果
     if (this.slowTimer > 0) {
@@ -288,6 +357,19 @@ export class Enemy {
     }
 
     ctx.restore();
+
+    // 护盾条
+    if (this.alive && this.maxShieldHp > 0 && this.shieldHp > 0) {
+      const sBarW = s * 1.4;
+      const sBarH = 3;
+      const sBarX = this.x - sBarW / 2;
+      const sBarY = this.y - s / 2 - 17;
+      const shieldRatio = this.shieldHp / this.maxShieldHp;
+      ctx.fillStyle = 'rgba(0,0,0,0.7)';
+      ctx.fillRect(sBarX - 1, sBarY - 1, sBarW + 2, sBarH + 2);
+      ctx.fillStyle = '#3498db';
+      ctx.fillRect(sBarX, sBarY, sBarW * shieldRatio, sBarH);
+    }
 
     // 血条
     if (this.alive && this.hp < this.maxHp) {
@@ -894,5 +976,271 @@ export class Enemy {
       ctx.arc(px, py, 2 + Math.sin(now * 0.01 + i) * 1, 0, Math.PI * 2);
       ctx.fill();
     }
+  }
+
+  // --- 暗影刺客：半隐身 + 双匕 + 暗影拖尾 ---
+  _drawAssassin(ctx, s, flash, now, bob) {
+    const c = flash ? '#fff' : this.color;
+    const legSwing = Math.sin(this.walkCycle) * 5;
+
+    // 暗影拖尾
+    ctx.fillStyle = 'rgba(44,62,80,0.15)';
+    for (let i = 1; i <= 3; i++) {
+      ctx.beginPath();
+      ctx.arc(-this.facingX * i * 4, -this.facingY * i * 4, s / 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // 腿
+    ctx.fillStyle = flash ? '#ddd' : '#1a1a2e';
+    ctx.fillRect(-3, s / 4 + bob, 2, 5 + legSwing);
+    ctx.fillRect(2, s / 4 + bob, 2, 5 - legSwing);
+
+    // 身体（紧身忍者服）
+    ctx.fillStyle = c;
+    ctx.beginPath();
+    ctx.ellipse(0, bob, s / 3.2, s / 2.2, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 头（面罩）
+    ctx.fillStyle = flash ? '#eee' : '#1a1a2e';
+    ctx.beginPath(); ctx.arc(0, -s / 3 + bob, s / 4, 0, Math.PI * 2); ctx.fill();
+
+    // 护额
+    ctx.fillStyle = flash ? '#ccc' : '#7f8c8d';
+    ctx.fillRect(-s / 3.5, -s / 3 - 2 + bob, s / 1.8, 3);
+
+    // 发光红眼
+    ctx.fillStyle = '#ff1744';
+    ctx.shadowColor = '#ff1744';
+    ctx.shadowBlur = 6;
+    ctx.beginPath(); ctx.arc(-2.5, -s / 3 + bob, 1.8, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(2.5, -s / 3 + bob, 1.8, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // 双匕首
+    ctx.fillStyle = flash ? '#eee' : '#90A4AE';
+    // 左匕
+    ctx.beginPath();
+    ctx.moveTo(-s / 3, -s / 6 + bob);
+    ctx.lineTo(-s / 2 - 6, -s / 3 + bob);
+    ctx.lineTo(-s / 3 + 1, 0 + bob);
+    ctx.closePath();
+    ctx.fill();
+    // 右匕
+    ctx.beginPath();
+    ctx.moveTo(s / 3, -s / 6 + bob);
+    ctx.lineTo(s / 2 + 6, -s / 3 + bob);
+    ctx.lineTo(s / 3 - 1, 0 + bob);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // --- 召唤师：法阵 + 暗能量 + 召唤光环 ---
+  _drawSummoner(ctx, s, flash, now, bob) {
+    const c = flash ? '#fff' : this.color;
+    const pulse = Math.sin(now * 0.004) * 3;
+
+    // 召唤法阵
+    ctx.strokeStyle = `rgba(142,68,173,${0.3 + Math.sin(now * 0.005) * 0.15})`;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(0, s / 3, s / 2 + 4 + pulse, 0, Math.PI * 2);
+    ctx.stroke();
+    // 法阵内圈
+    ctx.beginPath();
+    ctx.arc(0, s / 3, s / 3, 0, Math.PI * 2);
+    ctx.stroke();
+    // 法阵符号
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2 + now * 0.002;
+      const r = s / 2 + 4 + pulse;
+      ctx.fillStyle = `rgba(142,68,173,0.4)`;
+      ctx.beginPath();
+      ctx.arc(Math.cos(a) * r, s / 3 + Math.sin(a) * r, 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // 身体（长袍）
+    ctx.fillStyle = c;
+    ctx.beginPath();
+    ctx.moveTo(-s / 2.5, s / 3 + bob);
+    ctx.lineTo(-s / 4, -s / 4 + bob);
+    ctx.quadraticCurveTo(0, -s / 3 + bob, s / 4, -s / 4 + bob);
+    ctx.lineTo(s / 2.5, s / 3 + bob);
+    ctx.closePath();
+    ctx.fill();
+
+    // 暗能量纹路
+    ctx.strokeStyle = flash ? 'rgba(255,255,255,0.3)' : 'rgba(142,68,173,0.5)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(-s / 5, 0 + bob);
+    ctx.lineTo(0, s / 5 + bob);
+    ctx.lineTo(s / 5, 0 + bob);
+    ctx.stroke();
+
+    // 头
+    ctx.fillStyle = flash ? '#eee' : '#9B59B6';
+    ctx.beginPath(); ctx.arc(0, -s / 3 - 2 + bob, s / 4.5, 0, Math.PI * 2); ctx.fill();
+
+    // 兜帽
+    ctx.fillStyle = flash ? '#ddd' : '#6C3483';
+    ctx.beginPath();
+    ctx.arc(0, -s / 3 - 4 + bob, s / 3.5, Math.PI + 0.3, -0.3);
+    ctx.closePath();
+    ctx.fill();
+
+    // 发光紫眼
+    ctx.fillStyle = '#E040FB';
+    ctx.shadowColor = '#E040FB';
+    ctx.shadowBlur = 5;
+    ctx.beginPath(); ctx.arc(-2, -s / 3 - 2 + bob, 2, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(2, -s / 3 - 2 + bob, 2, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // 召唤计数指示
+    if (this.summonCount > 0) {
+      ctx.fillStyle = 'rgba(142,68,173,0.6)';
+      ctx.font = 'bold 8px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(`×${this.summonCount}`, 0, s / 2 + 6);
+    }
+  }
+
+  // --- 盾卫：大盾 + 全身甲 + 护盾光环 ---
+  _drawShieldGuard(ctx, s, flash, now, bob) {
+    const c = flash ? '#fff' : this.color;
+    const legSwing = Math.sin(this.walkCycle) * 3;
+
+    // 腿
+    ctx.fillStyle = flash ? '#ddd' : '#1565C0';
+    ctx.fillRect(-4, s / 4 + bob, 3, 6 + legSwing);
+    ctx.fillRect(2, s / 4 + bob, 3, 6 - legSwing);
+
+    // 身体（重甲）
+    ctx.fillStyle = c;
+    ctx.beginPath();
+    ctx.roundRect(-s / 2.8, -s / 5 + bob, s * 0.7, s * 0.6, 3);
+    ctx.fill();
+
+    // 装甲板高光
+    ctx.fillStyle = flash ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.1)';
+    ctx.beginPath();
+    ctx.roundRect(-s / 2.8, -s / 5 + bob, s * 0.7, s * 0.3, 3);
+    ctx.fill();
+
+    // 大盾牌（左手）
+    const shieldPulse = this.shieldHp > 0 ? Math.sin(now * 0.006) * 2 : 0;
+    ctx.fillStyle = flash ? '#ddd' : '#1E88E5';
+    ctx.beginPath();
+    ctx.ellipse(-s / 2 - 4, 2 + bob, 8, 12 + shieldPulse, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // 盾牌十字
+    ctx.strokeStyle = flash ? '#eee' : '#90CAF9';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-s / 2 - 4, -6 + bob);
+    ctx.lineTo(-s / 2 - 4, 10 + bob);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-s / 2 - 10, 2 + bob);
+    ctx.lineTo(-s / 2 + 2, 2 + bob);
+    ctx.stroke();
+
+    // 护盾能量光环
+    if (this.shieldHp > 0) {
+      const shieldAlpha = 0.2 + (this.shieldHp / this.maxShieldHp) * 0.3;
+      ctx.strokeStyle = `rgba(52,152,219,${shieldAlpha})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, bob, s / 2 + 3, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // 头盔（全封闭式）
+    ctx.fillStyle = flash ? '#eee' : '#0D47A1';
+    ctx.beginPath(); ctx.arc(0, -s / 3 + bob, s / 3.8, 0, Math.PI * 2); ctx.fill();
+    // 面罩缝
+    ctx.strokeStyle = flash ? '#ccc' : '#0a3d91';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(-s / 5, -s / 3 + bob);
+    ctx.lineTo(s / 5, -s / 3 + bob);
+    ctx.stroke();
+
+    // 眼缝
+    ctx.fillStyle = flash ? '#fff' : '#64B5F6';
+    ctx.fillRect(-4, -s / 3 - 1 + bob, 3, 2);
+    ctx.fillRect(2, -s / 3 - 1 + bob, 3, 2);
+  }
+
+  // --- 爆破兵：炸药包 + 火信 + 危险标记 ---
+  _drawBomber(ctx, s, flash, now, bob) {
+    const c = flash ? '#fff' : this.color;
+    const legSwing = Math.sin(this.walkCycle) * 4;
+    const fuseGlow = 0.5 + Math.sin(now * 0.01) * 0.4;
+
+    // 腿
+    ctx.fillStyle = flash ? '#ddd' : '#BF360C';
+    ctx.fillRect(-3, s / 4 + bob, 2, 5 + legSwing);
+    ctx.fillRect(2, s / 4 + bob, 2, 5 - legSwing);
+
+    // 身体
+    ctx.fillStyle = c;
+    ctx.beginPath();
+    ctx.ellipse(0, bob, s / 3, s / 2.3, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 炸药包（背后）
+    ctx.fillStyle = flash ? '#ddd' : '#4E342E';
+    ctx.beginPath();
+    ctx.roundRect(-s / 5, -s / 6 + bob, s * 0.4, s * 0.45, 3);
+    ctx.fill();
+    // TNT标记
+    ctx.fillStyle = flash ? '#fff' : '#FF5722';
+    ctx.font = 'bold 7px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('TNT', 0.5, s / 8 + bob);
+
+    // 头
+    ctx.fillStyle = flash ? '#eee' : '#FFCCBC';
+    ctx.beginPath(); ctx.arc(0, -s / 3 + bob, s / 4.5, 0, Math.PI * 2); ctx.fill();
+
+    // 头巾
+    ctx.fillStyle = flash ? '#ddd' : '#D84315';
+    ctx.beginPath();
+    ctx.arc(0, -s / 3 - 1 + bob, s / 4, Math.PI, 0);
+    ctx.fill();
+
+    // 火信（头顶，闪烁）
+    ctx.strokeStyle = flash ? '#ccc' : '#5D4037';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(0, -s / 2 + bob);
+    ctx.lineTo(2, -s / 2 - 6 + bob);
+    ctx.stroke();
+    // 火花
+    ctx.fillStyle = `rgba(255,${150 + Math.random() * 100},0,${fuseGlow})`;
+    ctx.shadowColor = '#FF6F00';
+    ctx.shadowBlur = 4;
+    ctx.beginPath();
+    ctx.arc(2, -s / 2 - 6 + bob, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // 危险标记
+    ctx.fillStyle = `rgba(255,87,34,${0.4 + Math.sin(now * 0.008) * 0.3})`;
+    ctx.font = 'bold 10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('⚠', 0, s / 2 + 8 + bob);
+
+    // 眼睛（疯狂）
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(-2.5, -s / 3 + bob, 2, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(2.5, -s / 3 + bob, 2, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.arc(-2, -s / 3 + bob, 1, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(3, -s / 3 + bob, 1, 0, Math.PI * 2); ctx.fill();
   }
 }

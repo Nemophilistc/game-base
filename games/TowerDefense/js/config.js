@@ -139,7 +139,7 @@ export const ENEMY_TYPES = {
     name: '步兵',
     hp: 80,
     speed: 1.0,
-    reward: 50,
+    reward: 30,
     color: '#e74c3c',
     size: 0.7,
     armor: 0
@@ -148,7 +148,7 @@ export const ENEMY_TYPES = {
     name: '刺客',
     hp: 50,
     speed: 2.0,
-    reward: 60,
+    reward: 35,
     color: '#f39c12',
     size: 0.6,
     armor: 0
@@ -157,7 +157,7 @@ export const ENEMY_TYPES = {
     name: '飞龙',
     hp: 60,
     speed: 1.2,
-    reward: 70,
+    reward: 40,
     color: '#9b59b6',
     size: 0.65,
     armor: 0,
@@ -167,7 +167,7 @@ export const ENEMY_TYPES = {
     name: '重甲',
     hp: 200,
     speed: 0.7,
-    reward: 80,
+    reward: 50,
     color: '#7f8c8d',
     size: 0.85,
     armor: 15
@@ -176,7 +176,7 @@ export const ENEMY_TYPES = {
     name: '萨满',
     hp: 100,
     speed: 0.9,
-    reward: 100,
+    reward: 60,
     color: '#2ecc71',
     size: 0.7,
     armor: 0,
@@ -188,10 +188,54 @@ export const ENEMY_TYPES = {
     name: '魔王',
     hp: 800,
     speed: 0.5,
-    reward: 400,
+    reward: 300,
     color: '#c0392b',
     size: 1.2,
     armor: 10
+  },
+  assassin: {
+    name: '暗影刺客',
+    hp: 40,
+    speed: 2.5,
+    reward: 45,
+    color: '#2c3e50',
+    size: 0.55,
+    armor: 0,
+    stealth: true
+  },
+  summoner: {
+    name: '召唤师',
+    hp: 120,
+    speed: 0.6,
+    reward: 80,
+    color: '#8E44AD',
+    size: 0.75,
+    armor: 0,
+    summonType: 'normal',
+    summonInterval: 4,
+    maxSummons: 3
+  },
+  shield: {
+    name: '盾卫',
+    hp: 150,
+    speed: 0.8,
+    reward: 55,
+    color: '#2980b9',
+    size: 0.8,
+    armor: 5,
+    shieldHp: 80,
+    shieldRegen: 2
+  },
+  bomber: {
+    name: '爆破兵',
+    hp: 70,
+    speed: 1.3,
+    reward: 40,
+    color: '#d35400',
+    size: 0.65,
+    armor: 0,
+    explosionDamage: 1,
+    explosionRadius: 2
   }
 };
 

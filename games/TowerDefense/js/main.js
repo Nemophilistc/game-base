@@ -17,6 +17,7 @@ let towers = [];
 let enemies = [];
 let projectiles = [];
 let particles = [];
+let goldPopups = [];
 let waveManager;
 let lastTime = 0;
 let gameStarted = false;
@@ -49,6 +50,32 @@ class Particle {
     ctx.beginPath();
     ctx.arc(this.x, this.y, this.size * alpha, 0, Math.PI * 2);
     ctx.fill();
+  }
+}
+
+// ---- 金币飘字 ----
+class GoldPopup {
+  constructor(x, y, amount) {
+    this.x = x;
+    this.y = y;
+    this.amount = amount;
+    this.life = 1.0;
+    this.alive = true;
+  }
+
+  update(dt) {
+    this.y -= 40 * dt;
+    this.life -= dt;
+    if (this.life <= 0) this.alive = false;
+  }
+
+  draw(ctx) {
+    const alpha = Math.max(0, this.life);
+    ctx.fillStyle = `rgba(241,196,15,${alpha})`;
+    ctx.font = 'bold 14px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`+${this.amount}G`, this.x, this.y);
   }
 }
 
@@ -232,18 +259,49 @@ function update(dt) {
     uiState.score += enemy.reward;
     uiState.killCount++;
     spawnParticles(enemy.x, enemy.y, 'rgb(255,100,50)', 12);
+    goldPopups.push(new GoldPopup(enemy.x, enemy.y - 20, enemy.reward));
     playEnemyDeath();
+
+    // 爆破兵死亡爆炸
+    if (enemy.explosionDamage > 0 && !enemy.exploded) {
+      enemy.exploded = true;
+      // 对周围塔造成伤害（减少塔的血量或直接移除低级塔）
+      // 这里改为对周围敌人也造成溅射伤害
+      for (const other of enemies) {
+        if (other === enemy || !other.alive) continue;
+        const dx = other.x - enemy.x;
+        const dy = other.y - enemy.y;
+        if (Math.sqrt(dx * dx + dy * dy) <= enemy.explosionRadius) {
+          other.takeDamage(30, true);
+        }
+      }
+      // 爆炸特效
+      spawnParticles(enemy.x, enemy.y, 'rgb(255,150,0)', 20);
+      spawnParticles(enemy.x, enemy.y, 'rgb(255,50,0)', 15);
+    }
   }
 
-  // 更新粒子
-  for (const p of particles) {
-    p.update(dt);
+  // 召唤师召唤
+  for (const enemy of enemies) {
+    if (enemy.alive && enemy._shouldSummon) {
+      enemy._shouldSummon = false;
+      const summon = new Enemy(enemy.summonType, 1);
+      summon.pathIndex = Math.max(0, enemy.pathIndex - 1);
+      summon.x = enemy.x + (Math.random() - 0.5) * 20;
+      summon.y = enemy.y + (Math.random() - 0.5) * 20;
+      enemies.push(summon);
+    }
   }
+
+  // 更新粒子和飘字
+  for (const p of particles) p.update(dt);
+  for (const g of goldPopups) g.update(dt);
 
   // 清理
   enemies = enemies.filter(e => e.alive || e.deathTimer < 0.3);
   projectiles = projectiles.filter(p => p.alive);
   particles = particles.filter(p => p.alive);
+  goldPopups = goldPopups.filter(g => g.alive);
 
   // 波次生成完毕，检查是否全部消灭
   if (waveResult === 'spawning_done') {
@@ -296,9 +354,10 @@ function render() {
   }
 
   // 绘制粒子
-  for (const p of particles) {
-    p.draw(ctx);
-  }
+  for (const p of particles) p.draw(ctx);
+
+  // 绘制金币飘字
+  for (const g of goldPopups) g.draw(ctx);
 
   // 绘制UI（覆盖层）
   drawUI(ctx);

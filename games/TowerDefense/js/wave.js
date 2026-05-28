@@ -30,17 +30,22 @@ function generateWaveConfigs() {
         let type = 'normal';
         const roll = Math.random();
 
-        if (w >= 3 && roll < 0.3) {
-          type = 'fast';
-        }
-        if (w >= 6 && roll < 0.2) {
-          type = 'flying';
-        }
-        if (w >= 10 && roll < 0.15) {
-          type = 'armored';
-        }
-        if (w >= 14 && roll < 0.1) {
+        if (w >= 18 && roll < 0.06) {
+          type = 'summoner';
+        } else if (w >= 15 && roll < 0.1) {
+          type = 'shield';
+        } else if (w >= 12 && roll < 0.12) {
+          type = 'bomber';
+        } else if (w >= 9 && roll < 0.15) {
+          type = 'assassin';
+        } else if (w >= 7 && roll < 0.2) {
           type = 'healer';
+        } else if (w >= 5 && roll < 0.25) {
+          type = 'armored';
+        } else if (w >= 3 && roll < 0.3) {
+          type = 'flying';
+        } else if (w >= 2 && roll < 0.35) {
+          type = 'fast';
         }
 
         enemies.push({ type, delay: i * 0.6 });
