@@ -11,18 +11,29 @@ function generateWaveConfigs() {
     const enemies = [];
     const hpMult = 1 + (w - 1) * 0.15; // 每波血量增加15%
 
-    // 基础数量随波次增加
-    const baseCount = Math.min(5 + Math.floor(w * 1.2), 30);
+    // 基础数量随波次增加（后期大量敌人）
+    const baseCount = Math.min(8 + Math.floor(w * 2.2), 70);
 
     // 每5波Boss
     if (w % 5 === 0) {
-      // Boss波
-      for (let i = 0; i < Math.floor(w / 10) + 1; i++) {
+      // Boss波 - Boss数量随波次增加
+      const bossCount = Math.floor(w / 10) + 1;
+      for (let i = 0; i < bossCount; i++) {
         enemies.push({ type: 'boss', delay: i * 2 });
       }
-      // 配一些小兵
-      for (let i = 0; i < baseCount / 2; i++) {
-        enemies.push({ type: 'normal', delay: i * 0.8 });
+      // 配大量小兵护卫Boss
+      const guardCount = Math.floor(baseCount * 0.8);
+      for (let i = 0; i < guardCount; i++) {
+        let type = 'normal';
+        const roll = Math.random();
+        if (w >= 15 && roll < 0.15) type = 'shield';
+        else if (w >= 12 && roll < 0.2) type = 'bomber';
+        else if (w >= 9 && roll < 0.25) type = 'assassin';
+        else if (w >= 7 && roll < 0.3) type = 'healer';
+        else if (w >= 5 && roll < 0.35) type = 'armored';
+        else if (w >= 3 && roll < 0.4) type = 'flying';
+        else if (w >= 2 && roll < 0.5) type = 'fast';
+        enemies.push({ type, delay: i * 0.5 });
       }
     } else {
       // 根据波次解锁不同敌人
