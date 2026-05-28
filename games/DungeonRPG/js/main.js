@@ -64,6 +64,13 @@ function init() {
 
   // 事件监听
   window.addEventListener('keydown', handleKeyDown);
+  canvas.addEventListener('click', () => {
+    if (gameState === STATE.MENU) {
+      startNewGame(menuSelection);
+    } else if (gameState === STATE.GAME_OVER || gameState === STATE.VICTORY) {
+      resetGame();
+    }
+  });
 
   // 开始游戏循环
   requestAnimationFrame(gameLoop);

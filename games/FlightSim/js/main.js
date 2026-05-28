@@ -41,6 +41,17 @@ function init() {
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
 
+    // Click to start/restart
+    canvas.addEventListener('click', () => {
+        if (gameState === STATE.MENU) {
+            sound.init();
+            sound.resume();
+            startGame();
+        } else if (gameState === STATE.GAMEOVER) {
+            startGame();
+        }
+    });
+
     // Touch controls for mobile
     setupTouchControls();
 
