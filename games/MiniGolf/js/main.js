@@ -4,7 +4,8 @@
 
 import { CANVAS_MAX_W, CANVAS_MAX_H, COURSE_W, COURSE_H, BALL_RADIUS,
          MAX_DRAG, MAX_SPEED, COURSE_NAMES, COURSES } from './config.js';
-import * as Sound from './sound.js';
+import { resumeAudio, playHit, playWallBounce, playBumper, playHoleIn, playWaterSplash, playSandThud, playWindmillHit } from './sound.js';
+const Sound = { resumeAudio, playHit, playWallBounce, playBumper, playHoleIn, playWaterSplash, playSandThud, playWindmillHit };
 import { createBall, resetBall, isBallMoving, applyShot, step, simulateTrajectory } from './physics.js';
 import { drawCourse, drawWalls, drawBumpers, drawWindmill, drawBall, drawAimLine } from './course.js';
 import { createTrail, updateTrail, drawTrail, createParticles, updateParticles,
@@ -50,7 +51,7 @@ function init() {
     createStartOverlay((s, e) => {
         startHole = s;
         endHole = e;
-        startGame();
+        doStartGame();
     });
 
     requestAnimationFrame(gameLoop);
@@ -80,7 +81,7 @@ function toCanvasY(y) { return canvasOffY + y * scale; }
 function toCourseX(cx) { return (cx - canvasOffX) / scale; }
 function toCourseY(cy) { return (cy - canvasOffY) / scale; }
 
-function startGame() {
+function doStartGame() {
     Sound.resumeAudio();
     totalStrokes = 0;
     holeScores = [];
@@ -217,7 +218,16 @@ function nextHole() {
     currentHole++;
     if (currentHole >= endHole) {
         const totalPar = holeScores.reduce((sum, _, i) => sum + COURSES[startHole + i].par, 0);
-        showGameComplete(totalStrokes, totalPar, holeScores, startHole);
+        showGameComplete(totalStrokes, totalPar, holeScores, startHole, () => {
+            gameStarted = false;
+            course = null;
+            ball = null;
+            createStartOverlay((s, e) => {
+                startHole = s;
+                endHole = e;
+                doStartGame();
+            });
+        });
         gameStarted = false;
     } else {
         transitioning = true;
