@@ -455,6 +455,13 @@
                 </div>
             </div>
 
+            <!-- 卡片面板 -->
+            <div id="cardPanel" class="panel-card" style="display:none">
+                <div id="cardTitle" class="panel-title">卡牌</div>
+                <div id="cardText" style="font-size:16px;color:#fbbf24;line-height:1.5;padding:8px 0"></div>
+                <div id="cardResult" style="font-size:14px;color:#94a3b8;margin-top:4px"></div>
+            </div>
+
             <!-- 监狱面板 -->
             <div id="jailPanel" class="panel-card">
                 <div class="panel-title">监狱</div>
@@ -1739,71 +1746,57 @@ class UI {
         }
     }
 
-    // 绘制建筑标记
+    // 绘制地产所有权 + 建筑标记
     drawBuildings(players) {
         const ctx = this.ctx;
         for (const player of players) {
             if (player.bankrupt) continue;
             for (const sid of player.properties) {
-                const houses = player.getHousesOn(sid);
-                if (houses <= 0) continue;
-
                 const sq = SQUARES[sid];
-                if (!sq || sq.type !== 'property') continue;
+                if (!sq) continue;
 
                 const r = this.cellRects[sid];
-                let bx, by;
+                const cx = r.x + r.w / 2;
+                const cy = r.y + r.h / 2;
+                const houses = player.getHousesOn(sid);
 
-                // 建筑显示在色带对面
-                if (sid >= 1 && sid <= 9) {
-                    bx = r.x + 16;
-                    by = r.y + r.h - 40;
-                } else if (sid >= 11 && sid <= 19) {
-                    bx = r.x + 16;
-                    by = r.y + 16;
-                } else if (sid >= 21 && sid <= 29) {
-                    bx = r.x + 16;
-                    by = r.y + 16;
-                } else if (sid >= 31 && sid <= 39) {
-                    bx = r.x + r.w - 56;
-                    by = r.y + 16;
-                } else {
-                    continue;
-                }
-
-                if (houses === 5) {
-                    // 酒店 - 玩家颜色大矩形 + H标记
-                    ctx.fillStyle = player.color;
-                    ctx.fillRect(bx, by, 48, 36);
-                    ctx.strokeStyle = 'rgba(0,0,0,0.5)';
-                    ctx.lineWidth = 2;
-                    ctx.strokeRect(bx, by, 48, 36);
-                    ctx.fillStyle = '#fff';
-                    ctx.font = 'bold 24px Arial';
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    ctx.fillText('H', bx + 24, by + 20);
-                } else {
-                    // 房屋 - 玩家颜色小方块 + 屋顶三角
-                    for (let h = 0; h < houses; h++) {
-                        const hx = bx + h * 26;
-                        // 方块底座
-                        ctx.fillStyle = player.color;
-                        ctx.fillRect(hx, by + 6, 22, 16);
-                        ctx.strokeStyle = 'rgba(0,0,0,0.3)';
-                        ctx.lineWidth = 1;
-                        ctx.strokeRect(hx, by + 6, 22, 16);
-                        // 屋顶三角
+                if (sq.type === 'property' && houses > 0) {
+                    if (houses === 5) {
+                        // 酒店 - 大红色方块 + H
+                        ctx.fillStyle = '#e74c3c';
+                        ctx.fillRect(cx - 28, cy - 20, 56, 40);
+                        ctx.strokeStyle = '#c0392b';
+                        ctx.lineWidth = 2;
+                        ctx.strokeRect(cx - 28, cy - 20, 56, 40);
+                        ctx.fillStyle = '#fff';
+                        ctx.font = 'bold 28px Arial';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText('H', cx, cy + 2);
+                    } else {
+                        // 房屋 - 绿色圆圈 + 数字
+                        ctx.fillStyle = '#27ae60';
                         ctx.beginPath();
-                        ctx.moveTo(hx - 2, by + 8);
-                        ctx.lineTo(hx + 11, by);
-                        ctx.lineTo(hx + 24, by + 8);
-                        ctx.closePath();
-                        ctx.fillStyle = player.color;
+                        ctx.arc(cx, cy, 24, 0, Math.PI * 2);
                         ctx.fill();
-                        ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+                        ctx.strokeStyle = '#1e8449';
+                        ctx.lineWidth = 2;
                         ctx.stroke();
+                        ctx.fillStyle = '#fff';
+                        ctx.font = 'bold 22px Arial';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(String(houses), cx, cy + 2);
                     }
+                } else {
+                    // 无建筑 - 玩家颜色小圆点标记所有权
+                    ctx.fillStyle = player.color;
+                    ctx.beginPath();
+                    ctx.arc(r.x + r.w - 16, r.y + r.h - 16, 12, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = '#fff';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
                 }
             }
         }
@@ -2453,10 +2446,22 @@ class MonopolyGame {
         const card = type === 'chance' ? this.cards.drawChance() : this.cards.drawChest();
         const result = this.cards.resolve(card, player, this.board, this.players);
 
+        // 在右侧面板显示卡牌
+        const cardPanel = document.getElementById('cardPanel');
+        const cardTitle = document.getElementById('cardTitle');
+        const cardText = document.getElementById('cardText');
+        const cardResult = document.getElementById('cardResult');
+        cardTitle.textContent = type === 'chance' ? '机会' : '命运';
+        cardTitle.style.color = type === 'chance' ? '#FFA07A' : '#FFB6C1';
+        cardText.textContent = card.text;
+        cardResult.textContent = '';
+        cardPanel.style.display = 'block';
+
         this.ui.showMessage(card.text, 2500);
 
         // 执行卡牌动作
         setTimeout(() => {
+            let resultText = '';
             for (const action of result.actions) {
                 switch (action.type) {
                     case 'moveTo':
@@ -2472,10 +2477,12 @@ class MonopolyGame {
 
                     case 'collect':
                         player.receive(action.amount);
+                        resultText += `获得 $${action.amount}  `;
                         break;
 
                     case 'pay':
                         player.pay(action.amount);
+                        resultText += `支付 $${action.amount}  `;
                         this._checkBankrupt(player);
                         break;
 
@@ -2484,6 +2491,7 @@ class MonopolyGame {
                         if (from && !from.bankrupt) {
                             from.pay(action.amount);
                             player.receive(action.amount);
+                            resultText += `从 ${from.name} 获得 $${action.amount}  `;
                             this._checkBankrupt(from);
                         }
                         break;
@@ -2491,14 +2499,17 @@ class MonopolyGame {
                     case 'goToJail':
                         player.goToJail();
                         Sound.jail();
+                        cardResult.textContent = '入狱！';
                         this._endAction();
                         return;
 
                     case 'getOutOfJail':
                         player.getOutOfJailCards++;
+                        resultText += '获得出狱卡  ';
                         break;
                 }
             }
+            if (resultText) cardResult.textContent = resultText;
             this._endAction();
         }, 2000);
     }
@@ -2530,6 +2541,7 @@ class MonopolyGame {
         document.getElementById('actionPanel').style.display = 'none';
         document.getElementById('buildPanel').style.display = 'none';
         document.getElementById('tradePanel').style.display = 'none';
+        document.getElementById('cardPanel').style.display = 'none';
 
         // 双数再掷（但刚从监狱出来不算）
         if (this.dice1 === this.dice2 && !this.wasInJail && !player.inJail && !player.bankrupt) {

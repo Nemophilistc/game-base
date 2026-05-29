@@ -1620,6 +1620,7 @@ function drawCelebration(ctx, celeb, toCanvasX, toCanvasY, holeX, holeY) {
 
 // Start overlay
 function createStartOverlay(onStart) {
+    console.log('[MiniGolf] createStartOverlay called');
     // Create overlay background
     var overlay = document.createElement('div');
     overlay.id = 'startOverlay';
@@ -1683,6 +1684,7 @@ function createStartOverlay(onStart) {
 
     overlay.appendChild(content);
     document.body.appendChild(overlay);
+    console.log('[MiniGolf] overlay appended, startBtn:', startBtn, 'parent:', startBtn.parentNode);
 
     // Course selection handlers
     var courseBtns = content.querySelectorAll('.course-btn');
@@ -1705,7 +1707,9 @@ function createStartOverlay(onStart) {
     }
 
     // Start button click handler
+    console.log('[MiniGolf] attaching onclick to startBtn:', startBtn);
     startBtn.onclick = function() {
+        console.log('[MiniGolf] START BUTTON CLICKED! courseMode:', courseMode);
         overlay.style.opacity = '0';
         overlay.style.pointerEvents = 'none';
         overlay.style.transition = 'opacity 0.4s';
@@ -1715,8 +1719,10 @@ function createStartOverlay(onStart) {
         }, 400);
         var s = (courseMode === 'back') ? 9 : 0;
         var en = (courseMode === 'front') ? 9 : 18;
+        console.log('[MiniGolf] calling onStart with:', s, en);
         onStart(s, en);
     };
+    console.log('[MiniGolf] onclick attached, startBtn.onclick:', startBtn.onclick);
 
     return overlay;
 }
@@ -1834,7 +1840,9 @@ let gameStarted, transitioning;
 let lastBallPos; // for water reset
 
 function init() {
+    console.log('[MiniGolf] init() called, stack:', new Error().stack);
     canvas = document.getElementById('gameCanvas');
+    console.log('[MiniGolf] canvas:', canvas);
     ctx = canvas.getContext('2d');
 
     resize();
@@ -1856,12 +1864,15 @@ function init() {
     gameStarted = false;
     transitioning = false;
 
+    console.log('[MiniGolf] calling createStartOverlay...');
     createStartOverlay((s, e) => {
+        console.log('[MiniGolf] onStart callback fired! startHole:', s, 'endHole:', e);
         startHole = s;
         endHole = e;
         startGame();
     });
 
+    console.log('[MiniGolf] starting gameLoop');
     requestAnimationFrame(gameLoop);
 }
 
@@ -1890,11 +1901,13 @@ function toCourseX(cx) { return (cx - canvasOffX) / scale; }
 function toCourseY(cy) { return (cy - canvasOffY) / scale; }
 
 function startGame() {
+    console.log('[MiniGolf] startGame() called, startHole:', startHole, 'endHole:', endHole);
     Sound.resumeAudio();
     totalStrokes = 0;
     holeScores = [];
     currentHole = startHole;
     gameStarted = true;
+    console.log('[MiniGolf] loading hole:', currentHole);
     loadHole(currentHole);
 }
 
