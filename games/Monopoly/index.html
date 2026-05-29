@@ -43,8 +43,8 @@
             border-radius: 12px;
             box-shadow: 0 0 40px rgba(99, 102, 241, 0.3);
             cursor: pointer;
-            width: 1544px;
-            height: 1544px;
+            width: auto;
+            height: 95vh;
         }
 
         /* 右侧面板 */
@@ -385,13 +385,6 @@
         }
 
         /* 响应式 */
-        @media (max-width: 1700px) {
-            #gameCanvas {
-                width: 1200px;
-                height: 1200px;
-            }
-        }
-
         @media (max-width: 1300px) {
             #gameContainer {
                 flex-direction: column;
@@ -412,8 +405,6 @@
 
             #gameCanvas {
                 max-width: 95vw;
-                max-height: 80vh;
-                width: auto;
                 height: auto;
             }
         }
