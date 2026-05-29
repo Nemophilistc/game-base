@@ -619,7 +619,7 @@ const game = new Game();
 
 // Wait for DOM
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => game.init());
+    document.addEventListener('DOMContentLoaded', function() { game.init(); });
 } else {
     game.init();
 }

@@ -6,10 +6,10 @@ export class UI {
     constructor(canvas) {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
-        this.boardSize = 640;
-        this.cellSize = 46;
-        this.cornerSize = 64;
-        this.offset = 10;
+        this.boardSize = 920;
+        this.cellSize = 85;
+        this.cornerSize = 120;
+        this.offset = 12;
         this.playerAnimPos = {}; // 玩家动画位置
         this.diceValues = [0, 0];
         this.diceRolling = false;
@@ -18,8 +18,8 @@ export class UI {
         this.currentMessage = null;
         this.messageTimer = 0;
 
-        canvas.width = 860;
-        canvas.height = 660;
+        canvas.width = 944;
+        canvas.height = 944;
 
         this._computeLayout();
     }
@@ -103,12 +103,12 @@ export class UI {
 
         // 中心文字
         ctx.fillStyle = '#e2e8f0';
-        ctx.font = 'bold 34px Arial';
+        ctx.font = 'bold 52px Arial';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         const cx = this.boardSize / 2 + off;
-        ctx.fillText('大 富 翁', cx, this.boardSize / 2 + off - 30);
-        ctx.font = '18px Arial';
+        ctx.fillText('大 富 翁', cx, this.boardSize / 2 + off - 50);
+        ctx.font = '26px Arial';
         ctx.fillStyle = '#94a3b8';
         ctx.fillText('MONOPOLY', cx, this.boardSize / 2 + off);
 
@@ -141,7 +141,7 @@ export class UI {
 
         // 色带（地产/铁路/公用事业）
         if (sq.color) {
-            const bandSize = 14;
+            const bandSize = 24;
             ctx.fillStyle = COLOR_GROUPS[sq.color]?.css || '#666';
             if (id >= 1 && id <= 9) {
                 ctx.fillRect(r.x, r.y, r.w, bandSize); // 底边：上方色带
@@ -161,54 +161,54 @@ export class UI {
 
         const isCorner = [0, 10, 20, 30].includes(id);
         if (isCorner) {
-            ctx.font = 'bold 15px Arial';
+            ctx.font = 'bold 20px Arial';
             ctx.fillText(sq.name, r.x + r.w / 2, r.y + r.h / 2);
         } else {
             // 根据位置调整文字方向
-            ctx.font = '13px Arial';
+            ctx.font = '17px Arial';
             const cx = r.x + r.w / 2;
             const cy = r.y + r.h / 2;
 
             if (id >= 1 && id <= 9) {
                 // 底边 - 水平
-                ctx.fillText(this._truncName(sq.name, 6), cx, cy + 8);
+                ctx.fillText(this._truncName(sq.name, 7), cx, cy + 10);
                 if (sq.price) {
-                    ctx.font = '11px Arial';
+                    ctx.font = '14px Arial';
                     ctx.fillStyle = '#fbbf24';
-                    ctx.fillText('$' + sq.price, cx, cy + 22);
+                    ctx.fillText('$' + sq.price, cx, cy + 28);
                 }
             } else if (id >= 11 && id <= 19) {
                 // 左边 - 垂直
                 ctx.save();
-                ctx.translate(cx + 10, cy);
+                ctx.translate(cx + 14, cy);
                 ctx.rotate(-Math.PI / 2);
-                ctx.font = '13px Arial';
-                ctx.fillText(this._truncName(sq.name, 6), 0, 0);
+                ctx.font = '17px Arial';
+                ctx.fillText(this._truncName(sq.name, 7), 0, 0);
                 if (sq.price) {
-                    ctx.font = '11px Arial';
+                    ctx.font = '14px Arial';
                     ctx.fillStyle = '#fbbf24';
-                    ctx.fillText('$' + sq.price, 0, 16);
+                    ctx.fillText('$' + sq.price, 0, 20);
                 }
                 ctx.restore();
             } else if (id >= 21 && id <= 29) {
                 // 上边 - 水平
-                ctx.fillText(this._truncName(sq.name, 6), cx, cy - 8);
+                ctx.fillText(this._truncName(sq.name, 7), cx, cy - 10);
                 if (sq.price) {
-                    ctx.font = '11px Arial';
+                    ctx.font = '14px Arial';
                     ctx.fillStyle = '#fbbf24';
-                    ctx.fillText('$' + sq.price, cx, cy - 22);
+                    ctx.fillText('$' + sq.price, cx, cy - 28);
                 }
             } else if (id >= 31 && id <= 39) {
                 // 右边 - 垂直
                 ctx.save();
-                ctx.translate(cx - 10, cy);
+                ctx.translate(cx - 14, cy);
                 ctx.rotate(Math.PI / 2);
-                ctx.font = '13px Arial';
-                ctx.fillText(this._truncName(sq.name, 6), 0, 0);
+                ctx.font = '17px Arial';
+                ctx.fillText(this._truncName(sq.name, 7), 0, 0);
                 if (sq.price) {
-                    ctx.font = '11px Arial';
+                    ctx.font = '14px Arial';
                     ctx.fillStyle = '#fbbf24';
-                    ctx.fillText('$' + sq.price, 0, 16);
+                    ctx.fillText('$' + sq.price, 0, 20);
                 }
                 ctx.restore();
             }
@@ -246,10 +246,10 @@ export class UI {
             // 计算偏移避免重叠
             const idx = player.id;
             const offsets = [
-                { x: -13, y: -13 },
-                { x: 13, y: -13 },
-                { x: -13, y: 13 },
-                { x: 13, y: 13 }
+                { x: -22, y: -22 },
+                { x: 22, y: -22 },
+                { x: -22, y: 22 },
+                { x: 22, y: 22 }
             ];
             const off = offsets[idx] || { x: 0, y: 0 };
 
@@ -259,23 +259,23 @@ export class UI {
             // 棋子阴影
             ctx.fillStyle = 'rgba(0,0,0,0.4)';
             ctx.beginPath();
-            ctx.arc(px + 2, py + 2, 13, 0, Math.PI * 2);
+            ctx.arc(px + 3, py + 3, 22, 0, Math.PI * 2);
             ctx.fill();
 
             // 棋子主体
             ctx.fillStyle = player.color;
             ctx.beginPath();
-            ctx.arc(px, py, 13, 0, Math.PI * 2);
+            ctx.arc(px, py, 22, 0, Math.PI * 2);
             ctx.fill();
 
             // 边框
             ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 2;
+            ctx.lineWidth = 3;
             ctx.stroke();
 
             // 初始
             ctx.fillStyle = '#fff';
-            ctx.font = 'bold 13px Arial';
+            ctx.font = 'bold 20px Arial';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(player.name.charAt(0), px, py);
@@ -299,17 +299,17 @@ export class UI {
 
                 // 建筑显示在色带对面
                 if (sid >= 1 && sid <= 9) {
-                    bx = r.x + 6;
-                    by = r.y + r.h - 14;
+                    bx = r.x + 10;
+                    by = r.y + r.h - 24;
                 } else if (sid >= 11 && sid <= 19) {
-                    bx = r.x + 6;
-                    by = r.y + 6;
+                    bx = r.x + 10;
+                    by = r.y + 10;
                 } else if (sid >= 21 && sid <= 29) {
-                    bx = r.x + 6;
-                    by = r.y + 6;
+                    bx = r.x + 10;
+                    by = r.y + 10;
                 } else if (sid >= 31 && sid <= 39) {
-                    bx = r.x + r.w - 20;
-                    by = r.y + 6;
+                    bx = r.x + r.w - 34;
+                    by = r.y + 10;
                 } else {
                     continue;
                 }
@@ -317,22 +317,22 @@ export class UI {
                 if (houses === 5) {
                     // 酒店 - 红色矩形
                     ctx.fillStyle = '#e74c3c';
-                    ctx.fillRect(bx, by, 18, 14);
+                    ctx.fillRect(bx, by, 30, 22);
                     ctx.strokeStyle = '#c0392b';
                     ctx.lineWidth = 1;
-                    ctx.strokeRect(bx, by, 18, 14);
+                    ctx.strokeRect(bx, by, 30, 22);
                     ctx.fillStyle = '#fff';
-                    ctx.font = 'bold 10px Arial';
+                    ctx.font = 'bold 16px Arial';
                     ctx.textAlign = 'center';
-                    ctx.fillText('H', bx + 9, by + 10);
+                    ctx.fillText('H', bx + 15, by + 16);
                 } else {
                     // 房屋 - 绿色小方块
                     for (let h = 0; h < houses; h++) {
                         ctx.fillStyle = '#27ae60';
-                        ctx.fillRect(bx + h * 10, by, 9, 9);
+                        ctx.fillRect(bx + h * 16, by, 14, 14);
                         ctx.strokeStyle = '#1e8449';
                         ctx.lineWidth = 0.5;
-                        ctx.strokeRect(bx + h * 10, by, 9, 9);
+                        ctx.strokeRect(bx + h * 16, by, 14, 14);
                     }
                 }
             }
@@ -343,22 +343,22 @@ export class UI {
     drawDice(d1, d2, rolling = false) {
         const ctx = this.ctx;
         const cx = this.boardSize / 2 + this.offset;
-        const cy = this.boardSize / 2 + this.offset + 40;
+        const cy = this.boardSize / 2 + this.offset + 60;
 
-        this._drawDie(cx - 36, cy, d1 || 1, rolling);
-        this._drawDie(cx + 36, cy, d2 || 1, rolling);
+        this._drawDie(cx - 60, cy, d1 || 1, rolling);
+        this._drawDie(cx + 60, cy, d2 || 1, rolling);
     }
 
     _drawDie(x, y, value, rolling) {
         const ctx = this.ctx;
-        const size = 30;
+        const size = 48;
 
         ctx.fillStyle = rolling ? '#f59e0b' : '#fff';
         ctx.strokeStyle = '#333';
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 3;
 
         // 圆角矩形
-        const r = 5;
+        const r = 8;
         ctx.beginPath();
         ctx.moveTo(x - size + r, y - size);
         ctx.arcTo(x + size, y - size, x + size, y + size, r);
@@ -372,14 +372,14 @@ export class UI {
         // 点数
         if (value > 0 && value <= 6) {
             ctx.fillStyle = rolling ? '#fff' : '#333';
-            const dotR = 4;
+            const dotR = 6;
             const positions = {
                 1: [[0, 0]],
-                2: [[-10, -10], [10, 10]],
-                3: [[-10, -10], [0, 0], [10, 10]],
-                4: [[-10, -10], [10, -10], [-10, 10], [10, 10]],
-                5: [[-10, -10], [10, -10], [0, 0], [-10, 10], [10, 10]],
-                6: [[-10, -10], [10, -10], [-10, 0], [10, 0], [-10, 10], [10, 10]]
+                2: [[-16, -16], [16, 16]],
+                3: [[-16, -16], [0, 0], [16, 16]],
+                4: [[-16, -16], [16, -16], [-16, 16], [16, 16]],
+                5: [[-16, -16], [16, -16], [0, 0], [-16, 16], [16, 16]],
+                6: [[-16, -16], [16, -16], [-16, 0], [16, 0], [-16, 16], [16, 16]]
             };
             for (const [dx, dy] of positions[value]) {
                 ctx.beginPath();
@@ -408,14 +408,14 @@ export class UI {
         // 背景
         ctx.fillStyle = 'rgba(0,0,0,0.8)';
         const textWidth = ctx.measureText(msg.text).width;
-        const boxW = Math.max(200, textWidth + 40);
+        const boxW = Math.max(260, textWidth + 50);
         ctx.beginPath();
-        ctx.roundRect(cx - boxW / 2, cy - 18, boxW, 36, 8);
+        ctx.roundRect(cx - boxW / 2, cy - 22, boxW, 44, 10);
         ctx.fill();
 
         // 文字
         ctx.fillStyle = '#fbbf24';
-        ctx.font = 'bold 18px Arial';
+        ctx.font = 'bold 22px Arial';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(msg.text, cx, cy);
@@ -449,55 +449,55 @@ export class UI {
     // 渲染属性提示卡
     drawPropertyCard(square, x, y) {
         const ctx = this.ctx;
-        const w = 220;
-        const h = 260;
+        const w = 280;
+        const h = 320;
 
         // 背景
         ctx.fillStyle = 'rgba(15, 23, 42, 0.95)';
         ctx.beginPath();
-        ctx.roundRect(x, y, w, h, 10);
+        ctx.roundRect(x, y, w, h, 12);
         ctx.fill();
 
         // 色带
         if (square.color) {
             ctx.fillStyle = COLOR_GROUPS[square.color]?.css || '#666';
-            ctx.fillRect(x, y, w, 36);
+            ctx.fillRect(x, y, w, 44);
         }
 
         // 名称
         ctx.fillStyle = square.color ? '#fff' : '#e2e8f0';
-        ctx.font = 'bold 18px Arial';
+        ctx.font = 'bold 22px Arial';
         ctx.textAlign = 'center';
-        ctx.fillText(square.name, x + w / 2, y + (square.color ? 24 : 24));
+        ctx.fillText(square.name, x + w / 2, y + (square.color ? 30 : 30));
 
         if (square.type === 'property' && square.rent) {
             ctx.fillStyle = '#94a3b8';
-            ctx.font = '14px Arial';
+            ctx.font = '17px Arial';
             ctx.textAlign = 'left';
             const rents = square.rent;
             const labels = ['基本地租', '1栋房', '2栋房', '3栋房', '4栋房', '酒店'];
             for (let i = 0; i < rents.length; i++) {
-                ctx.fillText(`${labels[i]}: $${rents[i]}`, x + 15, y + 56 + i * 24);
+                ctx.fillText(`${labels[i]}: $${rents[i]}`, x + 18, y + 70 + i * 28);
             }
             ctx.fillStyle = '#fbbf24';
-            ctx.fillText(`购买价格: $${square.price}`, x + 15, y + 210);
-            ctx.fillText(`建造成本: $${this._getBuildCostForCard(square)}`, x + 15, y + 236);
+            ctx.fillText(`购买价格: $${square.price}`, x + 18, y + 255);
+            ctx.fillText(`建造成本: $${this._getBuildCostForCard(square)}`, x + 18, y + 285);
         } else if (square.type === 'railroad') {
             ctx.fillStyle = '#94a3b8';
-            ctx.font = '14px Arial';
+            ctx.font = '17px Arial';
             ctx.textAlign = 'left';
-            ctx.fillText(`购买价格: $${square.price}`, x + 15, y + 56);
-            ctx.fillText('1条铁路: $25', x + 15, y + 82);
-            ctx.fillText('2条铁路: $50', x + 15, y + 108);
-            ctx.fillText('3条铁路: $100', x + 15, y + 134);
-            ctx.fillText('4条铁路: $200', x + 15, y + 160);
+            ctx.fillText(`购买价格: $${square.price}`, x + 18, y + 70);
+            ctx.fillText('1条铁路: $25', x + 18, y + 100);
+            ctx.fillText('2条铁路: $50', x + 18, y + 130);
+            ctx.fillText('3条铁路: $100', x + 18, y + 160);
+            ctx.fillText('4条铁路: $200', x + 18, y + 190);
         } else if (square.type === 'utility') {
             ctx.fillStyle = '#94a3b8';
-            ctx.font = '14px Arial';
+            ctx.font = '17px Arial';
             ctx.textAlign = 'left';
-            ctx.fillText(`购买价格: $${square.price}`, x + 15, y + 56);
-            ctx.fillText('1个: 骰子点数 x4', x + 15, y + 82);
-            ctx.fillText('2个: 骰子点数 x10', x + 15, y + 108);
+            ctx.fillText(`购买价格: $${square.price}`, x + 18, y + 70);
+            ctx.fillText('1个: 骰子点数 x4', x + 18, y + 100);
+            ctx.fillText('2个: 骰子点数 x10', x + 18, y + 130);
         }
     }
 
