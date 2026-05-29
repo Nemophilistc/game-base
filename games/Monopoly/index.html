@@ -25,7 +25,7 @@
         #gameContainer {
             display: flex;
             gap: 16px;
-            max-width: 1400px;
+            max-width: 1920px;
             width: 100%;
             padding: 10px;
             height: 100vh;
@@ -43,8 +43,8 @@
             border-radius: 12px;
             box-shadow: 0 0 40px rgba(99, 102, 241, 0.3);
             cursor: pointer;
-            width: 944px;
-            height: 944px;
+            width: 1544px;
+            height: 1544px;
         }
 
         /* 右侧面板 */
@@ -385,6 +385,13 @@
         }
 
         /* 响应式 */
+        @media (max-width: 1700px) {
+            #gameCanvas {
+                width: 1200px;
+                height: 1200px;
+            }
+        }
+
         @media (max-width: 1300px) {
             #gameContainer {
                 flex-direction: column;
