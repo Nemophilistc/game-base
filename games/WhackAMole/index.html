@@ -1,0 +1,473 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>打地鼠</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{background:#0a0a0a;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'Segoe UI',Tahoma,sans-serif;overflow:hidden;color:#fff;user-select:none}
+        .header{font-size:42px;color:#ff9800;text-shadow:0 0 30px rgba(255,152,0,0.5);margin-bottom:10px;letter-spacing:4px}
+        .info-bar{display:flex;gap:15px;margin-bottom:12px}
+        .info-box{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:8px 16px;text-align:center;min-width:80px}
+        .info-label{font-size:11px;color:#888;margin-bottom:4px}
+        .info-val{font-size:20px;font-weight:bold;color:#ff9800}
+        #board{display:grid;grid-template-columns:repeat(3,1fr);gap:15px;padding:20px}
+        .hole{width:120px;height:120px;border-radius:50%;background:radial-gradient(ellipse,#1a1a0a,#0a0a00);border:3px solid #333;position:relative;cursor:pointer;overflow:hidden;transition:border-color 0.2s}
+        .hole:hover{border-color:#555}
+        .mole{position:absolute;bottom:-80px;left:50%;transform:translateX(-50%);font-size:56px;transition:bottom 0.2s ease-out;pointer-events:none}
+        .mole.up{bottom:10px}
+        .mole.normal{filter:none}
+        .mole.golden{filter:hue-rotate(40deg) brightness(1.5)}
+        .mole.bomb{filter:hue-rotate(0deg) brightness(0.8)}
+        .hole.hit{animation:hitFlash 0.3s}
+        @keyframes hitFlash{0%{border-color:#4caf50;box-shadow:0 0 20px #4caf50}100%{border-color:#333;box-shadow:none}}
+        .score-popup{position:absolute;top:10px;left:50%;transform:translateX(-50%);font-size:20px;font-weight:bold;pointer-events:none;animation:floatUp 0.8s forwards;z-index:10}
+        @keyframes floatUp{0%{opacity:1;top:10px}100%{opacity:0;top:-40px}}
+        .combo-text{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);font-size:48px;font-weight:bold;color:#ffd700;text-shadow:0 0 20px rgba(255,215,0,0.8);pointer-events:none;opacity:0;transition:opacity 0.3s;z-index:20}
+        .combo-text.active{opacity:1}
+        .overlay{position:fixed;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100;background:rgba(0,0,0,0.8)}
+        .overlay.hidden{display:none}
+        .overlay-title{font-size:48px;margin-bottom:15px;text-shadow:0 0 20px rgba(255,152,0,0.5)}
+        .menu-btn{background:linear-gradient(135deg,#ff9800 0%,#f57c00 100%);border:none;padding:14px 40px;font-size:18px;color:#fff;border-radius:8px;cursor:pointer;transition:all 0.3s;margin:6px}
+        .menu-btn:hover{transform:scale(1.08);box-shadow:0 0 25px rgba(255,152,0,0.5)}
+        .stats{font-size:20px;color:#aaa;margin-bottom:20px;text-align:center;line-height:1.6}
+        .help-box{margin-top:15px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:14px 20px;max-width:350px;text-align:left;font-size:13px;color:#aaa;line-height:1.8;backdrop-filter:blur(5px)}
+        .help-box h3{color:#ff9800;font-size:14px;margin-bottom:6px;text-align:center}
+        .time-bar{width:400px;height:8px;background:rgba(255,255,255,0.1);border-radius:4px;margin-bottom:10px;overflow:hidden}
+        .time-fill{height:100%;background:linear-gradient(90deg,#ff9800,#f44336);border-radius:4px;transition:width 0.5s}
+    </style>
+</head>
+<body>
+    <div class="header">打地鼠</div>
+    <div class="info-bar">
+        <div class="info-box"><div class="info-label">分数</div><div class="info-val" id="score">0</div></div>
+        <div class="info-box"><div class="info-label">连击</div><div class="info-val" id="combo">0</div></div>
+        <div class="info-box"><div class="info-label">最高</div><div class="info-val" id="high">0</div></div>
+    </div>
+    <div class="time-bar"><div class="time-fill" id="timeFill"></div></div>
+    <div id="board"></div>
+    <div class="combo-text" id="comboText"></div>
+
+    <div id="startOverlay" class="overlay">
+        <div class="overlay-title" style="color:#ff9800">打地鼠</div>
+        <button class="menu-btn" onclick="startGame()">开始游戏</button>
+        <div class="help-box">
+            <h3>操作说明</h3>
+            <div>点击冒出的地鼠得分</div>
+            <div>🐀 普通地鼠 +10分</div>
+            <div>⭐ 金色地鼠 +30分</div>
+            <div>💣 炸弹地鼠 -20分（别点！）</div>
+            <h3 style="margin-top:8px">游戏规则</h3>
+            <div>限时30秒，连续命中增加连击倍率</div>
+            <div>连击越高分数越多！</div>
+        </div>
+    </div>
+
+    <div id="endOverlay" class="overlay hidden">
+        <div class="overlay-title" style="color:#ff9800">时间到！</div>
+        <div id="endStats" class="stats"></div>
+        <button class="menu-btn" onclick="startGame()">再来一局</button>
+    </div>
+
+<script>
+// === ./config.js ===
+// 游戏常量配置
+const GAME_TIME = 30000;      // 游戏时长 30秒
+const HOLE_COUNT = 9;         // 地鼠洞数量
+
+// 地鼠类型配置（概率之和必须为1）
+const MOLE_TYPES = {
+    normal: { emoji: '🐀', probability: 0.7, baseScore: 10, duration: 1500 },
+    golden: { emoji: '⭐', probability: 0.2, baseScore: 30, duration: 1000 },
+    bomb:   { emoji: '💣', probability: 0.1, baseScore: -20, duration: 2000 }
+};
+
+// 连击倍率：每3连击+1倍，最高5倍
+const COMBO_STEP = 3;
+const MAX_MULTIPLIER = 5;
+
+// 生成速率随分数变化
+const SPAWN_RATE_BASE = 800;
+const SPAWN_RATE_MIN = 400;
+const SPAWN_RATE_SCORE_FACTOR = 2;
+
+// 地鼠冒出时长随分数缩短
+const DURATION_MIN = 600;
+const DURATION_SCORE_FACTOR = 2;
+
+// === ./sound.js ===
+// Web Audio API 音效管理
+const Sound = {
+    ctx: null,
+
+    init() {
+        if (!this.ctx) {
+            this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+    },
+
+    play(type) {
+        if (!this.ctx) return;
+        const c = this.ctx;
+        const o = c.createOscillator();
+        const g = c.createGain();
+        o.connect(g);
+        g.connect(c.destination);
+        const t = c.currentTime;
+
+        switch (type) {
+            case 'hit':
+                o.type = 'sine';
+                o.frequency.setValueAtTime(500, t);
+                o.frequency.exponentialRampToValueAtTime(800, t + 0.08);
+                g.gain.setValueAtTime(0.1, t);
+                g.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+                o.start(t);
+                o.stop(t + 0.1);
+                break;
+            case 'golden':
+                o.type = 'sine';
+                o.frequency.setValueAtTime(800, t);
+                o.frequency.setValueAtTime(1000, t + 0.05);
+                o.frequency.setValueAtTime(1200, t + 0.1);
+                g.gain.setValueAtTime(0.12, t);
+                g.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+                o.start(t);
+                o.stop(t + 0.2);
+                break;
+            case 'bomb':
+                o.type = 'sawtooth';
+                o.frequency.setValueAtTime(200, t);
+                o.frequency.exponentialRampToValueAtTime(50, t + 0.2);
+                g.gain.setValueAtTime(0.12, t);
+                g.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+                o.start(t);
+                o.stop(t + 0.2);
+                break;
+            case 'combo':
+                o.type = 'sine';
+                o.frequency.setValueAtTime(600, t);
+                o.frequency.setValueAtTime(900, t + 0.05);
+                g.gain.setValueAtTime(0.08, t);
+                g.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+                o.start(t);
+                o.stop(t + 0.12);
+                break;
+            case 'end':
+                o.type = 'sawtooth';
+                o.frequency.setValueAtTime(400, t);
+                o.frequency.exponentialRampToValueAtTime(100, t + 0.5);
+                g.gain.setValueAtTime(0.1, t);
+                g.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+                o.start(t);
+                o.stop(t + 0.5);
+                break;
+        }
+    }
+};
+
+// === ./moles.js ===
+
+// 地鼠状态数组，null表示空洞
+let moles = Array(HOLE_COUNT).fill(null);
+
+/** 重置所有地鼠（就地修改，保持引用不变） */
+function resetMoles() {
+    for (let i = 0; i < HOLE_COUNT; i++) moles[i] = null;
+}
+
+/**
+ * 生成一只地鼠
+ * @param {number} score - 当前分数，影响普通地鼠冒出时长
+ * @returns {number|null} 被选中的洞索引，无空洞时返回null
+ */
+function spawnMole(score) {
+    const empty = [];
+    for (let i = 0; i < HOLE_COUNT; i++) {
+        if (!moles[i]) empty.push(i);
+    }
+    if (empty.length === 0) return null;
+
+    const idx = empty[Math.floor(Math.random() * empty.length)];
+    const rand = Math.random();
+
+    let type, duration;
+    if (rand < 0.7) {
+        // 70% 普通地鼠
+        type = 'normal';
+        duration = Math.max(DURATION_MIN, MOLE_TYPES.normal.duration - score * DURATION_SCORE_FACTOR);
+    } else if (rand < 0.9) {
+        // 20% 金色地鼠
+        type = 'golden';
+        duration = MOLE_TYPES.golden.duration;
+    } else {
+        // 10% 炸弹地鼠
+        type = 'bomb';
+        duration = MOLE_TYPES.bomb.duration;
+    }
+
+    moles[idx] = { type, upTime: performance.now(), duration };
+    return idx;
+}
+
+/**
+ * 计算当前生成间隔
+ * @param {number} score
+ * @returns {number} 毫秒
+ */
+function getSpawnRate(score) {
+    return Math.max(SPAWN_RATE_MIN, SPAWN_RATE_BASE - score * SPAWN_RATE_SCORE_FACTOR);
+}
+
+/**
+ * 敲击地鼠，清除该洞状态
+ * @param {number} idx 洞索引
+ * @param {number} combo 当前连击数
+ * @returns {{type:string, points:number, combo:number, maxCombo:number, sound:string, isComboMilestone:boolean}|null}
+ */
+function whackMole(idx, combo, maxCombo) {
+    const mole = moles[idx];
+    if (!mole) return null;
+    moles[idx] = null;
+
+    if (mole.type === 'bomb') {
+        return {
+            type: 'bomb',
+            points: MOLE_TYPES.bomb.baseScore,  // -20
+            combo: 0,
+            maxCombo,
+            sound: 'bomb',
+            isComboMilestone: false
+        };
+    }
+
+    combo++;
+    if (combo > maxCombo) maxCombo = combo;
+
+    const mult = Math.min(5, 1 + Math.floor(combo / 3));
+    const pts = MOLE_TYPES[mole.type].baseScore * mult;
+
+    return {
+        type: mole.type,
+        points: pts,
+        combo,
+        maxCombo,
+        sound: mole.type === 'golden' ? 'golden' : 'hit',
+        isComboMilestone: combo > 0 && combo % 5 === 0
+    };
+}
+
+/**
+ * 自动消失过期地鼠，未命中的非炸弹地鼠会重置连击
+ * @returns {boolean} 是否有非炸弹地鼠超时（需要重置连击）
+ */
+function expireMoles() {
+    const now = performance.now();
+    let comboBroken = false;
+    for (let i = 0; i < HOLE_COUNT; i++) {
+        if (moles[i] && now - moles[i].upTime > moles[i].duration) {
+            if (moles[i].type !== 'bomb') comboBroken = true;
+            moles[i] = null;
+        }
+    }
+    return comboBroken;
+}
+
+// === ./ui.js ===
+
+/**
+ * 创建3x3地鼠洞面板，绑定点击回调
+ * @param {function(number):void} onWhack - 点击地鼠洞的回调，参数为洞索引
+ */
+function createBoard(onWhack) {
+    const board = document.getElementById('board');
+    board.innerHTML = '';
+    for (let i = 0; i < HOLE_COUNT; i++) {
+        const hole = document.createElement('div');
+        hole.className = 'hole';
+        const mole = document.createElement('div');
+        mole.className = 'mole';
+        mole.textContent = MOLE_TYPES.normal.emoji;
+        hole.appendChild(mole);
+        hole.addEventListener('click', () => onWhack(i));
+        board.appendChild(hole);
+    }
+}
+
+/** 根据moles数组渲染所有洞的地鼠状态 */
+function renderMoles() {
+    const holes = document.querySelectorAll('.hole');
+    for (let i = 0; i < HOLE_COUNT; i++) {
+        const moleEl = holes[i].querySelector('.mole');
+        if (moles[i]) {
+            moleEl.classList.add('up');
+            moleEl.classList.remove('normal', 'golden', 'bomb');
+            moleEl.classList.add(moles[i].type);
+            moleEl.textContent = MOLE_TYPES[moles[i].type].emoji;
+        } else {
+            moleEl.classList.remove('up', 'normal', 'golden', 'bomb');
+        }
+    }
+}
+
+/** 给被敲击的洞添加闪光动画 */
+function flashHole(idx) {
+    const hole = document.querySelectorAll('.hole')[idx];
+    hole.classList.add('hit');
+    setTimeout(() => hole.classList.remove('hit'), 300);
+    return hole;
+}
+
+/** 在洞上方显示浮动分数 */
+function showPopup(holeEl, text, color) {
+    const popup = document.createElement('div');
+    popup.className = 'score-popup';
+    popup.textContent = text;
+    popup.style.color = color;
+    holeEl.appendChild(popup);
+    setTimeout(() => popup.remove(), 800);
+}
+
+/** 屏幕中央显示连击里程碑文字 */
+function showComboMilestone(combo) {
+    const ct = document.getElementById('comboText');
+    ct.textContent = combo + ' 连击！';
+    ct.classList.add('active');
+    setTimeout(() => ct.classList.remove('active'), 800);
+}
+
+/** 更新顶部信息栏 */
+function updateInfoBar(score, combo, highScore) {
+    document.getElementById('score').textContent = score;
+    document.getElementById('combo').textContent = combo;
+    document.getElementById('high').textContent = highScore;
+}
+
+/** 更新时间条 */
+function updateTimeBar(remaining, total) {
+    document.getElementById('timeFill').style.width = (remaining / total * 100) + '%';
+}
+
+/** 隐藏所有覆盖层 */
+function hideOverlays() {
+    document.getElementById('startOverlay').classList.add('hidden');
+    document.getElementById('endOverlay').classList.add('hidden');
+}
+
+/** 显示结算界面 */
+function showEndOverlay(score, maxCombo, highScore) {
+    document.getElementById('endStats').innerHTML =
+        `分数: ${score}<br>最大连击: ${maxCombo}<br>最高: ${highScore}`;
+    document.getElementById('endOverlay').classList.remove('hidden');
+}
+
+// === main.js ===
+
+// 游戏状态
+let score = 0;
+let combo = 0;
+let maxCombo = 0;
+let gameActive = false;
+let timerStart = 0;
+let lastSpawn = 0;
+let highScore = parseInt(localStorage.getItem('whack_high')) || 0;
+
+/** 开始/重新开始游戏 */
+function startGame() {
+    Sound.init();
+    hideOverlays();
+
+    score = 0;
+    combo = 0;
+    maxCombo = 0;
+    gameActive = true;
+    lastSpawn = 0;
+
+    resetMoles();
+    timerStart = performance.now();
+
+    updateInfoBar(0, 0, highScore);
+    renderMoles();
+    requestAnimationFrame(gameLoop);
+}
+
+/** 敲击地鼠回调 */
+function onWhack(idx) {
+    if (!gameActive) return;
+
+    const result = whackMole(idx, combo, maxCombo);
+    if (!result) return;
+
+    const holeEl = flashHole(idx);
+
+    if (result.type === 'bomb') {
+        score = Math.max(0, score + result.points);
+        combo = result.combo;
+        maxCombo = result.maxCombo;
+        Sound.play(result.sound);
+        showPopup(holeEl, result.points, '#f44336');
+    } else {
+        combo = result.combo;
+        maxCombo = result.maxCombo;
+        score += result.points;
+        Sound.play(result.sound);
+        showPopup(holeEl, '+' + result.points, result.type === 'golden' ? '#ffd700' : '#4caf50');
+
+        if (result.isComboMilestone) {
+            Sound.play('combo');
+            showComboMilestone(combo);
+        }
+    }
+
+    updateInfoBar(score, combo, highScore);
+    renderMoles();
+}
+
+/** 主游戏循环 */
+function gameLoop(time) {
+    if (!gameActive) return;
+
+    const elapsed = time - timerStart;
+    const remaining = Math.max(0, GAME_TIME - elapsed);
+    updateTimeBar(remaining, GAME_TIME);
+
+    // 时间到
+    if (remaining <= 0) {
+        gameActive = false;
+        Sound.play('end');
+        highScore = Math.max(highScore, score);
+        localStorage.setItem('whack_high', highScore);
+        setTimeout(() => showEndOverlay(score, maxCombo, highScore), 300);
+        renderMoles();
+        return;
+    }
+
+    // 按节奏生成地鼠
+    if (time - lastSpawn > getSpawnRate(score)) {
+        spawnMole(score);
+        lastSpawn = time;
+    }
+
+    // 过期地鼠自动消失
+    if (expireMoles()) {
+        combo = 0;
+        updateInfoBar(score, combo, highScore);
+    }
+
+    renderMoles();
+    requestAnimationFrame(gameLoop);
+}
+
+// 初始化：创建面板，显示初始最高分
+createBoard(onWhack);
+updateInfoBar(0, 0, highScore);
+
+// 暴露startGame给HTML按钮的onclick
+window.startGame = startGame;
+
+
+</script>
+
+</body>
+</html>

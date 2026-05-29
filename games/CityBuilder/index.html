@@ -1,0 +1,2504 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MIMO 城市建设者</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      overflow: hidden;
+      background: #1a1a2e;
+      font-family: "Microsoft YaHei", "PingFang SC", "Helvetica Neue", sans-serif;
+      color: #e0e0e0;
+      user-select: none;
+    }
+
+    #game-canvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+      cursor: crosshair;
+    }
+
+    /* ---- 顶部资源栏 ---- */
+    #resource-bar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      padding: 0 20px;
+      background: rgba(16, 16, 40, 0.88);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      z-index: 100;
+    }
+
+    #resource-bar .res-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 15px;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+
+    #resource-bar .res-item.good { color: #4CAF50; }
+    #resource-bar .res-item.warn { color: #FF9800; }
+    #resource-bar .res-item.bad { color: #F44336; }
+
+    #res-title {
+      font-size: 18px;
+      font-weight: bold;
+      color: #4fc3f7;
+      margin-right: 10px;
+      letter-spacing: 1px;
+    }
+
+    #speed-controls {
+      display: flex;
+      gap: 4px;
+      margin-left: auto;
+    }
+
+    .speed-btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #ccc;
+      padding: 4px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.15s;
+    }
+
+    .speed-btn:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .speed-btn.active {
+      background: rgba(79, 195, 247, 0.25);
+      border-color: #4fc3f7;
+      color: #4fc3f7;
+    }
+
+    #btn-help {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #ccc;
+      padding: 4px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      margin-left: 8px;
+    }
+
+    #btn-help:hover {
+      background: rgba(255, 255, 255, 0.15);
+      color: #fff;
+    }
+
+    /* ---- 左侧建筑面板 ---- */
+    #building-panel {
+      position: fixed;
+      top: 60px;
+      left: 10px;
+      width: 110px;
+      max-height: calc(100vh - 80px);
+      overflow-y: auto;
+      background: rgba(16, 16, 40, 0.88);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 8px;
+      z-index: 100;
+    }
+
+    #building-panel::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    #building-panel::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 2px;
+    }
+
+    .panel-title {
+      font-size: 14px;
+      font-weight: bold;
+      color: #4fc3f7;
+      text-align: center;
+      padding-bottom: 6px;
+      margin-bottom: 6px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .building-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 8px 4px;
+      margin-bottom: 4px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.15s;
+      background: rgba(255, 255, 255, 0.04);
+      border: 2px solid transparent;
+    }
+
+    .building-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .building-btn.selected {
+      background: rgba(79, 195, 247, 0.15);
+      border-color: #4fc3f7;
+      box-shadow: 0 0 10px rgba(79, 195, 247, 0.3);
+    }
+
+    .building-btn.cannot-afford {
+      opacity: 0.45;
+    }
+
+    .building-icon {
+      font-size: 24px;
+      line-height: 1;
+    }
+
+    .building-name {
+      font-size: 12px;
+      margin-top: 2px;
+      font-weight: 500;
+    }
+
+    .building-cost {
+      font-size: 11px;
+      color: #FFD54F;
+      margin-top: 1px;
+    }
+
+    /* ---- 底部信息面板 ---- */
+    #info-panel {
+      position: fixed;
+      bottom: 15px;
+      left: 50%;
+      transform: translateX(-50%);
+      min-width: 360px;
+      max-width: 500px;
+      background: rgba(16, 16, 40, 0.92);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 14px 20px;
+      z-index: 100;
+      transition: opacity 0.2s, transform 0.2s;
+    }
+
+    #info-panel.hidden {
+      opacity: 0;
+      pointer-events: none;
+      transform: translateX(-50%) translateY(10px);
+    }
+
+    .info-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .info-icon {
+      font-size: 28px;
+    }
+
+    .info-name {
+      font-size: 18px;
+      font-weight: bold;
+      color: #fff;
+    }
+
+    .info-level {
+      font-size: 14px;
+      color: #FFD700;
+      font-weight: bold;
+    }
+
+    .info-details {
+      font-size: 13px;
+      color: #b0bec5;
+      margin-bottom: 4px;
+      line-height: 1.6;
+    }
+
+    .info-maint {
+      font-size: 12px;
+      color: #ef9a9a;
+      margin-bottom: 10px;
+    }
+
+    .info-actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn-upgrade, .btn-demolish {
+      padding: 6px 16px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 0.15s;
+    }
+
+    .btn-upgrade {
+      background: #4CAF50;
+      color: #fff;
+    }
+
+    .btn-upgrade:hover {
+      background: #66BB6A;
+      box-shadow: 0 2px 8px rgba(76, 175, 80, 0.4);
+    }
+
+    .btn-upgrade.disabled {
+      background: #555;
+      color: #999;
+      cursor: not-allowed;
+    }
+
+    .btn-demolish {
+      background: rgba(244, 67, 54, 0.15);
+      color: #EF5350;
+      border: 1px solid rgba(244, 67, 54, 0.3);
+    }
+
+    .btn-demolish:hover {
+      background: rgba(244, 67, 54, 0.3);
+    }
+
+    .max-level {
+      color: #FFD700;
+      font-size: 13px;
+    }
+
+    /* ---- 通知 ---- */
+    #notifications {
+      position: fixed;
+      bottom: 130px;
+      right: 15px;
+      width: 300px;
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      pointer-events: none;
+    }
+
+    .notification {
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      animation: slideIn 0.3s ease;
+    }
+
+    .notification.info {
+      background: rgba(33, 150, 243, 0.2);
+      border: 1px solid rgba(33, 150, 243, 0.3);
+      color: #90CAF9;
+    }
+
+    .notification.success {
+      background: rgba(76, 175, 80, 0.2);
+      border: 1px solid rgba(76, 175, 80, 0.3);
+      color: #A5D6A7;
+    }
+
+    .notification.warn {
+      background: rgba(255, 152, 0, 0.2);
+      border: 1px solid rgba(255, 152, 0, 0.3);
+      color: #FFCC80;
+    }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(30px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    /* ---- 帮助覆盖层 ---- */
+    #help-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+    }
+
+    #help-overlay.hidden {
+      display: none;
+    }
+
+    .help-content {
+      background: rgba(20, 20, 50, 0.95);
+      border-radius: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      padding: 30px 40px;
+      max-width: 500px;
+      width: 90%;
+    }
+
+    .help-content h2 {
+      font-size: 22px;
+      color: #4fc3f7;
+      margin-bottom: 16px;
+      text-align: center;
+    }
+
+    .help-content .help-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      font-size: 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .help-content .help-key {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 13px;
+    }
+
+    .help-content .help-close {
+      display: block;
+      margin: 20px auto 0;
+      padding: 8px 30px;
+      background: rgba(79, 195, 247, 0.2);
+      border: 1px solid #4fc3f7;
+      color: #4fc3f7;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .help-content .help-close:hover {
+      background: rgba(79, 195, 247, 0.35);
+    }
+
+    /* ---- 快捷键提示 ---- */
+    #shortcut-hint {
+      position: fixed;
+      bottom: 15px;
+      right: 15px;
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.3);
+      z-index: 50;
+    }
+
+    #shortcut-hint kbd {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-family: monospace;
+      font-size: 11px;
+    }
+  </style>
+</head>
+<body>
+
+  <canvas id="game-canvas"></canvas>
+
+  <!-- 顶部资源栏 -->
+  <div id="resource-bar">
+    <span id="res-title">🏙️ 城市建设者</span>
+    <span class="res-item" id="res-gold">💰 1000</span>
+    <span class="res-item" id="res-pop">👥 0/0</span>
+    <span class="res-item" id="res-food">🍎 50</span>
+    <span class="res-item" id="res-power">⚡ 0/0</span>
+    <span class="res-item good" id="res-satisfaction">😊 50%</span>
+    <span class="res-item" id="res-day">📅 第1天</span>
+    <span class="res-item" id="res-time">☀️ 白天</span>
+    <button id="btn-help">? 帮助</button>
+  </div>
+
+  <!-- 左侧建筑面板 -->
+  <div id="building-panel"></div>
+
+  <!-- 底部信息面板 -->
+  <div id="info-panel" class="hidden"></div>
+
+  <!-- 通知区域 -->
+  <div id="notifications"></div>
+
+  <!-- 快捷键提示 -->
+  <div id="shortcut-hint">
+    <kbd>1</kbd>-<kbd>0</kbd> 选择建筑 &nbsp;
+    <kbd>+</kbd> 升级 &nbsp;
+    <kbd>-</kbd> 拆除 &nbsp;
+    <kbd>Esc</kbd> 取消 &nbsp;
+    <kbd>H</kbd> 帮助
+  </div>
+
+  <!-- 帮助覆盖层 -->
+  <div id="help-overlay" class="hidden">
+    <div class="help-content">
+      <h2>🏙️ 城市建设者 - 操作指南</h2>
+      <div class="help-row"><span>选择建筑</span><span class="help-key">左侧面板 或 1-0</span></div>
+      <div class="help-row"><span>放置建筑</span><span class="help-key">左键点击地图</span></div>
+      <div class="help-row"><span>移动视角</span><span class="help-key">左键拖拽</span></div>
+      <div class="help-row"><span>缩放</span><span class="help-key">鼠标滚轮</span></div>
+      <div class="help-row"><span>选中建筑</span><span class="help-key">左键点击已有建筑</span></div>
+      <div class="help-row"><span>升级建筑</span><span class="help-key">选中后按 +</span></div>
+      <div class="help-row"><span>拆除建筑</span><span class="help-key">选中后按 - 或 Delete</span></div>
+      <div class="help-row"><span>取消选择</span><span class="help-key">Esc</span></div>
+      <div class="help-row"><span>游戏速度</span><span class="help-key">右上角 x1/x2/x3</span></div>
+      <button class="help-close" onclick="document.getElementById('help-overlay').classList.add('hidden')">知道了</button>
+    </div>
+  </div>
+
+  <script>
+// === ./config.js ===
+// ============================================
+// 城市建设者 - 配置文件
+// ============================================
+
+const GRID = {
+  cols: 30,
+  rows: 20,
+  cellSize: 40
+};
+
+const DAY_LENGTH = 600; // 每天帧数 (60fps下约10秒)
+const TICK_RATE = 60;
+
+// 建筑类型定义
+const BUILDINGS = {
+  residential: {
+    name: '住宅',
+    icon: '🏠',
+    color: '#4CAF50',
+    colorDark: '#388E3C',
+    cost: 100,
+    maintenance: 5,
+    powerNeed: 1,
+    populationCapacity: 5,
+    description: '提供人口容量',
+    detail: '每座住宅容纳5人'
+  },
+  commercial: {
+    name: '商业',
+    icon: '🏪',
+    color: '#42A5F5',
+    colorDark: '#1E88E5',
+    cost: 200,
+    maintenance: 10,
+    powerNeed: 2,
+    taxIncome: 20,
+    jobs: 3,
+    description: '产生税收收入',
+    detail: '提供3个岗位，每日+20金币'
+  },
+  industrial: {
+    name: '工业',
+    icon: '🏭',
+    color: '#78909C',
+    colorDark: '#546E7A',
+    cost: 300,
+    maintenance: 15,
+    powerNeed: 3,
+    taxIncome: 15,
+    resourceIncome: 10,
+    jobs: 5,
+    description: '产生资源和税收',
+    detail: '提供5个岗位，每日+15金币+10资源'
+  },
+  farm: {
+    name: '农场',
+    icon: '🌾',
+    color: '#FDD835',
+    colorDark: '#F9A825',
+    cost: 150,
+    maintenance: 8,
+    powerNeed: 0,
+    foodIncome: 10,
+    jobs: 2,
+    description: '提供食物',
+    detail: '提供2个岗位，每日+10食物'
+  },
+  school: {
+    name: '学校',
+    icon: '🏫',
+    color: '#FF9800',
+    colorDark: '#F57C00',
+    cost: 250,
+    maintenance: 12,
+    powerNeed: 2,
+    satisfactionBonus: 8,
+    description: '提升满意度',
+    detail: '满意度+8'
+  },
+  hospital: {
+    name: '医院',
+    icon: '🏥',
+    color: '#EF5350',
+    colorDark: '#E53935',
+    cost: 300,
+    maintenance: 15,
+    powerNeed: 3,
+    satisfactionBonus: 10,
+    description: '提升满意度',
+    detail: '满意度+10'
+  },
+  police: {
+    name: '警察局',
+    icon: '🚔',
+    color: '#5C6BC0',
+    colorDark: '#3949AB',
+    cost: 200,
+    maintenance: 10,
+    powerNeed: 2,
+    satisfactionBonus: 6,
+    description: '降低犯罪率',
+    detail: '满意度+6'
+  },
+  park: {
+    name: '公园',
+    icon: '🌳',
+    color: '#66BB6A',
+    colorDark: '#43A047',
+    cost: 100,
+    maintenance: 5,
+    powerNeed: 0,
+    satisfactionBonus: 4,
+    description: '美化环境',
+    detail: '满意度+4'
+  },
+  powerplant: {
+    name: '发电厂',
+    icon: '⚡',
+    color: '#FFEE58',
+    colorDark: '#FDD835',
+    cost: 400,
+    maintenance: 20,
+    powerNeed: 0,
+    powerSupply: 20,
+    description: '提供电力',
+    detail: '提供20单位电力'
+  },
+  road: {
+    name: '道路',
+    icon: '🛣️',
+    color: '#BDBDBD',
+    colorDark: '#9E9E9E',
+    cost: 20,
+    maintenance: 1,
+    powerNeed: 0,
+    description: '连接建筑',
+    detail: '连接各建筑'
+  }
+};
+
+// 建筑类型列表（用于UI顺序）
+const BUILDING_ORDER = [
+  'residential', 'commercial', 'industrial', 'farm',
+  'school', 'hospital', 'police', 'park',
+  'powerplant', 'road'
+];
+
+// 初始资源
+const INITIAL_RESOURCES = {
+  gold: 1000,
+  population: 0,
+  food: 50,
+  power: 0,
+  powerCapacity: 0,
+  satisfaction: 50
+};
+
+// 升级倍率
+const UPGRADE_COST_MULTIPLIER = 1.5;
+const UPGRADE_OUTPUT_MULTIPLIER = 1.5;
+const MAX_BUILDING_LEVEL = 3;
+
+// 居民相关
+const RESIDENT_SPEED = 0.8; // 格/秒
+const RESIDENT_SIZE = 4;
+const RESIDENT_COLORS = {
+  happy: '#4CAF50',
+  neutral: '#FFC107',
+  unhappy: '#F44336'
+};
+
+// 相机默认值
+const CAMERA_DEFAULTS = {
+  zoom: 1,
+  minZoom: 0.3,
+  maxZoom: 3,
+  zoomStep: 0.1
+};
+
+// === ./grid.js ===
+// ============================================
+// 城市建设者 - 网格地图系统
+// ============================================
+
+
+class Grid {
+  constructor() {
+    this.cols = GRID.cols;
+    this.rows = GRID.rows;
+    this.cellSize = GRID.cellSize;
+    this.cells = [];
+
+    for (let r = 0; r < this.rows; r++) {
+      this.cells[r] = [];
+      for (let c = 0; c < this.cols; c++) {
+        this.cells[r][c] = {
+          building: null, // { type, level, ... }
+          terrain: 'grass' // 预留地形
+        };
+      }
+    }
+  }
+
+  // 获取单元格
+  getCell(col, row) {
+    if (!this.isValid(col, row)) return null;
+    return this.cells[row][col];
+  }
+
+  // 设置单元格
+  setCell(col, row, data) {
+    if (!this.isValid(col, row)) return false;
+    this.cells[row][col] = { ...this.cells[row][col], ...data };
+    return true;
+  }
+
+  // 检查坐标是否有效
+  isValid(col, row) {
+    return col >= 0 && col < this.cols && row >= 0 && row < this.rows;
+  }
+
+  // 世界坐标转网格坐标
+  worldToGrid(worldX, worldY) {
+    return {
+      col: Math.floor(worldX / this.cellSize),
+      row: Math.floor(worldY / this.cellSize)
+    };
+  }
+
+  // 网格坐标转世界坐标（单元格左上角）
+  gridToWorld(col, row) {
+    return {
+      x: col * this.cellSize,
+      y: row * this.cellSize
+    };
+  }
+
+  // 网格坐标转世界坐标（单元格中心）
+  gridToWorldCenter(col, row) {
+    return {
+      x: col * this.cellSize + this.cellSize / 2,
+      y: row * this.cellSize + this.cellSize / 2
+    };
+  }
+
+  // 检查单元格是否为空
+  isEmpty(col, row) {
+    const cell = this.getCell(col, row);
+    return cell && cell.building === null;
+  }
+
+  // 获取建筑
+  getBuilding(col, row) {
+    const cell = this.getCell(col, row);
+    return cell ? cell.building : null;
+  }
+
+  // 放置建筑
+  placeBuilding(col, row, building) {
+    if (!this.isEmpty(col, row)) return false;
+    return this.setCell(col, row, { building });
+  }
+
+  // 移除建筑
+  removeBuilding(col, row) {
+    const cell = this.getCell(col, row);
+    if (!cell || !cell.building) return null;
+    const removed = cell.building;
+    cell.building = null;
+    return removed;
+  }
+
+  // 渲染网格
+  render(ctx, camera) {
+    const { x: startX, y: startY } = camera.screenToWorld(0, 0);
+    const { x: endX, y: endY } = camera.screenToWorld(camera.screenW, camera.screenH);
+
+    const startCol = Math.max(0, Math.floor(startX / this.cellSize));
+    const startRow = Math.max(0, Math.floor(startY / this.cellSize));
+    const endCol = Math.min(this.cols - 1, Math.ceil(endX / this.cellSize));
+    const endRow = Math.min(this.rows - 1, Math.ceil(endY / this.cellSize));
+
+    ctx.save();
+    ctx.translate(camera.x, camera.y);
+    ctx.scale(camera.zoom, camera.zoom);
+
+    // 绘制地面
+    for (let r = startRow; r <= endRow; r++) {
+      for (let c = startCol; c <= endCol; c++) {
+        const wx = c * this.cellSize;
+        const wy = r * this.cellSize;
+
+        // 棋盘格背景
+        const isLight = (c + r) % 2 === 0;
+        ctx.fillStyle = isLight ? '#2d5a27' : '#2a5423';
+        ctx.fillRect(wx, wy, this.cellSize, this.cellSize);
+      }
+    }
+
+    // 绘制网格线
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+    ctx.lineWidth = 0.5;
+    for (let r = startRow; r <= endRow + 1; r++) {
+      ctx.beginPath();
+      ctx.moveTo(startCol * this.cellSize, r * this.cellSize);
+      ctx.lineTo((endCol + 1) * this.cellSize, r * this.cellSize);
+      ctx.stroke();
+    }
+    for (let c = startCol; c <= endCol + 1; c++) {
+      ctx.beginPath();
+      ctx.moveTo(c * this.cellSize, startRow * this.cellSize);
+      ctx.lineTo(c * this.cellSize, (endRow + 1) * this.cellSize);
+      ctx.stroke();
+    }
+
+    // 绘制边界
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(0, 0, this.cols * this.cellSize, this.rows * this.cellSize);
+
+    ctx.restore();
+  }
+}
+
+// === ./buildings.js ===
+// ============================================
+// 城市建设者 - 建筑系统
+// ============================================
+
+
+class BuildingSystem {
+  constructor(grid, economy) {
+    this.grid = grid;
+    this.economy = economy;
+    this.selectedType = null;
+    this.selectedCell = null; // { col, row } 当前选中的格子
+  }
+
+  // 选择建筑类型
+  selectType(type) {
+    if (this.selectedType === type) {
+      this.selectedType = null; // 取消选择
+    } else {
+      this.selectedType = type;
+    }
+    this.selectedCell = null;
+  }
+
+  // 选择格子
+  selectCell(col, row) {
+    const building = this.grid.getBuilding(col, row);
+    if (building) {
+      this.selectedCell = { col, row };
+      this.selectedType = null;
+    } else {
+      this.selectedCell = null;
+    }
+  }
+
+  // 能否放置
+  canPlace(type, col, row) {
+    const config = BUILDINGS[type];
+    if (!config) return false;
+    if (!this.grid.isEmpty(col, row)) return false;
+    if (this.economy.gold < config.cost) return false;
+    return true;
+  }
+
+  // 放置建筑
+  place(type, col, row) {
+    if (!this.canPlace(type, col, row)) return null;
+    const config = BUILDINGS[type];
+
+    const building = {
+      type,
+      level: 1,
+      placedDay: this.economy.day,
+      workers: 0
+    };
+
+    if (this.grid.placeBuilding(col, row, building)) {
+      this.economy.spendGold(config.cost);
+      return building;
+    }
+    return null;
+  }
+
+  // 拆除建筑
+  demolish(col, row) {
+    const building = this.grid.getBuilding(col, row);
+    if (!building) return null;
+    const config = BUILDINGS[building.type];
+    const refund = Math.floor(config.cost * 0.5 * building.level);
+    this.economy.gold += refund;
+    this.grid.removeBuilding(col, row);
+    if (this.selectedCell && this.selectedCell.col === col && this.selectedCell.row === row) {
+      this.selectedCell = null;
+    }
+    return { building, refund };
+  }
+
+  // 升级建筑
+  upgrade(col, row) {
+    const building = this.grid.getBuilding(col, row);
+    if (!building) return null;
+    if (building.level >= MAX_BUILDING_LEVEL) return null;
+
+    const config = BUILDINGS[building.type];
+    const upgradeCost = Math.floor(config.cost * Math.pow(UPGRADE_COST_MULTIPLIER, building.level));
+
+    if (this.economy.gold < upgradeCost) return null;
+
+    this.economy.gold -= upgradeCost;
+    building.level++;
+    return { building, cost: upgradeCost };
+  }
+
+  // 获取升级费用
+  getUpgradeCost(col, row) {
+    const building = this.grid.getBuilding(col, row);
+    if (!building || building.level >= MAX_BUILDING_LEVEL) return null;
+    const config = BUILDINGS[building.type];
+    return Math.floor(config.cost * Math.pow(UPGRADE_COST_MULTIPLIER, building.level));
+  }
+
+  // 渲染建筑
+  render(ctx, camera, hoverCell, dayProgress) {
+    ctx.save();
+    ctx.translate(camera.x, camera.y);
+    ctx.scale(camera.zoom, camera.zoom);
+
+    const cellSize = GRID.cellSize;
+
+    // 遍历所有格子绘制建筑
+    const { x: sx, y: sy } = camera.screenToWorld(0, 0);
+    const { x: ex, y: ey } = camera.screenToWorld(camera.screenW, camera.screenH);
+    const sc = Math.max(0, Math.floor(sx / cellSize));
+    const sr = Math.max(0, Math.floor(sy / cellSize));
+    const ec = Math.min(GRID.cols - 1, Math.ceil(ex / cellSize));
+    const er = Math.min(GRID.rows - 1, Math.ceil(ey / cellSize));
+
+    for (let r = sr; r <= er; r++) {
+      for (let c = sc; c <= ec; c++) {
+        const building = this.grid.getBuilding(c, r);
+        if (!building) continue;
+        this.drawBuilding(ctx, building, c * cellSize, r * cellSize, cellSize);
+      }
+    }
+
+    // 绘制悬停预览
+    if (hoverCell && this.selectedType) {
+      const { col, row } = hoverCell;
+      if (this.grid.isValid(col, row)) {
+        const wx = col * cellSize;
+        const wy = row * cellSize;
+        const canPlace = this.canPlace(this.selectedType, col, row);
+
+        ctx.globalAlpha = 0.5;
+        if (canPlace) {
+          this.drawBuilding(ctx, { type: this.selectedType, level: 1 }, wx, wy, cellSize);
+        } else {
+          ctx.fillStyle = 'rgba(244, 67, 54, 0.4)';
+          ctx.fillRect(wx + 1, wy + 1, cellSize - 2, cellSize - 2);
+          ctx.strokeStyle = '#F44336';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(wx + 4, wy + 4);
+          ctx.lineTo(wx + cellSize - 4, wy + cellSize - 4);
+          ctx.moveTo(wx + cellSize - 4, wy + 4);
+          ctx.lineTo(wx + 4, wy + cellSize - 4);
+          ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+      }
+    }
+
+    // 绘制选中高亮
+    if (this.selectedCell) {
+      const { col, row } = this.selectedCell;
+      const wx = col * cellSize;
+      const wy = row * cellSize;
+      ctx.strokeStyle = '#FFD700';
+      ctx.lineWidth = 3;
+      ctx.setLineDash([6, 4]);
+      ctx.strokeRect(wx + 1, wy + 1, cellSize - 2, cellSize - 2);
+      ctx.setLineDash([]);
+    }
+
+    ctx.restore();
+  }
+
+  // 绘制单个建筑
+  drawBuilding(ctx, building, x, y, size) {
+    const config = BUILDINGS[building.type];
+    if (!config) return;
+
+    const level = building.level || 1;
+    const padding = 2;
+    const bx = x + padding;
+    const by = y + padding;
+    const bw = size - padding * 2;
+    const bh = size - padding * 2;
+
+    // 建筑底色
+    ctx.fillStyle = config.color;
+    ctx.fillRect(bx, by, bw, bh);
+
+    // 深色边框
+    ctx.strokeStyle = config.colorDark;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(bx, by, bw, bh);
+
+    // 建筑细节
+    this.drawBuildingDetail(ctx, building.type, bx, by, bw, bh);
+
+    // 图标
+    ctx.font = `${size * 0.45}px "Segoe UI Emoji", "Apple Color Emoji", sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#fff';
+    ctx.fillText(config.icon, x + size / 2, y + size / 2);
+
+    // 等级标识
+    if (level > 1) {
+      ctx.font = `bold ${size * 0.22}px sans-serif`;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.fillStyle = '#FFD700';
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 2;
+      const starText = '★'.repeat(level - 1);
+      ctx.strokeText(starText, bx + 2, by + 1);
+      ctx.fillText(starText, bx + 2, by + 1);
+    }
+  }
+
+  // 绘制建筑细节
+  drawBuildingDetail(ctx, type, x, y, w, h) {
+    ctx.save();
+    switch (type) {
+      case 'residential':
+        // 屋顶
+        ctx.fillStyle = '#795548';
+        ctx.beginPath();
+        ctx.moveTo(x, y + h * 0.35);
+        ctx.lineTo(x + w / 2, y);
+        ctx.lineTo(x + w, y + h * 0.35);
+        ctx.closePath();
+        ctx.fill();
+        break;
+
+      case 'commercial':
+        // 橱窗
+        ctx.fillStyle = '#1565C0';
+        ctx.fillRect(x + w * 0.15, y + h * 0.5, w * 0.7, h * 0.35);
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x + w * 0.15, y + h * 0.5, w * 0.7, h * 0.35);
+        break;
+
+      case 'industrial':
+        // 烟囱
+        ctx.fillStyle = '#455A64';
+        ctx.fillRect(x + w * 0.7, y, w * 0.2, h * 0.5);
+        // 烟
+        ctx.fillStyle = 'rgba(200,200,200,0.5)';
+        ctx.beginPath();
+        ctx.arc(x + w * 0.8, y - 3, 4, 0, Math.PI * 2);
+        ctx.fill();
+        break;
+
+      case 'farm':
+        // 作物行
+        ctx.fillStyle = '#8BC34A';
+        for (let i = 0; i < 3; i++) {
+          ctx.fillRect(x + w * 0.15, y + h * (0.2 + i * 0.25), w * 0.7, h * 0.1);
+        }
+        break;
+
+      case 'school':
+        // 旗子
+        ctx.fillStyle = '#E65100';
+        ctx.fillRect(x + w * 0.1, y, 2, h * 0.6);
+        ctx.fillStyle = '#F44336';
+        ctx.beginPath();
+        ctx.moveTo(x + w * 0.1 + 2, y);
+        ctx.lineTo(x + w * 0.1 + 12, y + 5);
+        ctx.lineTo(x + w * 0.1 + 2, y + 10);
+        ctx.closePath();
+        ctx.fill();
+        break;
+
+      case 'hospital':
+        // 红十字
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(x + w * 0.4, y + h * 0.15, w * 0.2, h * 0.7);
+        ctx.fillRect(x + w * 0.15, y + h * 0.4, w * 0.7, h * 0.2);
+        break;
+
+      case 'police':
+        // 警徽
+        ctx.fillStyle = '#FFD700';
+        ctx.beginPath();
+        ctx.arc(x + w / 2, y + h * 0.3, w * 0.2, 0, Math.PI * 2);
+        ctx.fill();
+        break;
+
+      case 'park':
+        // 树
+        ctx.fillStyle = '#2E7D32';
+        ctx.beginPath();
+        ctx.arc(x + w * 0.3, y + h * 0.35, w * 0.2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(x + w * 0.7, y + h * 0.4, w * 0.15, 0, Math.PI * 2);
+        ctx.fill();
+        // 树干
+        ctx.fillStyle = '#795548';
+        ctx.fillRect(x + w * 0.28, y + h * 0.5, w * 0.06, h * 0.3);
+        ctx.fillRect(x + w * 0.67, y + h * 0.52, w * 0.06, h * 0.25);
+        break;
+
+      case 'powerplant':
+        // 闪电
+        ctx.fillStyle = '#FF6F00';
+        ctx.beginPath();
+        ctx.moveTo(x + w * 0.55, y + h * 0.1);
+        ctx.lineTo(x + w * 0.35, y + h * 0.5);
+        ctx.lineTo(x + w * 0.5, y + h * 0.5);
+        ctx.lineTo(x + w * 0.4, y + h * 0.9);
+        ctx.lineTo(x + w * 0.7, y + h * 0.4);
+        ctx.lineTo(x + w * 0.55, y + h * 0.4);
+        ctx.closePath();
+        ctx.fill();
+        break;
+
+      case 'road':
+        // 道路标线
+        ctx.fillStyle = '#757575';
+        ctx.setLineDash([4, 4]);
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(x + w * 0.5, y);
+        ctx.lineTo(x + w * 0.5, y + h);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x, y + h * 0.5);
+        ctx.lineTo(x + w, y + h * 0.5);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        break;
+    }
+    ctx.restore();
+  }
+}
+
+// === ./residents.js ===
+// ============================================
+// 城市建设者 - 居民模拟系统
+// ============================================
+
+
+class Resident {
+  constructor(homeCol, homeRow, id) {
+    this.id = id;
+    this.homeCol = homeCol;
+    this.homeRow = homeRow;
+    this.workCol = -1;
+    this.workRow = -1;
+
+    // 世界坐标（像素）
+    this.x = homeCol * GRID.cellSize + GRID.cellSize / 2;
+    this.y = homeRow * GRID.cellSize + GRID.cellSize / 2;
+    this.targetX = this.x;
+    this.targetY = this.y;
+
+    // 状态: home -> going_to_work -> work -> going_home
+    this.state = 'home';
+    this.stateTimer = 60 + Math.random() * 120; // 待在家的时间
+    this.moving = false;
+    this.speed = RESIDENT_SPEED * GRID.cellSize; // 像素/秒
+
+    // 需求
+    this.satisfaction = 70;
+    this.employed = false;
+    this.hasFood = true;
+    this.hasEducation = false;
+    this.hasHealthcare = false;
+
+    // 外观
+    this.color = RESIDENT_COLORS.happy;
+    this.direction = 1; // 1=右, -1=左
+  }
+
+  update(dt) {
+    const dtSec = dt / 60; // 假设60fps
+
+    switch (this.state) {
+      case 'home':
+        this.stateTimer -= dt;
+        if (this.stateTimer <= 0) {
+          if (this.employed) {
+            this.state = 'going_to_work';
+            this.targetX = this.workCol * GRID.cellSize + GRID.cellSize / 2;
+            this.targetY = this.workRow * GRID.cellSize + GRID.cellSize / 2;
+            this.moving = true;
+          } else {
+            // 无业游荡
+            this.stateTimer = 120 + Math.random() * 120;
+            const wander = GRID.cellSize * 2;
+            this.targetX = this.x + (Math.random() - 0.5) * wander;
+            this.targetY = this.y + (Math.random() - 0.5) * wander;
+            // 限制在地图内
+            this.targetX = Math.max(0, Math.min(GRID.cols * GRID.cellSize, this.targetX));
+            this.targetY = Math.max(0, Math.min(GRID.rows * GRID.cellSize, this.targetY));
+            this.moving = true;
+            this.state = 'wandering';
+          }
+        }
+        break;
+
+      case 'wandering':
+        if (this.moveToTarget(dtSec)) {
+          this.moving = false;
+          this.state = 'home';
+          this.stateTimer = 60 + Math.random() * 180;
+        }
+        break;
+
+      case 'going_to_work':
+        if (this.moveToTarget(dtSec)) {
+          this.moving = false;
+          this.state = 'work';
+          this.stateTimer = 180 + Math.random() * 120; // 工作时间
+        }
+        break;
+
+      case 'work':
+        this.stateTimer -= dt;
+        if (this.stateTimer <= 0) {
+          this.state = 'going_home';
+          this.targetX = this.homeCol * GRID.cellSize + GRID.cellSize / 2;
+          this.targetY = this.homeRow * GRID.cellSize + GRID.cellSize / 2;
+          this.moving = true;
+        }
+        break;
+
+      case 'going_home':
+        if (this.moveToTarget(dtSec)) {
+          this.moving = false;
+          this.state = 'home';
+          this.stateTimer = 120 + Math.random() * 180;
+        }
+        break;
+    }
+
+    // 更新颜色
+    if (this.satisfaction >= 60) {
+      this.color = RESIDENT_COLORS.happy;
+    } else if (this.satisfaction >= 35) {
+      this.color = RESIDENT_COLORS.neutral;
+    } else {
+      this.color = RESIDENT_COLORS.unhappy;
+    }
+  }
+
+  moveToTarget(dtSec) {
+    const dx = this.targetX - this.x;
+    const dy = this.targetY - this.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    if (dist < 2) {
+      this.x = this.targetX;
+      this.y = this.targetY;
+      return true; // 到达
+    }
+
+    const move = this.speed * dtSec;
+    const ratio = Math.min(move / dist, 1);
+    this.x += dx * ratio;
+    this.y += dy * ratio;
+
+    // 更新朝向
+    if (Math.abs(dx) > 1) {
+      this.direction = dx > 0 ? 1 : -1;
+    }
+
+    return false;
+  }
+}
+
+class ResidentSystem {
+  constructor(grid, economy) {
+    this.grid = grid;
+    this.economy = economy;
+    this.residents = [];
+    this.nextId = 0;
+    this.maxResidents = 200; // 性能上限
+  }
+
+  // 更新居民
+  update(dt, buildingStats) {
+    const popCapacity = buildingStats.totalPopulationCapacity;
+    const totalJobs = buildingStats.totalJobs;
+    const currentPop = this.residents.length;
+
+    // 生成新居民
+    if (this.economy.population > currentPop && this.residents.length < this.maxResidents) {
+      this.spawnResident(buildingStats);
+    }
+
+    // 移除多余居民
+    if (this.economy.population < currentPop) {
+      this.residents.splice(this.economy.population);
+    }
+
+    // 分配工作
+    this.assignJobs(buildingStats);
+
+    // 更新每个居民
+    for (const resident of this.residents) {
+      // 更新满意度
+      resident.satisfaction = this.economy.satisfaction + (Math.random() - 0.5) * 20;
+      resident.hasFood = this.economy.food > 0;
+      resident.update(dt);
+    }
+  }
+
+  // 生成居民
+  spawnResident(buildingStats) {
+    // 找一个住宅建筑
+    const residentialBuildings = buildingStats.buildings.filter(b => b.type === 'residential');
+    if (residentialBuildings.length === 0) return;
+
+    // 计算每个住宅的当前居民数
+    const homeCounts = {};
+    for (const r of this.residents) {
+      const key = `${r.homeCol},${r.homeRow}`;
+      homeCounts[key] = (homeCounts[key] || 0) + 1;
+    }
+
+    // 找一个有空位的住宅
+    for (const rb of residentialBuildings) {
+      const config = BUILDINGS.residential;
+      const capacity = Math.floor(config.populationCapacity * Math.pow(1.5, (rb.level || 1) - 1));
+      const key = `${rb.col},${rb.row}`;
+      const current = homeCounts[key] || 0;
+
+      if (current < capacity) {
+        const resident = new Resident(rb.col, rb.row, this.nextId++);
+        // 随机偏移初始位置
+        resident.x += (Math.random() - 0.5) * GRID.cellSize * 0.5;
+        resident.y += (Math.random() - 0.5) * GRID.cellSize * 0.5;
+        this.residents.push(resident);
+        return;
+      }
+    }
+  }
+
+  // 分配工作
+  assignJobs(buildingStats) {
+    // 收集所有工作岗位
+    const workplaces = buildingStats.buildings.filter(b =>
+      b.type === 'commercial' || b.type === 'industrial' || b.type === 'farm'
+    );
+
+    // 收集每个工作地的在职工人数
+    const workerCounts = {};
+    for (const r of this.residents) {
+      if (r.employed) {
+        const key = `${r.workCol},${r.workRow}`;
+        workerCounts[key] = (workerCounts[key] || 0) + 1;
+      }
+    }
+
+    // 为失业居民找工作
+    for (const resident of this.residents) {
+      if (resident.employed) continue;
+
+      for (const wp of workplaces) {
+        const config = BUILDINGS[wp.type];
+        const capacity = Math.floor((config.jobs || 0) * Math.pow(1.5, (wp.level || 1) - 1));
+        const key = `${wp.col},${wp.row}`;
+        const current = workerCounts[key] || 0;
+
+        if (current < capacity) {
+          resident.employed = true;
+          resident.workCol = wp.col;
+          resident.workRow = wp.row;
+          workerCounts[key] = current + 1;
+          break;
+        }
+      }
+    }
+
+    // 如果工作岗位不足，解雇多余的人
+    const employedResidents = this.residents.filter(r => r.employed);
+    const totalCapacity = workplaces.reduce((sum, wp) => {
+      const config = BUILDINGS[wp.type];
+      return sum + Math.floor((config.jobs || 0) * Math.pow(1.5, (wp.level || 1) - 1));
+    }, 0);
+
+    if (employedResidents.length > totalCapacity) {
+      // 解雇多余的
+      const toFire = employedResidents.length - totalCapacity;
+      for (let i = 0; i < toFire && employedResidents.length > 0; i++) {
+        const idx = Math.floor(Math.random() * employedResidents.length);
+        const fired = employedResidents.splice(idx, 1)[0];
+        fired.employed = false;
+        fired.workCol = -1;
+        fired.workRow = -1;
+        fired.state = 'home';
+        fired.stateTimer = 60;
+      }
+    }
+  }
+
+  // 渲染居民
+  render(ctx, camera) {
+    ctx.save();
+    ctx.translate(camera.x, camera.y);
+    ctx.scale(camera.zoom, camera.zoom);
+
+    // 只在合适的缩放级别下渲染居民
+    if (camera.zoom >= 0.5) {
+      const size = RESIDENT_SIZE * (camera.zoom < 1 ? 1 : 1);
+
+      for (const resident of this.residents) {
+        // 居民本体
+        ctx.fillStyle = resident.color;
+        ctx.beginPath();
+        ctx.arc(resident.x, resident.y - 4, size, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 头部
+        ctx.fillStyle = '#FFCCBC';
+        ctx.beginPath();
+        ctx.arc(resident.x, resident.y - 8, size * 0.7, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 身体
+        ctx.fillStyle = resident.color;
+        ctx.fillRect(resident.x - size * 0.6, resident.y - 4, size * 1.2, size * 1.5);
+
+        // 工作时显示小图标
+        if (resident.state === 'work' && camera.zoom >= 1) {
+          ctx.font = '8px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillStyle = '#fff';
+          ctx.fillText('💼', resident.x, resident.y - 14);
+        }
+      }
+    }
+
+    ctx.restore();
+  }
+
+  // 获取居民统计
+  getStats() {
+    const total = this.residents.length;
+    const employed = this.residents.filter(r => r.employed).length;
+    const avgSatisfaction = total > 0
+      ? this.residents.reduce((sum, r) => sum + r.satisfaction, 0) / total
+      : 0;
+
+    return {
+      total,
+      employed,
+      unemployed: total - employed,
+      avgSatisfaction: Math.floor(avgSatisfaction)
+    };
+  }
+}
+
+// === ./economy.js ===
+// ============================================
+// 城市建设者 - 经济系统
+// ============================================
+
+
+class Economy {
+  constructor() {
+    this.gold = INITIAL_RESOURCES.gold;
+    this.food = INITIAL_RESOURCES.food;
+    this.population = INITIAL_RESOURCES.population;
+    this.satisfaction = INITIAL_RESOURCES.satisfaction;
+
+    this.day = 1;
+    this.dayTimer = 0;
+    this.isDaytime = true;
+    this.dayProgress = 0; // 0-1
+
+    // 每日统计
+    this.dailyIncome = 0;
+    this.dailyExpense = 0;
+    this.dailyFoodProduced = 0;
+    this.dailyFoodConsumed = 0;
+
+    // 历史记录
+    this.history = [];
+    this.totalEarned = 0;
+    this.totalSpent = 0;
+  }
+
+  // 重置每日统计
+  resetDailyStats() {
+    this.dailyIncome = 0;
+    this.dailyExpense = 0;
+    this.dailyFoodProduced = 0;
+    this.dailyFoodConsumed = 0;
+  }
+
+  // 计算建筑统计
+  calculateBuildingStats(grid) {
+    const stats = {
+      totalPopulationCapacity: 0,
+      totalJobs: 0,
+      totalTaxIncome: 0,
+      totalFoodIncome: 0,
+      totalResourceIncome: 0,
+      totalMaintenance: 0,
+      totalPowerSupply: 0,
+      totalPowerNeed: 0,
+      totalSatisfactionBonus: 0,
+      buildingCounts: {},
+      buildings: []
+    };
+
+    for (let r = 0; r < grid.rows; r++) {
+      for (let c = 0; c < grid.cols; c++) {
+        const building = grid.getBuilding(c, r);
+        if (!building) continue;
+
+        const config = BUILDINGS[building.type];
+        if (!config) continue;
+
+        const level = building.level || 1;
+        const multiplier = Math.pow(1.5, level - 1);
+
+        stats.buildings.push({ ...building, col: c, row: r });
+        stats.buildingCounts[building.type] = (stats.buildingCounts[building.type] || 0) + 1;
+
+        // 人口容量
+        if (config.populationCapacity) {
+          stats.totalPopulationCapacity += Math.floor(config.populationCapacity * multiplier);
+        }
+
+        // 工作岗位
+        if (config.jobs) {
+          stats.totalJobs += Math.floor(config.jobs * multiplier);
+        }
+
+        // 税收
+        if (config.taxIncome) {
+          stats.totalTaxIncome += Math.floor(config.taxIncome * multiplier);
+        }
+
+        // 食物
+        if (config.foodIncome) {
+          stats.totalFoodIncome += Math.floor(config.foodIncome * multiplier);
+        }
+
+        // 资源
+        if (config.resourceIncome) {
+          stats.totalResourceIncome += Math.floor(config.resourceIncome * multiplier);
+        }
+
+        // 维护费
+        stats.totalMaintenance += Math.ceil(config.maintenance * (1 + (level - 1) * 0.3));
+
+        // 电力
+        if (config.powerSupply) {
+          stats.totalPowerSupply += Math.floor(config.powerSupply * multiplier);
+        }
+        if (config.powerNeed) {
+          stats.totalPowerNeed += config.powerNeed;
+        }
+
+        // 满意度加成
+        if (config.satisfactionBonus) {
+          stats.totalSatisfactionBonus += Math.floor(config.satisfactionBonus * multiplier);
+        }
+      }
+    }
+
+    return stats;
+  }
+
+  // 每日结算
+  endDay(grid) {
+    const stats = this.calculateBuildingStats(grid);
+    let notifications = [];
+
+    // 税收收入（基于人口和商业建筑）
+    const employedRatio = stats.totalJobs > 0
+      ? Math.min(1, this.population / stats.totalJobs)
+      : 0;
+    const taxFromResidents = Math.floor(this.population * 2 * employedRatio);
+    const totalTax = stats.totalTaxIncome + taxFromResidents;
+
+    // 食物
+    this.dailyFoodProduced = stats.totalFoodIncome;
+    this.dailyFoodConsumed = Math.ceil(this.population * 0.8);
+    this.food += this.dailyFoodProduced - this.dailyFoodConsumed;
+
+    // 金币
+    this.dailyIncome = totalTax;
+    this.dailyExpense = stats.totalMaintenance;
+    this.gold += this.dailyIncome - this.dailyExpense;
+    this.totalEarned += this.dailyIncome;
+    this.totalSpent += this.dailyExpense;
+
+    // 满意度计算
+    this.calculateSatisfaction(stats, employedRatio);
+
+    // 人口增长/减少
+    if (this.satisfaction >= 50 && this.population < stats.totalPopulationCapacity) {
+      const growth = Math.max(1, Math.floor(this.satisfaction / 25));
+      const space = stats.totalPopulationCapacity - this.population;
+      const added = Math.min(growth, space);
+      if (added > 0) {
+        this.population += added;
+        notifications.push(`+${added} 新居民迁入`);
+      }
+    } else if (this.satisfaction < 25 && this.population > 0) {
+      const leaving = Math.min(2, this.population);
+      this.population -= leaving;
+      notifications.push(`${leaving} 居民因不满离开`);
+    }
+
+    // 食物不足警告
+    if (this.food < 0) {
+      this.food = 0;
+      notifications.push('食物不足！居民挨饿');
+    }
+
+    // 金币不足警告
+    if (this.gold < 0) {
+      notifications.push('财政赤字！减少建筑或增加收入');
+    }
+
+    // 电力不足警告
+    if (stats.totalPowerNeed > stats.totalPowerSupply && stats.totalPowerNeed > 0) {
+      notifications.push('电力不足！建造发电厂');
+    }
+
+    // 记录历史
+    this.history.push({
+      day: this.day,
+      gold: this.gold,
+      population: this.population,
+      food: this.food,
+      satisfaction: this.satisfaction
+    });
+
+    // 保存每日统计（在重置前）
+    const dailyReport = {
+      income: this.dailyIncome,
+      expense: this.dailyExpense,
+      foodProduced: this.dailyFoodProduced,
+      foodConsumed: this.dailyFoodConsumed
+    };
+
+    // 推进到下一天
+    this.day++;
+    this.dayTimer = 0;
+    this.resetDailyStats();
+
+    return { notifications, stats, dailyReport };
+  }
+
+  // 计算满意度
+  calculateSatisfaction(stats, employedRatio) {
+    let sat = 50; // 基础值
+
+    // 基础设施加成
+    sat += stats.totalSatisfactionBonus;
+
+    // 就业率加成
+    sat += Math.floor(employedRatio * 15);
+
+    // 食物充足加成
+    if (this.food > 0) {
+      sat += 5;
+    } else {
+      sat -= 15;
+    }
+
+    // 电力充足
+    if (stats.totalPowerSupply >= stats.totalPowerNeed || stats.totalPowerNeed === 0) {
+      sat += 5;
+    } else {
+      sat -= 10;
+    }
+
+    // 住房充足
+    if (this.population <= stats.totalPopulationCapacity && stats.totalPopulationCapacity > 0) {
+      sat += 5;
+    } else if (stats.totalPopulationCapacity === 0 && this.population > 0) {
+      sat -= 10;
+    }
+
+    // 金币为负
+    if (this.gold < 0) {
+      sat -= 10;
+    }
+
+    this.satisfaction = Math.max(0, Math.min(100, sat));
+  }
+
+  // 更新时间
+  update(dt) {
+    this.dayTimer += dt;
+    this.dayProgress = this.dayTimer / DAY_LENGTH;
+    this.isDaytime = this.dayProgress < 0.5;
+
+    // 一天结束
+    if (this.dayTimer >= DAY_LENGTH) {
+      return true; // 通知调用者结算
+    }
+    return false;
+  }
+
+  // 扣除建造费用
+  spendGold(amount) {
+    if (this.gold < amount) return false;
+    this.gold -= amount;
+    this.totalSpent += amount;
+    return true;
+  }
+
+  // 获取电力统计
+  getPowerStats(grid) {
+    const stats = this.calculateBuildingStats(grid);
+    return {
+      supply: stats.totalPowerSupply,
+      need: stats.totalPowerNeed
+    };
+  }
+
+  // 获取当前状态摘要
+  getSummary(grid) {
+    const stats = this.calculateBuildingStats(grid);
+    return {
+      gold: Math.floor(this.gold),
+      population: this.population,
+      populationCapacity: stats.totalPopulationCapacity,
+      food: Math.floor(this.food),
+      powerSupply: stats.totalPowerSupply,
+      powerNeed: stats.totalPowerNeed,
+      satisfaction: Math.floor(this.satisfaction),
+      day: this.day,
+      dayProgress: this.dayProgress,
+      isDaytime: this.isDaytime
+    };
+  }
+}
+
+// === ./ui.js ===
+// ============================================
+// 城市建设者 - UI系统
+// ============================================
+
+
+class UI {
+  constructor(buildingSystem, economy) {
+    this.buildingSystem = buildingSystem;
+    this.economy = economy;
+
+    this.notifications = [];
+    this.notificationTimer = 0;
+
+    this.init();
+  }
+
+  init() {
+    this.createBuildingPanel();
+    this.createSpeedControls();
+  }
+
+  // 创建建筑选择面板
+  createBuildingPanel() {
+    const panel = document.getElementById('building-panel');
+    panel.innerHTML = '<div class="panel-title">建筑</div>';
+
+    for (const type of BUILDING_ORDER) {
+      const config = BUILDINGS[type];
+      const btn = document.createElement('div');
+      btn.className = 'building-btn';
+      btn.dataset.type = type;
+      btn.innerHTML = `
+        <span class="building-icon">${config.icon}</span>
+        <span class="building-name">${config.name}</span>
+        <span class="building-cost">💰${config.cost}</span>
+      `;
+      btn.title = config.description;
+      btn.addEventListener('click', () => {
+        this.buildingSystem.selectType(type);
+        this.updateBuildingPanel();
+      });
+      panel.appendChild(btn);
+    }
+  }
+
+  // 创建速度控制
+  createSpeedControls() {
+    const bar = document.getElementById('resource-bar');
+    const speedDiv = document.createElement('div');
+    speedDiv.id = 'speed-controls';
+    speedDiv.innerHTML = `
+      <button class="speed-btn active" data-speed="1">x1</button>
+      <button class="speed-btn" data-speed="2">x2</button>
+      <button class="speed-btn" data-speed="3">x3</button>
+    `;
+    bar.appendChild(speedDiv);
+  }
+
+  // 更新建筑面板高亮
+  updateBuildingPanel() {
+    const btns = document.querySelectorAll('.building-btn');
+    btns.forEach(btn => {
+      btn.classList.toggle('selected', btn.dataset.type === this.buildingSystem.selectedType);
+    });
+  }
+
+  // 更新资源显示
+  updateResources(summary) {
+    const set = (id, text) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = text;
+    };
+
+    set('res-gold', `💰 ${summary.gold}`);
+    set('res-pop', `👥 ${summary.population}/${summary.populationCapacity}`);
+    set('res-food', `🍎 ${summary.food}`);
+    set('res-power', `⚡ ${summary.powerSupply}/${summary.powerNeed}`);
+
+    const satEl = document.getElementById('res-satisfaction');
+    if (satEl) {
+      satEl.textContent = `😊 ${summary.satisfaction}%`;
+      satEl.className = summary.satisfaction >= 60 ? 'good' : summary.satisfaction >= 35 ? 'warn' : 'bad';
+    }
+
+    set('res-day', `📅 第${summary.day}天`);
+
+    // 日夜指示
+    const dayEl = document.getElementById('res-time');
+    if (dayEl) {
+      dayEl.textContent = summary.isDaytime ? '☀️ 白天' : '🌙 夜晚';
+    }
+  }
+
+  // 更新信息面板
+  updateInfoPanel(col, row, grid, economy) {
+    const panel = document.getElementById('info-panel');
+
+    if (col === null || row === null) {
+      panel.classList.add('hidden');
+      return;
+    }
+
+    const building = grid.getBuilding(col, row);
+    if (!building) {
+      panel.classList.add('hidden');
+      return;
+    }
+
+    const config = BUILDINGS[building.type];
+    const level = building.level || 1;
+    const multiplier = Math.pow(1.5, level - 1);
+
+    panel.classList.remove('hidden');
+
+    let details = '';
+    if (config.populationCapacity) details += `人口容量: ${Math.floor(config.populationCapacity * multiplier)} `;
+    if (config.jobs) details += `岗位: ${Math.floor(config.jobs * multiplier)} `;
+    if (config.taxIncome) details += `税收: +${Math.floor(config.taxIncome * multiplier)}/天 `;
+    if (config.foodIncome) details += `食物: +${Math.floor(config.foodIncome * multiplier)}/天 `;
+    if (config.powerSupply) details += `电力: +${Math.floor(config.powerSupply * multiplier)} `;
+    if (config.satisfactionBonus) details += `满意度: +${Math.floor(config.satisfactionBonus * multiplier)} `;
+
+    const upgradeCost = this.buildingSystem.getUpgradeCost(col, row);
+    const canUpgrade = upgradeCost !== null && economy.gold >= upgradeCost;
+
+    panel.innerHTML = `
+      <div class="info-header">
+        <span class="info-icon">${config.icon}</span>
+        <span class="info-name">${config.name}</span>
+        <span class="info-level">Lv.${level}</span>
+      </div>
+      <div class="info-details">${details}</div>
+      <div class="info-maint">维护费: ${Math.ceil(config.maintenance * (1 + (level - 1) * 0.3))}/天</div>
+      <div class="info-actions">
+        ${level < MAX_BUILDING_LEVEL ? `
+          <button class="btn-upgrade ${canUpgrade ? '' : 'disabled'}" id="btn-upgrade">
+            升级 (💰${upgradeCost})
+          </button>
+        ` : '<span class="max-level">已满级</span>'}
+        <button class="btn-demolish" id="btn-demolish">
+          拆除 (返还💰${Math.floor(config.cost * 0.5 * level)})
+        </button>
+      </div>
+    `;
+
+    // 绑定按钮事件
+    const upgradeBtn = document.getElementById('btn-upgrade');
+    if (upgradeBtn && canUpgrade) {
+      upgradeBtn.addEventListener('click', () => {
+        const result = this.buildingSystem.upgrade(col, row);
+        if (result) {
+          this.addNotification(`${config.name} 升级到 Lv.${result.building.level}`, 'success');
+        }
+      });
+    }
+
+    const demolishBtn = document.getElementById('btn-demolish');
+    if (demolishBtn) {
+      demolishBtn.addEventListener('click', () => {
+        const result = this.buildingSystem.demolish(col, row);
+        if (result) {
+          this.addNotification(`拆除${config.name}，返还 ${result.refund} 金币`, 'warn');
+          panel.classList.add('hidden');
+        }
+      });
+    }
+  }
+
+  // 添加通知
+  addNotification(text, type = 'info') {
+    this.notifications.push({ text, type, timer: 300 });
+    this.renderNotifications();
+  }
+
+  // 批量添加通知
+  addNotifications(texts, type = 'info') {
+    for (const text of texts) {
+      this.notifications.push({ text, type, timer: 300 });
+    }
+    this.renderNotifications();
+  }
+
+  // 更新通知
+  updateNotifications(dt) {
+    let changed = false;
+    for (let i = this.notifications.length - 1; i >= 0; i--) {
+      this.notifications[i].timer -= dt;
+      if (this.notifications[i].timer <= 0) {
+        this.notifications.splice(i, 1);
+        changed = true;
+      }
+    }
+    if (changed) this.renderNotifications();
+  }
+
+  // 渲染通知列表
+  renderNotifications() {
+    const container = document.getElementById('notifications');
+    container.innerHTML = '';
+    const recent = this.notifications.slice(-5);
+    for (const n of recent) {
+      const div = document.createElement('div');
+      div.className = `notification ${n.type}`;
+      div.textContent = n.text;
+      const opacity = Math.min(1, n.timer / 60);
+      div.style.opacity = opacity;
+      container.appendChild(div);
+    }
+  }
+
+  // 显示帮助
+  toggleHelp() {
+    const help = document.getElementById('help-overlay');
+    help.classList.toggle('hidden');
+  }
+
+  // 更新建造按钮可用状态
+  updateBuildingAvailability(gold) {
+    const btns = document.querySelectorAll('.building-btn');
+    btns.forEach(btn => {
+      const type = btn.dataset.type;
+      const config = BUILDINGS[type];
+      btn.classList.toggle('cannot-afford', gold < config.cost);
+    });
+  }
+}
+
+// === ./sound.js ===
+// ============================================
+// 城市建设者 - 音效系统 (Web Audio API)
+// ============================================
+
+let audioCtx = null;
+
+function getCtx() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (audioCtx.state === 'suspended') {
+    audioCtx.resume();
+  }
+  return audioCtx;
+}
+
+function playTone(frequency, duration, type = 'sine', volume = 0.15) {
+  try {
+    const ctx = getCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(frequency, ctx.currentTime);
+    gain.gain.setValueAtTime(volume, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + duration);
+  } catch (e) {
+    // 音频不可用时静默失败
+  }
+}
+
+// 建造音效 - 短促上升音
+function playBuild() {
+  playTone(440, 0.1, 'sine', 0.12);
+  setTimeout(() => playTone(660, 0.15, 'sine', 0.1), 80);
+  setTimeout(() => playTone(880, 0.2, 'sine', 0.08), 160);
+}
+
+// 拆除音效 - 下降音
+function playDemolish() {
+  playTone(440, 0.15, 'sawtooth', 0.08);
+  setTimeout(() => playTone(330, 0.15, 'sawtooth', 0.06), 100);
+  setTimeout(() => playTone(220, 0.2, 'sawtooth', 0.05), 200);
+}
+
+// 收税音效 - 硬币声
+function playTax() {
+  playTone(1200, 0.08, 'sine', 0.08);
+  setTimeout(() => playTone(1500, 0.08, 'sine', 0.06), 60);
+  setTimeout(() => playTone(1800, 0.12, 'sine', 0.05), 120);
+}
+
+// 升级音效 - 和弦上升
+function playUpgrade() {
+  playTone(523, 0.15, 'sine', 0.1);
+  setTimeout(() => playTone(659, 0.15, 'sine', 0.1), 100);
+  setTimeout(() => playTone(784, 0.15, 'sine', 0.1), 200);
+  setTimeout(() => playTone(1047, 0.25, 'sine', 0.12), 300);
+}
+
+// 错误音效 - 低沉警告
+function playError() {
+  playTone(200, 0.2, 'square', 0.06);
+  setTimeout(() => playTone(180, 0.3, 'square', 0.04), 150);
+}
+
+// 通知音效 - 清脆提示
+function playNotify() {
+  playTone(880, 0.1, 'sine', 0.08);
+  setTimeout(() => playTone(1100, 0.15, 'sine', 0.06), 80);
+}
+
+// === main.js ===
+// ============================================
+// 城市建设者 - 游戏主循环
+// ============================================
+
+
+// ---- 全局状态 ----
+let canvas, ctx;
+let grid, buildingSystem, residentSystem, economy, ui;
+let camera;
+let gameSpeed = 1;
+let isRunning = true;
+let lastTime = 0;
+let hoverCell = null;
+
+// 拖拽状态
+let isDragging = false;
+let dragStartX = 0, dragStartY = 0;
+let cameraStartX = 0, cameraStartY = 0;
+let mouseMoved = false;
+
+// ---- 初始化 ----
+function init() {
+  canvas = document.getElementById('game-canvas');
+  ctx = canvas.getContext('2d');
+
+  resizeCanvas();
+  window.addEventListener('resize', resizeCanvas);
+
+  // 初始化相机
+  camera = {
+    x: 0, y: 0,
+    zoom: 1,
+    screenW: canvas.width,
+    screenH: canvas.height,
+
+    screenToWorld(sx, sy) {
+      return {
+        x: (sx - this.x) / this.zoom,
+        y: (sy - this.y) / this.zoom
+      };
+    },
+
+    worldToScreen(wx, wy) {
+      return {
+        x: wx * this.zoom + this.x,
+        y: wy * this.zoom + this.y
+      };
+    },
+
+    centerOn(wx, wy) {
+      this.x = this.screenW / 2 - wx * this.zoom;
+      this.y = this.screenH / 2 - wy * this.zoom;
+    }
+  };
+
+  // 居中相机到地图中心
+  const mapW = GRID.cols * GRID.cellSize;
+  const mapH = GRID.rows * GRID.cellSize;
+  camera.centerOn(mapW / 2, mapH / 2);
+
+  // 初始化游戏系统
+  grid = new Grid();
+  economy = new Economy();
+  buildingSystem = new BuildingSystem(grid, economy);
+  residentSystem = new ResidentSystem(grid, economy);
+  ui = new UI(buildingSystem, economy);
+
+  // 绑定事件
+  bindEvents();
+
+  // 开始游戏循环
+  lastTime = performance.now();
+  requestAnimationFrame(gameLoop);
+
+  ui.addNotification('欢迎来到城市建设者！选择建筑类型开始建造', 'info');
+}
+
+// ---- 画布大小 ----
+function resizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  if (camera) {
+    camera.screenW = canvas.width;
+    camera.screenH = canvas.height;
+  }
+}
+
+// ---- 事件绑定 ----
+function bindEvents() {
+  // 鼠标事件
+  canvas.addEventListener('mousedown', onMouseDown);
+  canvas.addEventListener('mousemove', onMouseMove);
+  canvas.addEventListener('mouseup', onMouseUp);
+  canvas.addEventListener('wheel', onWheel, { passive: false });
+  canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+  // 键盘事件
+  document.addEventListener('keydown', onKeyDown);
+
+  // 速度控制
+  document.querySelectorAll('.speed-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      gameSpeed = parseInt(btn.dataset.speed);
+      document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
+
+  // 帮助按钮
+  document.getElementById('btn-help').addEventListener('click', () => ui.toggleHelp());
+  document.getElementById('help-overlay').addEventListener('click', (e) => {
+    if (e.target.id === 'help-overlay') ui.toggleHelp();
+  });
+}
+
+// ---- 鼠标事件 ----
+function onMouseDown(e) {
+  if (e.button === 0) { // 左键
+    isDragging = true;
+    mouseMoved = false;
+    dragStartX = e.clientX;
+    dragStartY = e.clientY;
+    cameraStartX = camera.x;
+    cameraStartY = camera.y;
+  }
+}
+
+function onMouseMove(e) {
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+
+  // 更新悬停格子
+  const worldPos = camera.screenToWorld(mx, my);
+  const gc = grid.worldToGrid(worldPos.x, worldPos.y);
+  hoverCell = grid.isValid(gc.col, gc.row) ? gc : null;
+
+  // 拖拽
+  if (isDragging) {
+    const dx = e.clientX - dragStartX;
+    const dy = e.clientY - dragStartY;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+      mouseMoved = true;
+    }
+    if (mouseMoved) {
+      camera.x = cameraStartX + dx;
+      camera.y = cameraStartY + dy;
+    }
+  }
+}
+
+function onMouseUp(e) {
+  if (e.button === 0) {
+    if (!mouseMoved && hoverCell) {
+      // 点击操作
+      if (buildingSystem.selectedType) {
+        // 放置建筑
+        const result = buildingSystem.place(buildingSystem.selectedType, hoverCell.col, hoverCell.row);
+        if (result) {
+          const config = BUILDINGS[result.type];
+          Sound.playBuild();
+          ui.addNotification(`建造了${config.name}`, 'success');
+        } else {
+          Sound.playError();
+          if (!grid.isEmpty(hoverCell.col, hoverCell.row)) {
+            ui.addNotification('此处已有建筑', 'warn');
+          } else if (buildingSystem.selectedType) {
+            const cost = BUILDINGS[buildingSystem.selectedType].cost;
+            if (economy.gold < cost) {
+              ui.addNotification(`金币不足 (需要${cost})`, 'warn');
+            }
+          }
+        }
+      } else {
+        // 选中建筑
+        buildingSystem.selectCell(hoverCell.col, hoverCell.row);
+      }
+    }
+    isDragging = false;
+  }
+}
+
+function onWheel(e) {
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+
+  // 先计算缩放前鼠标对应的世界坐标
+  const worldBefore = camera.screenToWorld(mx, my);
+
+  // 更新缩放
+  const zoomDelta = e.deltaY > 0 ? -CAMERA_DEFAULTS.zoomStep : CAMERA_DEFAULTS.zoomStep;
+  camera.zoom = Math.max(CAMERA_DEFAULTS.minZoom,
+    Math.min(CAMERA_DEFAULTS.maxZoom, camera.zoom + zoomDelta));
+
+  // 缩放后，调整相机位置使鼠标下方的世界坐标不变
+  camera.x = mx - worldBefore.x * camera.zoom;
+  camera.y = my - worldBefore.y * camera.zoom;
+}
+
+function onKeyDown(e) {
+  switch (e.key) {
+    case 'Escape':
+      buildingSystem.selectedType = null;
+      buildingSystem.selectedCell = null;
+      ui.updateBuildingPanel();
+      break;
+    case 'h':
+    case 'H':
+      ui.toggleHelp();
+      break;
+    case '1': case '2': case '3': case '4': case '5':
+    case '6': case '7': case '8': case '9':
+      {
+        const types = ['residential', 'commercial', 'industrial', 'farm',
+          'school', 'hospital', 'police', 'park', 'powerplant', 'road'];
+        const idx = parseInt(e.key) - 1;
+        if (idx >= 0 && idx < types.length) {
+          buildingSystem.selectType(types[idx]);
+          ui.updateBuildingPanel();
+        }
+      }
+      break;
+    case '0':
+      buildingSystem.selectType('road');
+      ui.updateBuildingPanel();
+      break;
+    case '+':
+    case '=':
+      if (buildingSystem.selectedCell) {
+        const { col, row } = buildingSystem.selectedCell;
+        const result = buildingSystem.upgrade(col, row);
+        if (result) {
+          Sound.playUpgrade();
+          ui.addNotification(`${BUILDINGS[result.building.type].name} 升级到 Lv.${result.building.level}`, 'success');
+        }
+      }
+      break;
+    case '-':
+    case 'Delete':
+      if (buildingSystem.selectedCell) {
+        const { col, row } = buildingSystem.selectedCell;
+        const building = grid.getBuilding(col, row);
+        if (building) {
+          const result = buildingSystem.demolish(col, row);
+          if (result) {
+            Sound.playDemolish();
+            ui.addNotification(`拆除${BUILDINGS[building.type].name}，返还${result.refund}金币`, 'warn');
+          }
+        }
+      }
+      break;
+  }
+}
+
+// ---- 游戏主循环 ----
+function gameLoop(timestamp) {
+  if (!isRunning) return;
+
+  const rawDtMs = Math.min(timestamp - lastTime, 50); // 限制最大dt (ms)
+  lastTime = timestamp;
+
+  // dt = 逻辑帧数 (1帧 = 1/60秒 at 1x速度)
+  const dt = (rawDtMs / 1000) * 60 * gameSpeed;
+
+  // 更新
+  update(dt);
+
+  // 渲染
+  render();
+
+  requestAnimationFrame(gameLoop);
+}
+
+// ---- 更新 ----
+function update(dt) {
+  // 更新经济/时间
+  const dayEnded = economy.update(dt);
+  if (dayEnded) {
+    const result = economy.endDay(grid);
+    Sound.playTax();
+    const dr = result.dailyReport;
+    ui.addNotification(`第${economy.day - 1}天结算: 收入+${dr.income} 支出-${dr.expense}`, 'info');
+    if (result.notifications.length > 0) {
+      ui.addNotifications(result.notifications, 'warn');
+    }
+  }
+
+  // 更新建筑统计
+  const stats = economy.calculateBuildingStats(grid);
+
+  // 更新居民
+  residentSystem.update(dt, stats);
+
+  // 同步人口到经济系统
+  economy.population = residentSystem.residents.length;
+
+  // 更新UI
+  const summary = economy.getSummary(grid);
+  ui.updateResources(summary);
+  ui.updateBuildingAvailability(economy.gold);
+  ui.updateNotifications(dt);
+
+  // 更新信息面板
+  if (buildingSystem.selectedCell) {
+    ui.updateInfoPanel(buildingSystem.selectedCell.col, buildingSystem.selectedCell.row, grid, economy);
+  } else {
+    ui.updateInfoPanel(null, null, grid, economy);
+  }
+}
+
+// ---- 渲染 ----
+function render() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // 绘制背景
+  ctx.fillStyle = '#1a1a2e';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // 绘制网格
+  grid.render(ctx, camera);
+
+  // 绘制建筑
+  buildingSystem.render(ctx, camera, hoverCell, economy.dayProgress);
+
+  // 绘制居民
+  residentSystem.render(ctx, camera);
+
+  // 日夜叠加层
+  renderDayNight();
+
+  // 小地图
+  renderMinimap();
+
+  // 悬停提示
+  if (hoverCell && !buildingSystem.selectedType) {
+    renderHoverTooltip();
+  }
+}
+
+// 日夜效果
+function renderDayNight() {
+  const progress = economy.dayProgress;
+  let alpha = 0;
+
+  if (progress < 0.2) {
+    // 黎明
+    alpha = 0.2 - progress; // 0.2 -> 0
+  } else if (progress < 0.5) {
+    // 白天
+    alpha = 0;
+  } else if (progress < 0.7) {
+    // 黄昏
+    alpha = (progress - 0.5) * 1.5; // 0 -> 0.3
+  } else {
+    // 夜晚
+    alpha = 0.3;
+  }
+
+  if (alpha > 0) {
+    ctx.fillStyle = `rgba(10, 10, 40, ${alpha})`;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+}
+
+// 小地图
+function renderMinimap() {
+  const mmW = 150, mmH = 100;
+  const mmX = canvas.width - mmW - 15;
+  const mmY = canvas.height - mmH - 15;
+  const scaleX = mmW / (GRID.cols * GRID.cellSize);
+  const scaleY = mmH / (GRID.rows * GRID.cellSize);
+
+  // 背景
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+  ctx.fillRect(mmX - 2, mmY - 2, mmW + 4, mmH + 4);
+
+  // 地图区域
+  ctx.fillStyle = '#1a3a1a';
+  ctx.fillRect(mmX, mmY, mmW, mmH);
+
+  // 建筑
+  for (let r = 0; r < GRID.rows; r++) {
+    for (let c = 0; c < GRID.cols; c++) {
+      const building = grid.getBuilding(c, r);
+      if (building) {
+        const config = BUILDINGS[building.type];
+        ctx.fillStyle = config.color;
+        ctx.fillRect(
+          mmX + c * GRID.cellSize * scaleX,
+          mmY + r * GRID.cellSize * scaleY,
+          Math.max(2, GRID.cellSize * scaleX),
+          Math.max(2, GRID.cellSize * scaleY)
+        );
+      }
+    }
+  }
+
+  // 视口范围
+  const topLeft = camera.screenToWorld(0, 0);
+  const bottomRight = camera.screenToWorld(canvas.width, canvas.height);
+  ctx.strokeStyle = '#FFD700';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(
+    mmX + topLeft.x * scaleX,
+    mmY + topLeft.y * scaleY,
+    (bottomRight.x - topLeft.x) * scaleX,
+    (bottomRight.y - topLeft.y) * scaleY
+  );
+}
+
+// 绘制圆角矩形辅助函数
+function drawRoundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.arcTo(x + w, y, x + w, y + r, r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+  ctx.lineTo(x + r, y + h);
+  ctx.arcTo(x, y + h, x, y + h - r, r);
+  ctx.lineTo(x, y + r);
+  ctx.arcTo(x, y, x + r, y, r);
+  ctx.closePath();
+}
+
+// 悬停提示
+function renderHoverTooltip() {
+  if (!hoverCell) return;
+  const building = grid.getBuilding(hoverCell.col, hoverCell.row);
+  if (!building) return;
+
+  const config = BUILDINGS[building.type];
+  const worldPos = grid.gridToWorldCenter(hoverCell.col, hoverCell.row);
+  const screenPos = camera.worldToScreen(worldPos.x, worldPos.y);
+
+  const text = `${config.icon} ${config.name} Lv.${building.level}`;
+  ctx.font = 'bold 13px "Microsoft YaHei", sans-serif';
+  const tm = ctx.measureText(text);
+  const tw = tm.width + 16;
+  const th = 28;
+  const tx = screenPos.x - tw / 2;
+  const ty = screenPos.y - GRID.cellSize * camera.zoom / 2 - th - 8;
+
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+  drawRoundRect(ctx, tx, ty, tw, th, 6);
+  ctx.fill();
+
+  ctx.fillStyle = '#fff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, screenPos.x, ty + th / 2);
+}
+
+// ---- 启动 ----
+init();;
+
+
+</script>
+
+</body>
+</html>

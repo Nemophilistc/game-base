@@ -1,0 +1,2217 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>迷你高尔夫 - Mini Golf</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #0a0a1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+            font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+        }
+        #gameCanvas {
+            border-radius: 12px;
+            box-shadow: 0 0 40px rgba(74, 222, 128, 0.15), 0 0 80px rgba(0, 0, 0, 0.5);
+            touch-action: none;
+        }
+        .overlay {
+            position: fixed;
+            left: 0; top: 0; right: 0; bottom: 0;
+            background: rgba(10, 10, 26, 0.92);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            opacity: 1;
+            transition: opacity 0.4s;
+            padding: 20px;
+        }
+        .overlay.fade-out { opacity: 0; pointer-events: none; }
+        .overlay.fade-fast { animation: fadeInOut 1.2s ease-in-out; }
+        @keyframes fadeInOut {
+            0% { opacity: 0; }
+            20% { opacity: 1; }
+            80% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+        .overlay-content {
+            background: rgba(30, 30, 50, 0.95);
+            border: 1px solid rgba(74, 222, 128, 0.2);
+            border-radius: 16px;
+            padding: 28px 32px;
+            box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+            color: #fff;
+        }
+        .course-btn {
+            background: rgba(255, 255, 255, 0.08);
+            color: #aaa;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.2s;
+        }
+        .course-btn:hover { background: rgba(255, 255, 255, 0.15); color: #fff; }
+        .course-btn.active {
+            background: rgba(74, 222, 128, 0.2);
+            border-color: #4ADE80;
+            color: #4ADE80;
+        }
+        button:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(34, 197, 94, 0.5) !important; }
+        button:active { transform: translateY(0); }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb { background: rgba(74,222,128,0.3); border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <script>
+// === ./config.js ===
+// ============================================
+// Mini Golf - Configuration & Constants
+// ============================================
+
+const CANVAS_MAX_W = 800;
+const CANVAS_MAX_H = 900;
+const COURSE_W = 600;
+const COURSE_H = 800;
+
+// Physics
+const BALL_RADIUS = 10;
+const FRICTION = {
+    grass: 0.985,
+    ice: 0.996,
+    desert: 0.975
+};
+const BOUNCE_FACTOR = 0.7;
+const BUMPER_BOUNCE = 1.3;
+const MAX_SPEED = 10;
+const STOP_THRESHOLD = 0.08;
+const HOLE_RADIUS = 15;
+const HOLE_CAPTURE_SPEED = 6;
+const SLOPE_FORCE = 0.012;
+const SAND_FRICTION = 0.95;
+const MAX_DRAG = 200;
+
+// Aim line
+const AIM_DOT_COUNT = 30;
+const AIM_DOT_INTERVAL = 3;
+
+// Visual
+const BALL_COLOR = '#FFFFFF';
+const BALL_SHADOW = 'rgba(0,0,0,0.35)';
+const BALL_SHEEN = 'rgba(255,255,255,0.8)';
+const HOLE_COLOR = '#1a1a1a';
+const HOLE_RING = '#0a0a0a';
+const FLAG_COLOR = '#FF3333';
+const WALL_COLOR = '#FFFFFF';
+const WALL_BORDER = '#888888';
+const BUMPER_COLOR = '#FF4444';
+const BUMPER_HIGHLIGHT = '#FF8888';
+const SAND_COLOR = '#E8D5A3';
+const SAND_DARK = '#D4C090';
+const WATER_COLOR = '#4488CC';
+const WATER_DARK = '#3366AA';
+const WATER_HIGHLIGHT = 'rgba(255,255,255,0.15)';
+const SLOPE_COLOR = 'rgba(255,255,255,0.08)';
+const SLOPE_ARROW = 'rgba(255,255,255,0.15)';
+const WINDMILL_COLOR = '#885533';
+const WINDMILL_BLADE = '#BB8844';
+const TUNNEL_COLOR = '#555555';
+const TUNNEL_OPENING = '#333333';
+const TRAIL_COLOR = 'rgba(255,255,255,0.15)';
+
+// Effects
+const TRAIL_LENGTH = 20;
+const CONFETTI_COUNT = 60;
+const SPLASH_COUNT = 12;
+const DUST_COUNT = 6;
+const SPARK_COUNT = 4;
+const CELEBRATION_DURATION = 2000;
+
+// Theme colors
+const THEMES = {
+    grass: {
+        course: '#3A7D3A',
+        courseCenter: '#4A9D4A',
+        border: '#2D6B2D',
+        accent: '#5AB85A'
+    },
+    desert: {
+        course: '#C2A66B',
+        courseCenter: '#D4B87D',
+        border: '#A8904F',
+        accent: '#E0C88F'
+    },
+    ice: {
+        course: '#7EC8E8',
+        courseCenter: '#96D6F0',
+        border: '#5AADCC',
+        accent: '#B0E4F8'
+    }
+};
+
+// Course names (Chinese)
+const COURSE_NAMES = [
+    '直线推杆',
+    '直角弯道',
+    '弹珠迷阵',
+    '风车田园',
+    '之字险途',
+    'S弯挑战',
+    '窄道穿梭',
+    '三角绕行',
+    '钻石赛道',
+    '环形回路',
+    '弹射狂欢',
+    '双风车之路',
+    '水障碍区',
+    '沙漠迷踪',
+    '冰面滑行',
+    '终极迷宫',
+    '风车堡垒',
+    '冠军之路'
+];
+
+// Full course data
+const COURSES = [
+    // Hole 1: 直线推杆
+    {
+        par: 3,
+        start: { x: 300, y: 720 },
+        hole: { x: 300, y: 80 },
+        w: COURSE_W, h: COURSE_H,
+        walls: [
+            { x1: 100, y1: 30, x2: 500, y2: 30 },
+            { x1: 500, y1: 30, x2: 500, y2: 770 },
+            { x1: 500, y1: 770, x2: 100, y2: 770 },
+            { x1: 100, y1: 770, x2: 100, y2: 30 }
+        ],
+        bumpers: [],
+        sand: [],
+        water: [],
+        slopes: [],
+        windmill: null
+    },
+    // Hole 2: 直角弯道
+    {
+        par: 3,
+        start: { x: 300, y: 700 },
+        hole: { x: 150, y: 80 },
+        w: COURSE_W, h: COURSE_H,
+        walls: [
+            { x1: 80, y1: 30, x2: 520, y2: 30 },
+            { x1: 520, y1: 30, x2: 520, y2: 500 },
+            { x1: 520, y1: 500, x2: 350, y2: 500 },
+            { x1: 350, y1: 500, x2: 350, y2: 770 },
+            { x1: 350, y1: 770, x2: 80, y2: 770 },
+            { x1: 80, y1: 770, x2: 80, y2: 30 }
+        ],
+        bumpers: [],
+        sand: [],
+        water: [],
+        slopes: [],
+        windmill: null
+    },
+    // Hole 3: 弹珠迷阵
+    {
+        par: 4,
+        start: { x: 300, y: 720 },
+        hole: { x: 300, y: 80 },
+        w: COURSE_W, h: COURSE_H,
+        walls: [
+            { x1: 80, y1: 30, x2: 520, y2: 30 },
+            { x1: 520, y1: 30, x2: 520, y2: 770 },
+            { x1: 520, y1: 770, x2: 80, y2: 770 },
+            { x1: 80, y1: 770, x2: 80, y2: 30 },
+            { x1: 150, y1: 600, x2: 450, y2: 600 },
+            { x1: 150, y1: 400, x2: 450, y2: 400 },
+            { x1: 150, y1: 200, x2: 450, y2: 200 }
+        ],
+        bumpers: [],
+        sand: [],
+        water: [],
+        slopes: [],
+        windmill: null
+    },
+    // Hole 4: 风车田园
+    {
+        par: 4,
+        start: { x: 300, y: 720 },
+        hole: { x: 300, y: 80 },
+        w: COURSE_W, h: COURSE_H,
+        walls: [
+            { x1: 80, y1: 30, x2: 520, y2: 30 },
+            { x1: 520, y1: 30, x2: 520, y2: 770 },
+            { x1: 520, y1: 770, x2: 80, y2: 770 },
+            { x1: 80, y1: 770, x2: 80, y2: 30 }
+        ],
+        bumpers: [
+            { x: 200, y: 350, r: 20, bounce: 1.3 },
+            { x: 400, y: 350, r: 20, bounce: 1.3 }
+        ],
+        sand: [{ x: 250, y: 550, w: 100, h: 60 }],
+        water: [{ x: 200, y: 180, w: 200, h: 50 }],
+        slopes: [],
+        windmill: { x: 300, y: 250, armLength: 80, speed: 0.012, bladeWidth: 12 }
+    },
+    // Hole 5: 之字险途
+    {
+        par: 4,
+        start: { x: 300, y: 720 },
+        hole: { x: 300, y: 80 },
+        w: COURSE_W, h: COURSE_H,
+        walls: [
+            { x1: 60, y1: 30, x2: 540, y2: 30 },
+            { x1: 540, y1: 30, x2: 540, y2: 770 },
+            { x1: 540, y1: 770, x2: 60, y2: 770 },
+            { x1: 60, y1: 770, x2: 60, y2: 30 },
+            { x1: 150, y1: 600, x2: 500, y2: 600 },
+            { x1: 100, y1: 400, x2: 450, y2: 400 },
+            { x1: 150, y1: 200, x2: 500, y2: 200 }
+        ],
+        bumpers: [],
+        sand: [],
+        water: [],
+        slopes: [],
+        windmill: null
+    },
+    // Hole 6: S弯挑战
+    {
+        par: 4,
+        start: { x: 300, y: 720 },
+        hole: { x: 300, y: 80 },
+        w: COURSE_W, h: COURSE_H,
+        walls: [
+            { x1: 60, y1: 30, x2: 540, y2: 30 },
+            { x1: 540, y1: 30, x2: 540, y2: 770 },
+            { x1: 540, y1: 770, x2: 60, y2: 770 },
+            { x1: 60, y1: 770, x2: 60, y2: 30 },
+            { x1: 60, y1: 550, x2: 400, y2: 550 },
+            { x1: 200, y1: 300, x2: 540, y2: 300 }
+        ],
+        bumpers: [],
+        sand: [{ x: 400, y: 420, w: 80, h: 60 }],
+        water: [],
+        slopes: [],
+        windmill: null
+    },
+    // Hole 7: 窄道穿梭
+    {
+        par: 3,
+        start: { x: 180, y: 700 },
+        hole: { x: 420, y: 80 },
+        w: COURSE_W, h: COURSE_H,
+        walls: [
+            { x1: 60, y1: 30, x2: 540, y2: 30 },
+            { x1: 540, y1: 30, x2: 540, y2: 770 },
+            { x1: 540, y1: 770, x2: 60, y2: 770 },
+            { x1: 60, y1: 770, x2: 60, y2: 30 },
+            { x1: 60, y1: 350, x2: 200, y2: 350 },
+            { x1: 300, y1: 200, x2: 540, y2: 200 }
+        ],
+        bumpers: [],
+        sand: [],
+        water: [],
+        slopes: [],
+        windmill: null
+    },
+    // Hole 8: 三角绕行
+    {
+        par: 4,
+        start: { x: 300, y: 720 },
+        hole: { x: 300, y: 80 },
+        w: COURSE_W, h: COURSE_H,
+        walls: [
+            { x1: 60, y1: 30, x2: 540, y2: 30 },
+            { x1: 540, y1: 30, x2: 540, y2: 770 },
+            { x1: 540, y1: 770, x2: 60, y2: 770 },
+            { x1: 60, y1: 770, x2: 60, y2: 30 },
+            { x1: 300, y1: 200, x2: 450, y2: 450 },
+            { x1: 450, y1: 450, x2: 150, y2: 450 },
+            { x1: 150, y1: 450, x2: 300, y2: 200 }
+        ],
+        bumpers: [],
+        sand: [],
+        water: [],
+        slopes: [],
+        windmill: null
+    },
+    // Hole 9: 钻石赛道
+    {
+        par: 4,
+        start: { x: 300, y: 720 },
+        hole: { x: 300, y: 80 },
+        w: COURSE_W, h: COURSE_H,
+        walls: [
+            { x1: 60, y1: 30, x2: 540, y2: 30 },
+            { x1: 540, y1: 30, x2: 540, y2: 770 },
+            { x1: 540, y1: 770, x2: 60, y2: 770 },
+            { x1: 60, y1: 770, x2: 60, y2: 30 },
+            { x1: 300, y1: 250, x2: 450, y2: 400 },
+            { x1: 450, y1: 400, x2: 300, y2: 550 },
+            { x1: 300, y1: 550, x2: 150, y2: 400 },
+            { x1: 150, y1: 400, x2: 300, y2: 250 }
+        ],
+        bumpers: [],
+        sand: [],
+        water: [],
+        slopes: [],
+        windmill: null
+    },
+    // Hole 10: 环形回路
+    {
+        par: 4,
+        start: { x: 300, y: 720 },
+        hole: { x: 300, y: 80 },
+        w: COURSE_W, h: COURSE_H,
+        walls: [
+            { x1: 60, y1: 30, x2: 540, y2: 30 },
+            { x1: 540, y1: 30, x2: 540, y2: 770 },
+            { x1: 540, y1: 770, x2: 60, y2: 770 },
+            { x1: 60, y1: 770, x2: 60, y2: 30 },
+            { x1: 220, y1: 350, x2: 300, y2: 270 },
+            { x1: 300, y1: 270, x2: 380, y2: 350 },
+            { x1: 380, y1: 350, x2: 380, y2: 500 },
+            { x1: 380, y1: 500, x2: 300, y2: 580 },
+            { x1: 300, y1: 580, x2: 220, y2: 500 },
+            { x1: 220, y1: 500, x2: 220, y2: 350 }
+        ],
+        bumpers: [],
+        sand: [],
+        water: [],
+        slopes: [],
+        windmill: null
+    },
+    // Hole 11: 弹射狂欢
+    {
+        par: 4,
+        start: { x: 300, y: 720 },
+        hole: { x: 300, y: 80 },
+        w: COURSE_W, h: COURSE_H,
+        walls: [
+            { x1: 60, y1: 30, x2: 540, y2: 30 },
+            { x1: 540, y1: 30, x2: 540, y2: 770 },
+            { x1: 540, y1: 770, x2: 60, y2: 770 },
+            { x1: 60, y1: 770, x2: 60, y2: 30 }
+        ],
+        bumpers: [
+            { x: 200, y: 300, r: 25, bounce: 1.4 },
+            { x: 400, y: 300, r: 25, bounce: 1.4 },
+            { x: 300, y: 450, r: 25, bounce: 1.4 },
+            { x: 200, y: 550, r: 20, bounce: 1.2 },
+            { x: 400, y: 550, r: 20, bounce: 1.2 },
+            { x: 300, y: 200, r: 20, bounce: 1.2 }
+        ],
+        sand: [],
+        water: [],
+        slopes: [],
+        windmill: null
+    },
+    // Hole 12: 双风车之路
+    {
+        par: 5,
+        start: { x: 300, y: 720 },
+        hole: { x: 300, y: 80 },
+        w: COURSE_W, h: COURSE_H,
+        walls: [
+            { x1: 60, y1: 30, x2: 540, y2: 30 },
+            { x1: 540, y1: 30, x2: 540, y2: 770 },
+            { x1: 540, y1: 770, x2: 60, y2: 770 },
+            { x1: 60, y1: 770, x2: 60, y2: 30 }
+        ],
+        bumpers: [],
+        sand: [{ x: 120, y: 400, w: 80, h: 80 }, { x: 400, y: 400, w: 80, h: 80 }],
+        water: [{ x: 230, y: 180, w: 140, h: 40 }],
+        slopes: [],
+        windmill: { x: 300, y: 500, armLength: 90, speed: 0.015, bladeWidth: 14 }
+    },
+    // Hole 13: 水障碍区
+    {
+        par: 4,
+        start: { x: 300, y: 720 },
+        hole: { x: 300, y: 80 },
+        w: COURSE_W, h: COURSE_H,
+        walls: [
+            { x1: 60, y1: 30, x2: 540, y2: 30 },
+            { x1: 540, y1: 30, x2: 540, y2: 770 },
+            { x1: 540, y1: 770, x2: 60, y2: 770 },
+            { x1: 60, y1: 770, x2: 60, y2: 30 }
+        ],
+        bumpers: [],
+        sand: [{ x: 100, y: 500, w: 100, h: 60 }],
+        water: [
+            { x: 180, y: 450, w: 240, h: 60 },
+            { x: 200, y: 200, w: 200, h: 50 }
+        ],
+        slopes: [{ x: 200, y: 350, w: 200, h: 80, fx: 0, fy: 0.01 }],
+        windmill: null
+    },
+    // Hole 14: 沙漠迷踪
+    {
+        par: 4,
+        start: { x: 300, y: 720 },
+        hole: { x: 300, y: 80 },
+        w: COURSE_W, h: COURSE_H,
+        walls: [
+            { x1: 60, y1: 30, x2: 540, y2: 30 },
+            { x1: 540, y1: 30, x2: 540, y2: 770 },
+            { x1: 540, y1: 770, x2: 60, y2: 770 },
+            { x1: 60, y1: 770, x2: 60, y2: 30 }
+        ],
+        bumpers: [
+            { x: 300, y: 400, r: 30, bounce: 1.2 }
+        ],
+        sand: [
+            { x: 100, y: 350, w: 120, h: 100 },
+            { x: 380, y: 350, w: 120, h: 100 },
+            { x: 220, y: 550, w: 160, h: 80 },
+            { x: 200, y: 150, w: 200, h: 60 }
+        ],
+        water: [],
+        slopes: [],
+        windmill: null
+    },
+    // Hole 15: 冰面滑行
+    {
+        par: 3,
+        start: { x: 300, y: 720 },
+        hole: { x: 300, y: 80 },
+        w: COURSE_W, h: COURSE_H,
+        walls: [
+            { x1: 100, y1: 30, x2: 500, y2: 30 },
+            { x1: 500, y1: 30, x2: 500, y2: 770 },
+            { x1: 500, y1: 770, x2: 100, y2: 770 },
+            { x1: 100, y1: 770, x2: 100, y2: 30 }
+        ],
+        bumpers: [
+            { x: 200, y: 400, r: 20, bounce: 1.1 },
+            { x: 400, y: 400, r: 20, bounce: 1.1 }
+        ],
+        sand: [],
+        water: [{ x: 250, y: 250, w: 100, h: 40 }],
+        slopes: [
+            { x: 100, y: 300, w: 400, h: 200, fx: 0.008, fy: 0 }
+        ],
+        windmill: null
+    },
+    // Hole 16: 终极迷宫
+    {
+        par: 5,
+        start: { x: 300, y: 720 },
+        hole: { x: 300, y: 80 },
+        w: COURSE_W, h: COURSE_H,
+        walls: [
+            { x1: 60, y1: 30, x2: 540, y2: 30 },
+            { x1: 540, y1: 30, x2: 540, y2: 770 },
+            { x1: 540, y1: 770, x2: 60, y2: 770 },
+            { x1: 60, y1: 770, x2: 60, y2: 30 },
+            { x1: 60, y1: 600, x2: 350, y2: 600 },
+            { x1: 250, y1: 450, x2: 540, y2: 450 },
+            { x1: 60, y1: 300, x2: 350, y2: 300 },
+            { x1: 250, y1: 150, x2: 540, y2: 150 }
+        ],
+        bumpers: [],
+        sand: [],
+        water: [{ x: 380, y: 520, w: 100, h: 50 }],
+        slopes: [],
+        windmill: null
+    },
+    // Hole 17: 风车堡垒
+    {
+        par: 5,
+        start: { x: 300, y: 720 },
+        hole: { x: 300, y: 80 },
+        w: COURSE_W, h: COURSE_H,
+        walls: [
+            { x1: 60, y1: 30, x2: 540, y2: 30 },
+            { x1: 540, y1: 30, x2: 540, y2: 770 },
+            { x1: 540, y1: 770, x2: 60, y2: 770 },
+            { x1: 60, y1: 770, x2: 60, y2: 30 }
+        ],
+        bumpers: [],
+        sand: [{ x: 120, y: 600, w: 100, h: 80 }, { x: 380, y: 600, w: 100, h: 80 }],
+        water: [{ x: 220, y: 160, w: 160, h: 40 }],
+        slopes: [],
+        windmill: { x: 300, y: 400, armLength: 100, speed: 0.018, bladeWidth: 16 }
+    },
+    // Hole 18: 冠军之路
+    {
+        par: 5,
+        start: { x: 300, y: 720 },
+        hole: { x: 300, y: 80 },
+        w: COURSE_W, h: COURSE_H,
+        walls: [
+            { x1: 200, y1: 30, x2: 400, y2: 30 },
+            { x1: 400, y1: 30, x2: 540, y2: 100 },
+            { x1: 540, y1: 100, x2: 540, y2: 700 },
+            { x1: 540, y1: 700, x2: 400, y2: 770 },
+            { x1: 400, y1: 770, x2: 200, y2: 770 },
+            { x1: 200, y1: 770, x2: 60, y2: 700 },
+            { x1: 60, y1: 700, x2: 60, y2: 100 },
+            { x1: 60, y1: 100, x2: 200, y2: 30 }
+        ],
+        bumpers: [
+            { x: 200, y: 300, r: 20, bounce: 1.2 },
+            { x: 400, y: 300, r: 20, bounce: 1.2 },
+            { x: 300, y: 500, r: 25, bounce: 1.3 }
+        ],
+        sand: [
+            { x: 100, y: 450, w: 80, h: 60 },
+            { x: 420, y: 450, w: 80, h: 60 }
+        ],
+        water: [
+            { x: 230, y: 180, w: 140, h: 40 },
+            { x: 230, y: 600, w: 140, h: 40 }
+        ],
+        slopes: [],
+        windmill: { x: 300, y: 350, armLength: 85, speed: 0.015, bladeWidth: 14 }
+    }
+];
+
+// === ./sound.js ===
+// ============================================
+// Mini Golf - Sound System (Web Audio API)
+// ============================================
+
+let audioCtx = null;
+
+function ensureAudioCtx() {
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    return audioCtx;
+}
+
+function playTone(freq, duration, type = 'sine', vol = 0.15, detune = 0) {
+    try {
+        const ctx = ensureAudioCtx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, ctx.currentTime);
+        if (detune) osc.detune.setValueAtTime(detune, ctx.currentTime);
+        gain.gain.setValueAtTime(vol, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + duration);
+    } catch (e) {}
+}
+
+function playNoise(duration, vol = 0.08) {
+    try {
+        const ctx = ensureAudioCtx();
+        const bufferSize = ctx.sampleRate * duration;
+        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+            data[i] = (Math.random() * 2 - 1) * 0.5;
+        }
+        const source = ctx.createBufferSource();
+        source.buffer = buffer;
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(vol, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'highpass';
+        filter.frequency.setValueAtTime(2000, ctx.currentTime);
+        source.connect(filter);
+        filter.connect(gain);
+        gain.connect(ctx.destination);
+        source.start(ctx.currentTime);
+    } catch (e) {}
+}
+
+function resumeAudio() {
+    try {
+        const ctx = ensureAudioCtx();
+        if (ctx.state === 'suspended') ctx.resume();
+    } catch (e) {}
+}
+
+function playHit() {
+    playTone(440, 0.12, 'triangle', 0.2);
+    playTone(880, 0.08, 'sine', 0.08);
+}
+
+function playWallBounce() {
+    playTone(600, 0.08, 'square', 0.08);
+    playNoise(0.04, 0.06);
+}
+
+function playBumper() {
+    playTone(800, 0.15, 'sine', 0.15);
+    playTone(1200, 0.1, 'sine', 0.1);
+}
+
+function playHoleIn() {
+    const ctx = ensureAudioCtx();
+    const t = ctx.currentTime;
+    [523, 659, 784, 1047].forEach((f, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(f, t + i * 0.12);
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(0.2, t + i * 0.12);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + i * 0.12 + 0.4);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(t + i * 0.12);
+        osc.stop(t + i * 0.12 + 0.5);
+    });
+}
+
+function playWaterSplash() {
+    playNoise(0.3, 0.12);
+    playTone(200, 0.2, 'sine', 0.06);
+}
+
+function playSandThud() {
+    playNoise(0.1, 0.1);
+    playTone(150, 0.1, 'triangle', 0.08);
+}
+
+function playWindmillHit() {
+    playTone(300, 0.15, 'sawtooth', 0.1);
+    playTone(200, 0.1, 'triangle', 0.08);
+}
+
+// === ./physics.js ===
+// ============================================
+// Mini Golf - Physics Engine
+// ============================================
+
+
+function createBall(x, y) {
+    return { x, y, vx: 0, vy: 0, inHole: false, inWater: false };
+}
+
+function resetBall(ball, x, y) {
+    ball.x = x;
+    ball.y = y;
+    ball.vx = 0;
+    ball.vy = 0;
+    ball.inHole = false;
+    ball.inWater = false;
+}
+
+function isBallMoving(ball) {
+    return !ball.inHole && (Math.abs(ball.vx) > STOP_THRESHOLD || Math.abs(ball.vy) > STOP_THRESHOLD);
+}
+
+function applyShot(ball, vx, vy) {
+    const speed = Math.sqrt(vx * vx + vy * vy);
+    if (speed > MAX_SPEED) {
+        const ratio = MAX_SPEED / speed;
+        vx *= ratio;
+        vy *= ratio;
+    }
+    ball.vx = vx;
+    ball.vy = vy;
+}
+
+// Closest point on segment to point
+function closestPointOnSeg(px, py, x1, y1, x2, y2) {
+    const dx = x2 - x1, dy = y2 - y1;
+    const lenSq = dx * dx + dy * dy;
+    if (lenSq === 0) return { x: x1, y: y1, t: 0 };
+    let t = ((px - x1) * dx + (py - y1) * dy) / lenSq;
+    t = Math.max(0, Math.min(1, t));
+    return { x: x1 + t * dx, y: y1 + t * dy, t };
+}
+
+// Ball-Wall collision
+function collideWall(ball, wall, bounce) {
+    const cp = closestPointOnSeg(ball.x, ball.y, wall.x1, wall.y1, wall.x2, wall.y2);
+    const dx = ball.x - cp.x, dy = ball.y - cp.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < BALL_RADIUS && dist > 0) {
+        const nx = dx / dist, ny = dy / dist;
+        const dot = ball.vx * nx + ball.vy * ny;
+        if (dot < 0) {
+            ball.vx -= (1 + bounce) * dot * nx;
+            ball.vy -= (1 + bounce) * dot * ny;
+        }
+        const push = BALL_RADIUS - dist + 0.5;
+        ball.x += nx * push;
+        ball.y += ny * push;
+        return true;
+    }
+    return false;
+}
+
+// Ball-Bumper collision
+function collideBumper(ball, bumper) {
+    const dx = ball.x - bumper.x, dy = ball.y - bumper.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const minDist = BALL_RADIUS + bumper.r;
+    if (dist < minDist && dist > 0) {
+        const nx = dx / dist, ny = dy / dist;
+        const dot = ball.vx * nx + ball.vy * ny;
+        if (dot < 0) {
+            ball.vx -= (1 + bumper.bounce) * dot * nx;
+            ball.vy -= (1 + bumper.bounce) * dot * ny;
+        }
+        const push = minDist - dist + 1;
+        ball.x += nx * push;
+        ball.y += ny * push;
+        return true;
+    }
+    return false;
+}
+
+// Ball-Windmill collision
+function collideWindmill(ball, wm) {
+    const cos = Math.cos(wm.angle), sin = Math.sin(wm.angle);
+    let hit = false;
+    for (let arm = 0; arm < 4; arm++) {
+        const a = wm.angle + arm * Math.PI / 2;
+        const ac = Math.cos(a), as = Math.sin(a);
+        const x1 = wm.x - ac * wm.armLength, y1 = wm.y - as * wm.armLength;
+        const x2 = wm.x + ac * wm.armLength, y2 = wm.y + as * wm.armLength;
+        const cp = closestPointOnSeg(ball.x, ball.y, x1, y1, x2, y2);
+        const dx = ball.x - cp.x, dy = ball.y - cp.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < BALL_RADIUS + wm.bladeWidth / 2 && dist > 0) {
+            const nx = dx / dist, ny = dy / dist;
+            const dot = ball.vx * nx + ball.vy * ny;
+            if (dot < 0) {
+                ball.vx -= (1 + 0.8) * dot * nx;
+                ball.vy -= (1 + 0.8) * dot * ny;
+            }
+            // Add windmill tangential velocity
+            const rx = cp.x - wm.x, ry = cp.y - wm.y;
+            const tangentX = -ry * wm.speed * 30;
+            const tangentY = rx * wm.speed * 30;
+            ball.vx += tangentX * 0.05;
+            ball.vy += tangentY * 0.05;
+            const push = BALL_RADIUS + wm.bladeWidth / 2 - dist + 1;
+            ball.x += nx * push;
+            ball.y += ny * push;
+            hit = true;
+        }
+    }
+    return hit;
+}
+
+// Check if ball is in a rectangle area
+function inRect(ball, rect) {
+    return ball.x >= rect.x && ball.x <= rect.x + rect.w &&
+           ball.y >= rect.y && ball.y <= rect.y + rect.h;
+}
+
+// Check ball-hole
+function checkHole(ball, holePos) {
+    const dx = ball.x - holePos.x, dy = ball.y - holePos.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
+    if (dist < HOLE_RADIUS && speed < HOLE_CAPTURE_SPEED) {
+        ball.inHole = true;
+        ball.vx = 0;
+        ball.vy = 0;
+        ball.x = holePos.x;
+        ball.y = holePos.y;
+        return true;
+    }
+    // Gravitational pull when close and slow
+    if (dist < HOLE_RADIUS * 3 && speed < HOLE_CAPTURE_SPEED * 1.5) {
+        const pull = 0.0015 * (1 - dist / (HOLE_RADIUS * 3));
+        ball.vx -= dx * pull * dist;
+        ball.vy -= dy * pull * dist;
+    }
+    return false;
+}
+
+// Check ball-out-of-bounds (safety)
+function checkBounds(ball) {
+    const margin = BALL_RADIUS + 5;
+    if (ball.x < margin) { ball.x = margin; ball.vx = Math.abs(ball.vx) * 0.5; }
+    if (ball.x > COURSE_W - margin) { ball.x = COURSE_W - margin; ball.vx = -Math.abs(ball.vx) * 0.5; }
+    if (ball.y < margin) { ball.y = margin; ball.vy = Math.abs(ball.vy) * 0.5; }
+    if (ball.y > COURSE_H - margin) { ball.y = COURSE_H - margin; ball.vy = -Math.abs(ball.vy) * 0.5; }
+}
+
+// Main physics step
+function step(ball, course, dt = 1) {
+    if (ball.inHole) return { wallHit: false, bumperHit: false, waterHit: false, sandHit: false, holeIn: false, windmillHit: false };
+
+    const events = { wallHit: false, bumperHit: false, waterHit: false, sandHit: false, holeIn: false, windmillHit: false };
+
+    // Update windmill angle
+    if (course.windmill) {
+        course.windmill.angle = (course.windmill.angle || 0) + course.windmill.speed * dt;
+    }
+
+    // Apply slopes
+    if (course.slopes) {
+        for (const s of course.slopes) {
+            if (inRect(ball, s)) {
+                ball.vx += s.fx * SLOPE_FORCE * dt;
+                ball.vy += s.fy * SLOPE_FORCE * dt;
+            }
+        }
+    }
+
+    // Check sand friction
+    let onSand = false;
+    if (course.sand) {
+        for (const s of course.sand) {
+            if (inRect(ball, s)) { onSand = true; events.sandHit = true; break; }
+        }
+    }
+
+    const friction = onSand ? SAND_FRICTION : (FRICTION[course.theme] || FRICTION.grass);
+
+    // Sub-step movement
+    const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
+    const steps = speed > 3 ? Math.ceil(speed / 2) : 1;
+    const subDt = dt / steps;
+
+    for (let i = 0; i < steps; i++) {
+        ball.x += ball.vx * subDt;
+        ball.y += ball.vy * subDt;
+
+        // Wall collisions
+        for (const w of course.walls) {
+            if (collideWall(ball, w, w.bounce || BOUNCE_FACTOR)) {
+                events.wallHit = true;
+            }
+        }
+
+        // Bumper collisions
+        if (course.bumpers) {
+            for (const b of course.bumpers) {
+                if (collideBumper(ball, b)) {
+                    events.bumperHit = true;
+                }
+            }
+        }
+
+        // Windmill collision
+        if (course.windmill) {
+            if (collideWindmill(ball, course.windmill)) {
+                events.windmillHit = true;
+            }
+        }
+
+        checkBounds(ball);
+    }
+
+    // Apply friction
+    ball.vx *= Math.pow(friction, dt);
+    ball.vy *= Math.pow(friction, dt);
+
+    // Check water
+    if (course.water) {
+        for (const w of course.water) {
+            if (inRect(ball, w)) {
+                const speed2 = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
+                if (speed2 < 2) {
+                    events.waterHit = true;
+                    ball.inWater = true;
+                    ball.vx = 0;
+                    ball.vy = 0;
+                } else {
+                    ball.vx *= 0.92;
+                    ball.vy *= 0.92;
+                }
+                break;
+            }
+        }
+    }
+
+    // Check hole
+    if (checkHole(ball, course.hole)) {
+        events.holeIn = true;
+    }
+
+    // Stop if very slow
+    if (Math.abs(ball.vx) < STOP_THRESHOLD && Math.abs(ball.vy) < STOP_THRESHOLD) {
+        ball.vx = 0;
+        ball.vy = 0;
+    }
+
+    return events;
+}
+
+// Simulate trajectory for preview
+function simulateTrajectory(startX, startY, vx, vy, course, maxSteps = 120) {
+    const points = [];
+    let x = startX, y = startY;
+    let svx = vx, svy = vy;
+    const friction = FRICTION[course.theme] || FRICTION.grass;
+
+    for (let i = 0; i < maxSteps; i++) {
+        x += svx;
+        y += svy;
+
+        // Wall bounce
+        for (const w of course.walls) {
+            const cp = closestPointOnSeg(x, y, w.x1, w.y1, w.x2, w.y2);
+            const dx = x - cp.x, dy = y - cp.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < BALL_RADIUS && dist > 0) {
+                const nx = dx / dist, ny = dy / dist;
+                const dot = svx * nx + svy * ny;
+                if (dot < 0) {
+                    svx -= (1 + BOUNCE_FACTOR) * dot * nx;
+                    svy -= (1 + BOUNCE_FACTOR) * dot * ny;
+                }
+                x += nx * (BALL_RADIUS - dist + 1);
+                y += ny * (BALL_RADIUS - dist + 1);
+            }
+        }
+
+        // Bumper bounce
+        if (course.bumpers) {
+            for (const b of course.bumpers) {
+                const dx = x - b.x, dy = y - b.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist < BALL_RADIUS + b.r && dist > 0) {
+                    const nx = dx / dist, ny = dy / dist;
+                    const dot = svx * nx + svy * ny;
+                    if (dot < 0) {
+                        svx -= (1 + b.bounce) * dot * nx;
+                        svy -= (1 + b.bounce) * dot * ny;
+                    }
+                }
+            }
+        }
+
+        svx *= friction;
+        svy *= friction;
+
+        if (Math.abs(svx) < 0.05 && Math.abs(svy) < 0.05) break;
+        if (x < 10 || x > COURSE_W - 10 || y < 10 || y > COURSE_H - 10) break;
+
+        if (i % 3 === 0) points.push({ x, y, alpha: 1 - i / maxSteps });
+    }
+    return points;
+}
+
+// === ./course.js ===
+// ============================================
+// Mini Golf - Course Rendering
+// ============================================
+
+
+function getTheme(course) {
+    return THEMES[course.theme] || THEMES.grass;
+}
+
+// Draw the course background
+function drawCourse(ctx, course, toCanvasX, toCanvasY, scale, frameCount) {
+    const theme = getTheme(course);
+    const cx1 = toCanvasX(0), cy1 = toCanvasY(0);
+    const cw = course.w * scale, ch = course.h * scale;
+
+    // Background
+    const grad = ctx.createRadialGradient(
+        cx1 + cw / 2, cy1 + ch / 2, 0,
+        cx1 + cw / 2, cy1 + ch / 2, Math.max(cw, ch) * 0.7
+    );
+    grad.addColorStop(0, theme.courseCenter);
+    grad.addColorStop(1, theme.course);
+    ctx.fillStyle = grad;
+    ctx.fillRect(cx1, cy1, cw, ch);
+
+    // Grass texture dots
+    ctx.fillStyle = 'rgba(255,255,255,0.04)';
+    for (let i = 0; i < 80; i++) {
+        const x = cx1 + (i * 137.5 % cw);
+        const y = cy1 + (i * 89.3 % ch);
+        ctx.beginPath();
+        ctx.arc(x, y, 2 * scale, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // Slopes
+    if (course.slopes) {
+        for (const s of course.slopes) {
+            const sx = toCanvasX(s.x), sy = toCanvasY(s.y);
+            ctx.fillStyle = SLOPE_COLOR;
+            ctx.fillRect(sx, sy, s.w * scale, s.h * scale);
+            // Arrow showing slope direction
+            ctx.strokeStyle = SLOPE_ARROW;
+            ctx.lineWidth = 2;
+            const dirX = s.fx > 0 ? 1 : s.fx < 0 ? -1 : 0;
+            const dirY = s.fy > 0 ? 1 : s.fy < 0 ? -1 : 0;
+            for (let i = 0; i < 3; i++) {
+                const ax = sx + (s.w * 0.3 + i * s.w * 0.2) * scale;
+                const ay = sy + s.h * 0.5 * scale;
+                ctx.beginPath();
+                ctx.moveTo(ax - dirX * 10 * scale, ay - dirY * 10 * scale);
+                ctx.lineTo(ax + dirX * 10 * scale, ay + dirY * 10 * scale);
+                ctx.lineTo(ax + dirX * 6 * scale - dirY * 4 * scale, ay + dirY * 6 * scale + dirX * 4 * scale);
+                ctx.stroke();
+            }
+            ctx.lineWidth = 1;
+        }
+    }
+
+    // Sand traps
+    if (course.sand) {
+        for (const s of course.sand) {
+            const sx = toCanvasX(s.x), sy = toCanvasY(s.y);
+            const sandGrad = ctx.createRadialGradient(
+                sx + s.w * scale / 2, sy + s.h * scale / 2, 0,
+                sx + s.w * scale / 2, sy + s.h * scale / 2, Math.max(s.w, s.h) * scale * 0.6
+            );
+            sandGrad.addColorStop(0, SAND_COLOR);
+            sandGrad.addColorStop(1, SAND_DARK);
+            ctx.fillStyle = sandGrad;
+            ctx.beginPath();
+            ctx.ellipse(sx + s.w * scale / 2, sy + s.h * scale / 2,
+                       s.w * scale / 2, s.h * scale / 2, 0, 0, Math.PI * 2);
+            ctx.fill();
+            // Sand dots
+            ctx.fillStyle = 'rgba(180,160,120,0.3)';
+            for (let i = 0; i < 12; i++) {
+                const dx = sx + (s.w * (0.1 + Math.random() * 0.8)) * scale;
+                const dy = sy + (s.h * (0.1 + Math.random() * 0.8)) * scale;
+                ctx.beginPath();
+                ctx.arc(dx, dy, 1.5 * scale, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+    }
+
+    // Water hazards
+    if (course.water) {
+        for (const w of course.water) {
+            const wx = toCanvasX(w.x), wy = toCanvasY(w.y);
+            const waterGrad = ctx.createRadialGradient(
+                wx + w.w * scale / 2, wy + w.h * scale / 2, 0,
+                wx + w.w * scale / 2, wy + w.h * scale / 2, Math.max(w.w, w.h) * scale * 0.6
+            );
+            waterGrad.addColorStop(0, WATER_COLOR);
+            waterGrad.addColorStop(1, WATER_DARK);
+            ctx.fillStyle = waterGrad;
+            ctx.beginPath();
+            ctx.ellipse(wx + w.w * scale / 2, wy + w.h * scale / 2,
+                       w.w * scale / 2, w.h * scale / 2, 0, 0, Math.PI * 2);
+            ctx.fill();
+            // Animated water ripples
+            const time = frameCount * 0.03;
+            ctx.strokeStyle = WATER_HIGHLIGHT;
+            ctx.lineWidth = 1.5;
+            for (let i = 0; i < 3; i++) {
+                const rx = w.w * 0.15 * (i + 1) * scale;
+                const ry = w.h * 0.12 * (i + 1) * scale;
+                ctx.globalAlpha = 0.3 - i * 0.08;
+                ctx.beginPath();
+                ctx.ellipse(wx + w.w * scale / 2 + Math.sin(time + i) * 5 * scale,
+                           wy + w.h * scale / 2, rx, ry, 0, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+            ctx.globalAlpha = 1;
+            ctx.lineWidth = 1;
+        }
+    }
+
+    // Hole (cup)
+    const hx = toCanvasX(course.hole.x), hy = toCanvasY(course.hole.y);
+    // Shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.2)';
+    ctx.beginPath();
+    ctx.arc(hx + 2 * scale, hy + 2 * scale, HOLE_RADIUS * scale, 0, Math.PI * 2);
+    ctx.fill();
+    // Ring
+    ctx.fillStyle = HOLE_RING;
+    ctx.beginPath();
+    ctx.arc(hx, hy, HOLE_RADIUS * scale + 2, 0, Math.PI * 2);
+    ctx.fill();
+    // Cup
+    ctx.fillStyle = HOLE_COLOR;
+    ctx.beginPath();
+    ctx.arc(hx, hy, HOLE_RADIUS * scale, 0, Math.PI * 2);
+    ctx.fill();
+    // Inner gradient
+    const holeGrad = ctx.createRadialGradient(hx, hy, 0, hx, hy, HOLE_RADIUS * scale);
+    holeGrad.addColorStop(0, '#000000');
+    holeGrad.addColorStop(1, '#1a1a1a');
+    ctx.fillStyle = holeGrad;
+    ctx.beginPath();
+    ctx.arc(hx, hy, HOLE_RADIUS * scale * 0.8, 0, Math.PI * 2);
+    ctx.fill();
+    // Flag
+    const flagH = 35 * scale;
+    ctx.strokeStyle = '#DDDDDD';
+    ctx.lineWidth = 2 * scale;
+    ctx.beginPath();
+    ctx.moveTo(hx, hy);
+    ctx.lineTo(hx, hy - flagH);
+    ctx.stroke();
+    ctx.fillStyle = FLAG_COLOR;
+    ctx.beginPath();
+    ctx.moveTo(hx, hy - flagH);
+    ctx.lineTo(hx + 14 * scale, hy - flagH + 8 * scale);
+    ctx.lineTo(hx, hy - flagH + 16 * scale);
+    ctx.closePath();
+    ctx.fill();
+    ctx.lineWidth = 1;
+}
+
+// Draw walls
+function drawWalls(ctx, course, toCanvasX, toCanvasY, scale) {
+    for (const w of course.walls) {
+        const sx = toCanvasX(w.x1), sy = toCanvasY(w.y1);
+        const ex = toCanvasX(w.x2), ey = toCanvasY(w.y2);
+
+        // Shadow
+        ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+        ctx.lineWidth = 8 * scale;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(sx + 2, sy + 2);
+        ctx.lineTo(ex + 2, ey + 2);
+        ctx.stroke();
+
+        // Main wall
+        ctx.strokeStyle = WALL_COLOR;
+        ctx.lineWidth = 6 * scale;
+        ctx.beginPath();
+        ctx.moveTo(sx, sy);
+        ctx.lineTo(ex, ey);
+        ctx.stroke();
+
+        // Highlight
+        ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+        ctx.lineWidth = 2 * scale;
+        ctx.beginPath();
+        ctx.moveTo(sx, sy);
+        ctx.lineTo(ex, ey);
+        ctx.stroke();
+    }
+    ctx.lineCap = 'butt';
+    ctx.lineWidth = 1;
+}
+
+// Draw bumpers
+function drawBumpers(ctx, course, toCanvasX, toCanvasY, scale) {
+    if (!course.bumpers) return;
+    for (const b of course.bumpers) {
+        const bx = toCanvasX(b.x), by = toCanvasY(b.y);
+        const r = b.r * scale;
+        // Shadow
+        ctx.fillStyle = 'rgba(0,0,0,0.25)';
+        ctx.beginPath();
+        ctx.arc(bx + 2, by + 2, r, 0, Math.PI * 2);
+        ctx.fill();
+        // Body
+        const bGrad = ctx.createRadialGradient(bx - r * 0.3, by - r * 0.3, 0, bx, by, r);
+        bGrad.addColorStop(0, BUMPER_HIGHLIGHT);
+        bGrad.addColorStop(1, BUMPER_COLOR);
+        ctx.fillStyle = bGrad;
+        ctx.beginPath();
+        ctx.arc(bx, by, r, 0, Math.PI * 2);
+        ctx.fill();
+        // Ring
+        ctx.strokeStyle = '#CC2222';
+        ctx.lineWidth = 2 * scale;
+        ctx.beginPath();
+        ctx.arc(bx, by, r, 0, Math.PI * 2);
+        ctx.stroke();
+        // Highlight
+        ctx.fillStyle = 'rgba(255,255,255,0.35)';
+        ctx.beginPath();
+        ctx.arc(bx - r * 0.25, by - r * 0.25, r * 0.35, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    ctx.lineWidth = 1;
+}
+
+// Draw windmill
+function drawWindmill(ctx, wm, toCanvasX, toCanvasY, scale) {
+    if (!wm) return;
+    const wx = toCanvasX(wm.x), wy = toCanvasY(wm.y);
+    const angle = wm.angle || 0;
+
+    // Center post
+    ctx.fillStyle = WINDMILL_COLOR;
+    ctx.beginPath();
+    ctx.arc(wx, wy, 10 * scale, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Blades
+    ctx.save();
+    ctx.translate(wx, wy);
+    for (let arm = 0; arm < 4; arm++) {
+        ctx.save();
+        ctx.rotate(angle + arm * Math.PI / 2);
+        // Blade
+        const bladeGrad = ctx.createLinearGradient(0, 0, wm.armLength * scale, 0);
+        bladeGrad.addColorStop(0, WINDMILL_COLOR);
+        bladeGrad.addColorStop(0.5, WINDMILL_BLADE);
+        bladeGrad.addColorStop(1, WINDMILL_COLOR);
+        ctx.fillStyle = bladeGrad;
+        ctx.beginPath();
+        ctx.moveTo(-8 * scale, -wm.bladeWidth / 2 * scale);
+        ctx.lineTo(wm.armLength * scale, -wm.bladeWidth / 4 * scale);
+        ctx.lineTo(wm.armLength * scale, wm.bladeWidth / 4 * scale);
+        ctx.lineTo(-8 * scale, wm.bladeWidth / 2 * scale);
+        ctx.closePath();
+        ctx.fill();
+        // Border
+        ctx.strokeStyle = '#664422';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.restore();
+    }
+    ctx.restore();
+
+    // Center cap
+    ctx.fillStyle = '#553322';
+    ctx.beginPath();
+    ctx.arc(wx, wy, 5 * scale, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.lineWidth = 1;
+}
+
+// Draw the ball
+function drawBall(ctx, ball, toCanvasX, toCanvasY, scale) {
+    const bx = toCanvasX(ball.x), by = toCanvasY(ball.y);
+    const r = BALL_RADIUS * scale;
+
+    // Shadow
+    ctx.fillStyle = BALL_SHADOW;
+    ctx.beginPath();
+    ctx.ellipse(bx + 3 * scale, by + 3 * scale, r * 1.1, r * 0.7, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Ball body
+    const ballGrad = ctx.createRadialGradient(bx - r * 0.3, by - r * 0.3, 0, bx, by, r);
+    ballGrad.addColorStop(0, '#FFFFFF');
+    ballGrad.addColorStop(0.7, '#E8E8E8');
+    ballGrad.addColorStop(1, '#CCCCCC');
+    ctx.fillStyle = ballGrad;
+    ctx.beginPath();
+    ctx.arc(bx, by, r, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Sheen
+    ctx.fillStyle = BALL_SHEEN;
+    ctx.beginPath();
+    ctx.arc(bx - r * 0.25, by - r * 0.25, r * 0.35, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Outline
+    ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(bx, by, r, 0, Math.PI * 2);
+    ctx.stroke();
+}
+
+// Draw aim line
+// dragDx, dragDy are in canvas-pixel units (offset from ball to cursor in canvas space)
+function drawAimLine(ctx, ballX, ballY, dragDx, dragDy, power, trajectoryPoints, toCanvasX, toCanvasY, scale) {
+    if (power <= 0) return;
+
+    const bx = toCanvasX(ballX), by = toCanvasY(ballY);
+
+    // Power indicator glow
+    ctx.globalAlpha = 0.1 + power * 0.2;
+    ctx.strokeStyle = power < 0.5 ? '#44FF44' : power < 0.8 ? '#FFAA00' : '#FF3333';
+    ctx.lineWidth = 18 * scale;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.arc(bx, by, 25 * scale, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.lineCap = 'butt';
+
+    // Trajectory dots
+    if (trajectoryPoints && trajectoryPoints.length > 0) {
+        for (let i = 0; i < trajectoryPoints.length; i++) {
+            const p = trajectoryPoints[i];
+            const px = toCanvasX(p.x), py = toCanvasY(p.y);
+            ctx.globalAlpha = p.alpha * 0.5;
+            ctx.fillStyle = '#FFFFFF';
+            ctx.beginPath();
+            ctx.arc(px, py, 3 * scale, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+    }
+
+    // Direction arrow (shoots opposite to drag)
+    // dragDx/dragDy = cursor - ball in canvas pixels
+    // Shot direction = ball - cursor = -drag
+    const ax = -dragDx, ay = -dragDy;
+    const len = Math.sqrt(ax * ax + ay * ay);
+    if (len < 5) return;
+    const nx = ax / len, ny = ay / len;
+    const arrowLen = Math.min(len * 0.4, 60 * scale);
+
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = 2 * scale;
+    ctx.globalAlpha = 0.6;
+    ctx.beginPath();
+    ctx.moveTo(bx + nx * 20 * scale, by + ny * 20 * scale);
+    ctx.lineTo(bx + nx * (20 * scale + arrowLen), by + ny * (20 * scale + arrowLen));
+    ctx.stroke();
+    // Arrowhead
+    const tipX = bx + nx * (20 * scale + arrowLen);
+    const tipY = by + ny * (20 * scale + arrowLen);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.moveTo(tipX, tipY);
+    ctx.lineTo(tipX - nx * 8 * scale + ny * 5 * scale, tipY - ny * 8 * scale - nx * 5 * scale);
+    ctx.lineTo(tipX - nx * 8 * scale - ny * 5 * scale, tipY - ny * 8 * scale + nx * 5 * scale);
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.lineWidth = 1;
+}
+
+// === ./effects.js ===
+// ============================================
+// Mini Golf - Visual Effects
+// ============================================
+
+
+// Ball trail
+function createTrail() {
+    return { points: [] };
+}
+
+function updateTrail(trail, ballX, ballY, moving) {
+    if (moving) {
+        trail.points.push({ x: ballX, y: ballY, alpha: 1 });
+        if (trail.points.length > TRAIL_LENGTH) trail.points.shift();
+    }
+    for (let i = 0; i < trail.points.length; i++) {
+        trail.points[i].alpha -= 0.05;
+    }
+    trail.points = trail.points.filter(p => p.alpha > 0);
+}
+
+function drawTrail(ctx, trail, toCanvasX, toCanvasY, scale) {
+    for (const p of trail.points) {
+        ctx.globalAlpha = p.alpha * 0.3;
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath();
+        ctx.arc(toCanvasX(p.x), toCanvasY(p.y), 5 * scale, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+}
+
+// Particles
+function createParticles() {
+    return { list: [] };
+}
+
+function addParticle(pool, p) {
+    pool.list.push(p);
+}
+
+function spawnConfetti(pool, x, y) {
+    for (let i = 0; i < CONFETTI_COUNT; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 1 + Math.random() * 5;
+        const colors = ['#FF3333', '#33FF33', '#3333FF', '#FFFF33', '#FF33FF', '#33FFFF', '#FF8800', '#88FF00'];
+        addParticle(pool, {
+            x, y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed - 2,
+            life: 1,
+            decay: 0.008 + Math.random() * 0.015,
+            size: 3 + Math.random() * 5,
+            color: colors[Math.floor(Math.random() * colors.length)],
+            type: 'confetti',
+            rotation: Math.random() * Math.PI * 2,
+            rotSpeed: (Math.random() - 0.5) * 0.2
+        });
+    }
+    // Add star particles
+    for (let i = 0; i < 15; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 0.5 + Math.random() * 3;
+        addParticle(pool, {
+            x, y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed - 1,
+            life: 1,
+            decay: 0.006 + Math.random() * 0.01,
+            size: 4 + Math.random() * 6,
+            color: '#FFD700',
+            type: 'star',
+            rotation: Math.random() * Math.PI * 2,
+            rotSpeed: (Math.random() - 0.5) * 0.15
+        });
+    }
+}
+
+function spawnSplash(pool, x, y) {
+    for (let i = 0; i < SPLASH_COUNT; i++) {
+        const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI;
+        const speed = 1 + Math.random() * 3;
+        addParticle(pool, {
+            x, y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            life: 1,
+            decay: 0.02 + Math.random() * 0.03,
+            size: 2 + Math.random() * 4,
+            color: '#6699DD',
+            type: 'splash'
+        });
+    }
+}
+
+function spawnDust(pool, x, y) {
+    for (let i = 0; i < DUST_COUNT; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 0.3 + Math.random() * 1.5;
+        addParticle(pool, {
+            x, y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            life: 1,
+            decay: 0.02 + Math.random() * 0.03,
+            size: 3 + Math.random() * 5,
+            color: '#D4C090',
+            type: 'dust'
+        });
+    }
+}
+
+function spawnSparks(pool, x, y) {
+    for (let i = 0; i < SPARK_COUNT; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 1 + Math.random() * 3;
+        addParticle(pool, {
+            x, y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            life: 1,
+            decay: 0.03 + Math.random() * 0.05,
+            size: 2 + Math.random() * 3,
+            color: '#FFFFFF',
+            type: 'spark'
+        });
+    }
+}
+
+function updateParticles(pool) {
+    for (const p of pool.list) {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.05; // gravity
+        p.life -= p.decay;
+        if (p.rotation !== undefined) p.rotation += p.rotSpeed;
+    }
+    pool.list = pool.list.filter(p => p.life > 0);
+}
+
+function drawParticles(ctx, pool, toCanvasX, toCanvasY, scale) {
+    for (const p of pool.list) {
+        const cx = toCanvasX(p.x), cy = toCanvasY(p.y);
+        ctx.globalAlpha = Math.max(0, p.life);
+        ctx.fillStyle = p.color;
+
+        if (p.type === 'confetti') {
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate(p.rotation);
+            ctx.fillRect(-p.size * scale / 2, -p.size * scale / 4, p.size * scale, p.size * scale / 2);
+            ctx.restore();
+        } else if (p.type === 'star') {
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate(p.rotation);
+            drawStar(ctx, 0, 0, p.size * scale, p.color);
+            ctx.restore();
+        } else if (p.type === 'splash') {
+            ctx.beginPath();
+            ctx.arc(cx, cy, p.size * scale * p.life, 0, Math.PI * 2);
+            ctx.fill();
+        } else if (p.type === 'spark') {
+            ctx.shadowColor = p.color;
+            ctx.shadowBlur = 6;
+            ctx.beginPath();
+            ctx.arc(cx, cy, p.size * scale, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+        } else {
+            ctx.beginPath();
+            ctx.arc(cx, cy, p.size * scale, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+    ctx.globalAlpha = 1;
+}
+
+function drawStar(ctx, cx, cy, r, color) {
+    ctx.beginPath();
+    for (let i = 0; i < 5; i++) {
+        const a = (i * 4 * Math.PI) / 5 - Math.PI / 2;
+        const x = cx + r * Math.cos(a);
+        const y = cy + r * Math.sin(a);
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+}
+
+// Celebration effect
+function createCelebration() {
+    return { active: false, timer: 0, scale: 1 };
+}
+
+function startCelebration(celeb) {
+    celeb.active = true;
+    celeb.timer = CELEBRATION_DURATION;
+    celeb.scale = 1;
+}
+
+function updateCelebration(celeb, dt) {
+    if (!celeb.active) return;
+    celeb.timer -= dt;
+    celeb.scale = 1 + Math.sin(celeb.timer * 0.005) * 0.1;
+    if (celeb.timer <= 0) celeb.active = false;
+}
+
+function drawCelebration(ctx, celeb, toCanvasX, toCanvasY, holeX, holeY) {
+    if (!celeb.active) return;
+    const cx = toCanvasX(holeX), cy = toCanvasY(holeY);
+    const progress = 1 - celeb.timer / CELEBRATION_DURATION;
+
+    // Expanding ring
+    ctx.strokeStyle = '#FFD700';
+    ctx.lineWidth = 3;
+    ctx.globalAlpha = 1 - progress;
+    ctx.beginPath();
+    ctx.arc(cx, cy, (30 + progress * 80) * celeb.scale, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Glow
+    const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, 50 * celeb.scale);
+    gradient.addColorStop(0, 'rgba(255, 215, 0, 0.3)');
+    gradient.addColorStop(1, 'rgba(255, 215, 0, 0)');
+    ctx.fillStyle = gradient;
+    ctx.globalAlpha = (1 - progress) * 0.5;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 50 * celeb.scale, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.lineWidth = 1;
+}
+
+// === ./ui.js ===
+// ============================================
+// Mini Golf - UI System
+// ============================================
+
+
+// Start overlay
+function createStartOverlay(onStart) {
+    console.log('[MiniGolf] createStartOverlay called');
+    // Create overlay background
+    var overlay = document.createElement('div');
+    overlay.id = 'startOverlay';
+    overlay.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;background:rgba(10,10,26,0.92);z-index:100;display:flex;justify-content:center;align-items:center;padding:20px;overflow-y:auto;';
+
+    // Course selection state
+    var courseMode = 'all';
+
+    // Build content
+    var content = document.createElement('div');
+    content.style.cssText = 'text-align:center;max-width:500px;color:#fff;font-family:Segoe UI,PingFang SC,Microsoft YaHei,sans-serif;';
+
+    content.innerHTML =
+        '<div style="font-size:2.5em;margin-bottom:8px;">⛳</div>' +
+        '<h1 style="font-size:2.4em;margin:0 0 6px;color:#4ADE80;letter-spacing:2px;">迷你高尔夫</h1>' +
+        '<p style="color:#94a3b8;margin:0 0 20px;font-size:1.05em;">Mini Golf · 18洞挑战</p>' +
+        '<div style="margin-bottom:18px;">' +
+            '<label style="color:#ccc;font-size:0.95em;display:block;margin-bottom:6px;">选择球场</label>' +
+            '<div id="courseSelect" style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">' +
+                '<button class="course-btn active" data-course="all" style="background:rgba(74,222,128,0.2);border:1px solid #4ADE80;color:#4ADE80;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:0.9em;">全部18洞</button>' +
+                '<button class="course-btn" data-course="front" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);color:#aaa;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:0.9em;">前9洞</button>' +
+                '<button class="course-btn" data-course="back" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);color:#aaa;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:0.9em;">后9洞</button>' +
+            '</div>' +
+        '</div>';
+
+    // Create start button separately for reliable click handling
+    var startBtn = document.createElement('button');
+    startBtn.textContent = '开始游戏';
+    startBtn.style.cssText = 'background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;border:none;padding:14px 48px;font-size:1.2em;border-radius:12px;cursor:pointer;box-shadow:0 4px 15px rgba(34,197,94,0.4);display:inline-block;margin:10px 0;';
+
+    content.appendChild(startBtn);
+
+    // Instructions
+    var instructions = document.createElement('div');
+    instructions.style.cssText = 'margin-top:20px;text-align:left;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:14px 18px;';
+    instructions.innerHTML =
+        '<div style="color:#4ADE80;font-weight:bold;margin-bottom:8px;">操作说明</div>' +
+        '<div style="color:#aaa;font-size:0.9em;line-height:1.8;">' +
+            '· 点击球并拖动瞄准（反向射击）<br>' +
+            '· 拖动越远，击球力度越大<br>' +
+            '· 松开鼠标/手指击球<br>' +
+            '· 目标：用最少杆数将球打入洞中' +
+        '</div>' +
+        '<div style="color:#4ADE80;font-weight:bold;margin:10px 0 6px;">障碍物</div>' +
+        '<div style="color:#aaa;font-size:0.9em;line-height:1.8;">' +
+            '<span style="color:#FF4444;">●</span> 弹力器 — 球碰到会弹开<br>' +
+            '<span style="color:#885533;">✦</span> 风车 — 旋转的障碍物<br>' +
+            '<span style="color:#E8D5A3;">■</span> 沙坑 — 减速区域<br>' +
+            '<span style="color:#4488CC;">■</span> 水障碍 — 球会回到原位' +
+        '</div>';
+    content.appendChild(instructions);
+
+    // High score
+    var highScore = document.createElement('div');
+    highScore.style.cssText = 'margin-top:14px;color:#FFD700;font-size:0.9em;';
+    var saved = localStorage.getItem('miniGolfHighScore');
+    if (saved) {
+        highScore.textContent = '最佳成绩: ' + saved + ' 杆';
+    }
+    content.appendChild(highScore);
+
+    overlay.appendChild(content);
+    document.body.appendChild(overlay);
+    console.log('[MiniGolf] overlay appended, startBtn:', startBtn, 'parent:', startBtn.parentNode);
+
+    // Course selection handlers
+    var courseBtns = content.querySelectorAll('.course-btn');
+    for (var i = 0; i < courseBtns.length; i++) {
+        (function(btn) {
+            btn.onclick = function() {
+                for (var j = 0; j < courseBtns.length; j++) {
+                    courseBtns[j].style.background = 'rgba(255,255,255,0.08)';
+                    courseBtns[j].style.borderColor = 'rgba(255,255,255,0.15)';
+                    courseBtns[j].style.color = '#aaa';
+                    courseBtns[j].classList.remove('active');
+                }
+                btn.style.background = 'rgba(74,222,128,0.2)';
+                btn.style.borderColor = '#4ADE80';
+                btn.style.color = '#4ADE80';
+                btn.classList.add('active');
+                courseMode = btn.getAttribute('data-course');
+            };
+        })(courseBtns[i]);
+    }
+
+    // Start button click handler
+    console.log('[MiniGolf] attaching onclick to startBtn:', startBtn);
+    startBtn.onclick = function() {
+        console.log('[MiniGolf] START BUTTON CLICKED! courseMode:', courseMode);
+        overlay.style.opacity = '0';
+        overlay.style.pointerEvents = 'none';
+        overlay.style.transition = 'opacity 0.4s';
+        startBtn.style.pointerEvents = 'none';
+        setTimeout(function() {
+            if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+        }, 400);
+        var s = (courseMode === 'back') ? 9 : 0;
+        var en = (courseMode === 'front') ? 9 : 18;
+        console.log('[MiniGolf] calling onStart with:', s, en);
+        onStart(s, en);
+    };
+    console.log('[MiniGolf] onclick attached, startBtn.onclick:', startBtn.onclick);
+
+    return overlay;
+}
+
+// Hole transition
+function showHoleTransition(holeNum, par, courseName, callback) {
+    var overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;background:rgba(10,10,26,0.92);z-index:100;display:flex;justify-content:center;align-items:center;opacity:0;transition:opacity 0.3s;';
+
+    var content = document.createElement('div');
+    content.style.cssText = 'text-align:center;color:#fff;font-family:Segoe UI,PingFang SC,Microsoft YaHei,sans-serif;background:rgba(30,30,50,0.95);border:1px solid rgba(74,222,128,0.2);border-radius:16px;padding:28px 32px;box-shadow:0 8px 40px rgba(0,0,0,0.5);';
+    content.innerHTML =
+        '<div style="color:#4ADE80;font-size:1.1em;margin-bottom:4px;">第 ' + (holeNum + 1) + ' 洞</div>' +
+        '<div style="font-size:2em;color:#fff;font-weight:bold;margin-bottom:6px;">' + courseName + '</div>' +
+        '<div style="color:#ccc;font-size:1.2em;">标准杆: ' + par + '</div>';
+
+    overlay.appendChild(content);
+    document.body.appendChild(overlay);
+
+    // Fade in
+    setTimeout(function() { overlay.style.opacity = '1'; }, 10);
+
+    // Fade out after delay
+    setTimeout(function() {
+        overlay.style.opacity = '0';
+        setTimeout(function() {
+            if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+            callback();
+        }, 300);
+    }, 1200);
+}
+
+// Game complete overlay
+function showGameComplete(totalStrokes, totalPar, holeScores, startHole, onReplay) {
+    var diff = totalStrokes - totalPar;
+    var diffText = diff === 0 ? '平标准杆' : (diff > 0 ? '+' + diff : '' + diff);
+    var rating = diff <= -6 ? '神级表现' : diff <= -3 ? '出色发挥' : diff <= 0 ? '不错的成绩' : diff <= 3 ? '还需努力' : '继续加油';
+    var stars = diff <= -6 ? '⭐⭐⭐' : diff <= -3 ? '⭐⭐' : diff <= 0 ? '⭐' : '';
+
+    // Save high score
+    var prev = localStorage.getItem('miniGolfHighScore');
+    if (!prev || totalStrokes < parseInt(prev)) {
+        localStorage.setItem('miniGolfHighScore', totalStrokes);
+    }
+
+    var scoreRows = '';
+    for (var i = startHole; i < startHole + holeScores.length; i++) {
+        var s = holeScores[i - startHole];
+        var c = COURSES[i];
+        var diff2 = s - c.par;
+        var color = diff2 < 0 ? '#4ADE80' : diff2 === 0 ? '#fff' : diff2 <= 1 ? '#FFA500' : '#FF4444';
+        var label = diff2 === -2 ? '老鹰' : diff2 === -1 ? '小鸟' : diff2 === 0 ? '标准杆' : diff2 === 1 ? '柏忌' : diff2 === 2 ? '双柏忌' : '+' + diff2;
+        scoreRows += '<tr>' +
+            '<td style="padding:4px 10px;color:#aaa;">' + (i + 1) + '</td>' +
+            '<td style="padding:4px 10px;color:#ccc;">' + COURSE_NAMES[i] + '</td>' +
+            '<td style="padding:4px 10px;color:#aaa;">' + c.par + '</td>' +
+            '<td style="padding:4px 10px;font-weight:bold;color:' + color + ';">' + s + '</td>' +
+            '<td style="padding:4px 10px;color:' + color + ';">' + label + '</td>' +
+        '</tr>';
+    }
+
+    var overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;background:rgba(10,10,26,0.92);z-index:100;display:flex;justify-content:center;align-items:center;padding:20px;overflow-y:auto;';
+
+    var content = document.createElement('div');
+    content.style.cssText = 'text-align:center;max-width:550px;max-height:90vh;overflow-y:auto;color:#fff;font-family:Segoe UI,PingFang SC,Microsoft YaHei,sans-serif;background:rgba(30,30,50,0.95);border:1px solid rgba(74,222,128,0.2);border-radius:16px;padding:28px 32px;box-shadow:0 8px 40px rgba(0,0,0,0.5);';
+    content.innerHTML =
+        '<div style="font-size:2.5em;margin-bottom:6px;">🏆</div>' +
+        '<h2 style="color:#FFD700;margin:0 0 6px;font-size:1.8em;">比赛结束</h2>' +
+        '<div style="font-size:1.3em;color:#fff;margin-bottom:2px;">' + stars + ' ' + rating + ' ' + stars + '</div>' +
+        '<div style="font-size:2.2em;color:#4ADE80;font-weight:bold;margin:8px 0;">' + totalStrokes + ' 杆</div>' +
+        '<div style="color:#ccc;font-size:1.1em;margin-bottom:16px;">标准杆 ' + totalPar + ' · ' + diffText + '</div>' +
+        '<table style="width:100%;border-collapse:collapse;margin-bottom:18px;font-size:0.88em;">' +
+            '<tr style="border-bottom:1px solid rgba(255,255,255,0.15);">' +
+                '<th style="padding:6px 10px;color:#4ADE80;">洞</th>' +
+                '<th style="padding:6px 10px;color:#4ADE80;">名称</th>' +
+                '<th style="padding:6px 10px;color:#4ADE80;">标准</th>' +
+                '<th style="padding:6px 10px;color:#4ADE80;">杆数</th>' +
+                '<th style="padding:6px 10px;color:#4ADE80;">成绩</th>' +
+            '</tr>' +
+            scoreRows +
+        '</table>';
+
+    // Create replay button separately
+    var replayBtn = document.createElement('button');
+    replayBtn.textContent = '再来一局';
+    replayBtn.style.cssText = 'background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;border:none;padding:12px 40px;font-size:1.1em;border-radius:10px;cursor:pointer;box-shadow:0 4px 12px rgba(34,197,94,0.4);display:inline-block;';
+    content.appendChild(replayBtn);
+
+    overlay.appendChild(content);
+    document.body.appendChild(overlay);
+
+    replayBtn.onclick = function() {
+        if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+        if (onReplay) onReplay();
+    };
+}
+
+// === main.js ===
+// ============================================
+// Mini Golf - Main Game Loop
+// ============================================
+
+
+// Game state
+let canvas, ctx;
+let scale = 1, canvasOffX = 0, canvasOffY = 0;
+let ball, course, currentHole, startHole, endHole;
+let strokes, totalStrokes, holeScores, holePar;
+let aiming, aimDragX, aimDragY, aimPower;
+let trajectoryPoints;
+let trail, particles, celebration;
+let frameCount, lastTime;
+let gameStarted, transitioning;
+let lastBallPos; // for water reset
+
+function init() {
+    console.log('[MiniGolf] init() called, stack:', new Error().stack);
+    canvas = document.getElementById('gameCanvas');
+    console.log('[MiniGolf] canvas:', canvas);
+    ctx = canvas.getContext('2d');
+
+    resize();
+    window.addEventListener('resize', resize);
+
+    // Input events
+    canvas.addEventListener('mousedown', onPointerDown);
+    canvas.addEventListener('mousemove', onPointerMove);
+    canvas.addEventListener('mouseup', onPointerUp);
+    canvas.addEventListener('touchstart', onTouchStart, { passive: false });
+    canvas.addEventListener('touchmove', onTouchMove, { passive: false });
+    canvas.addEventListener('touchend', onTouchEnd, { passive: false });
+
+    trail = createTrail();
+    particles = createParticles();
+    celebration = createCelebration();
+    frameCount = 0;
+    lastTime = performance.now();
+    gameStarted = false;
+    transitioning = false;
+
+    console.log('[MiniGolf] calling createStartOverlay...');
+    createStartOverlay((s, e) => {
+        console.log('[MiniGolf] onStart callback fired! startHole:', s, 'endHole:', e);
+        startHole = s;
+        endHole = e;
+        startGame();
+    });
+
+    console.log('[MiniGolf] starting gameLoop');
+    requestAnimationFrame(gameLoop);
+}
+
+function resize() {
+    const maxW = Math.min(CANVAS_MAX_W, window.innerWidth - 20);
+    const maxH = Math.min(CANVAS_MAX_H, window.innerHeight - 20);
+    const aspect = COURSE_W / COURSE_H;
+    let cw, ch;
+    if (maxW / maxH > aspect) {
+        ch = maxH;
+        cw = ch * aspect;
+    } else {
+        cw = maxW;
+        ch = cw / aspect;
+    }
+    canvas.width = cw;
+    canvas.height = ch;
+    scale = cw / COURSE_W;
+    canvasOffX = 0;
+    canvasOffY = 0;
+}
+
+function toCanvasX(x) { return canvasOffX + x * scale; }
+function toCanvasY(y) { return canvasOffY + y * scale; }
+function toCourseX(cx) { return (cx - canvasOffX) / scale; }
+function toCourseY(cy) { return (cy - canvasOffY) / scale; }
+
+function startGame() {
+    console.log('[MiniGolf] startGame() called, startHole:', startHole, 'endHole:', endHole);
+    Sound.resumeAudio();
+    totalStrokes = 0;
+    holeScores = [];
+    currentHole = startHole;
+    gameStarted = true;
+    console.log('[MiniGolf] loading hole:', currentHole);
+    loadHole(currentHole);
+}
+
+function loadHole(idx) {
+    course = JSON.parse(JSON.stringify(COURSES[idx]));
+    course.theme = getThemeForHole(idx);
+    course.windmill = course.windmill ? { ...course.windmill, angle: 0 } : null;
+
+    ball = createBall(course.start.x, course.start.y);
+    lastBallPos = { x: course.start.x, y: course.start.y };
+    strokes = 0;
+    holePar = course.par;
+    aiming = false;
+    aimDragX = 0;
+    aimDragY = 0;
+    aimPower = 0;
+    trajectoryPoints = [];
+    trail.points = [];
+    particles.list = [];
+    transitioning = false;
+
+    showHoleTransition(idx, course.par, COURSE_NAMES[idx], () => {});
+}
+
+function getThemeForHole(idx) {
+    if (idx === 15) return 'ice';
+    if (idx === 13 || idx === 14) return 'desert';
+    return 'grass';
+}
+
+// Input handlers
+function getPointerPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    return {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+    };
+}
+
+function onPointerDown(e) {
+    if (!gameStarted || transitioning) return;
+    if (isBallMoving(ball) || ball.inHole) return;
+    const pos = getPointerPos(e);
+    startAim(pos.x, pos.y);
+}
+
+function onPointerMove(e) {
+    if (!aiming) return;
+    const pos = getPointerPos(e);
+    updateAim(pos.x, pos.y);
+}
+
+function onPointerUp(e) {
+    if (!aiming) return;
+    releaseAim();
+}
+
+function onTouchStart(e) {
+    e.preventDefault();
+    if (!gameStarted || transitioning) return;
+    if (isBallMoving(ball) || ball.inHole) return;
+    const touch = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+    startAim(touch.clientX - rect.left, touch.clientY - rect.top);
+}
+
+function onTouchMove(e) {
+    e.preventDefault();
+    if (!aiming) return;
+    const touch = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+    updateAim(touch.clientX - rect.left, touch.clientY - rect.top);
+}
+
+function onTouchEnd(e) {
+    e.preventDefault();
+    if (!aiming) return;
+    releaseAim();
+}
+
+function startAim(cx, cy) {
+    const bx = toCanvasX(ball.x), by = toCanvasY(ball.y);
+    const dx = cx - bx, dy = cy - by;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist > 80) return; // Must click near ball
+    aiming = true;
+    Sound.resumeAudio();
+}
+
+function updateAim(cx, cy) {
+    const bx = toCanvasX(ball.x), by = toCanvasY(ball.y);
+    aimDragX = cx - bx;
+    aimDragY = cy - by;
+    const dist = Math.sqrt(aimDragX * aimDragX + aimDragY * aimDragY);
+    aimPower = Math.min(1, dist / MAX_DRAG);
+
+    // Calculate trajectory preview
+    const power = aimPower * MAX_SPEED;
+    const dirX = -aimDragX / (dist || 1);
+    const dirY = -aimDragY / (dist || 1);
+    trajectoryPoints = simulateTrajectory(
+        ball.x, ball.y, dirX * power, dirY * power, course
+    );
+}
+
+function releaseAim() {
+    if (aimPower > 0.05) {
+        const dist = Math.sqrt(aimDragX * aimDragX + aimDragY * aimDragY);
+        if (dist > 5) {
+            const power = aimPower * MAX_SPEED;
+            const dirX = -aimDragX / dist;
+            const dirY = -aimDragY / dist;
+            applyShot(ball, dirX * power, dirY * power);
+            lastBallPos = { x: ball.x, y: ball.y };
+            strokes++;
+            totalStrokes++;
+            Sound.playHit();
+        }
+    }
+    aiming = false;
+    aimDragX = 0;
+    aimDragY = 0;
+    aimPower = 0;
+    trajectoryPoints = [];
+}
+
+function nextHole() {
+    holeScores.push(strokes);
+    currentHole++;
+    if (currentHole >= endHole) {
+        const totalPar = holeScores.reduce((sum, _, i) => sum + COURSES[startHole + i].par, 0);
+        showGameComplete(totalStrokes, totalPar, holeScores, startHole, () => {
+            gameStarted = false;
+            course = null;
+            ball = null;
+            createStartOverlay((s, e) => {
+                startHole = s;
+                endHole = e;
+                startGame();
+            });
+        });
+        gameStarted = false;
+    } else {
+        transitioning = true;
+        setTimeout(() => loadHole(currentHole), 800);
+    }
+}
+
+// HUD
+function drawHUD() {
+    const pad = 12;
+    const fontSize = Math.max(12, Math.min(16, canvas.width * 0.03));
+
+    ctx.font = `bold ${fontSize}px 'Segoe UI', sans-serif`;
+
+    // Top left - Hole info
+    ctx.textAlign = 'left';
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    ctx.fillRect(pad - 4, pad - 4, 130, 52);
+    ctx.fillStyle = '#4ADE80';
+    ctx.fillText(`第 ${currentHole + 1} 洞 / ${endHole}`, pad + 4, pad + fontSize);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText(`杆数: ${strokes}`, pad + 4, pad + fontSize * 2 + 4);
+
+    // Top right - Par & Total
+    ctx.textAlign = 'right';
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    ctx.fillRect(canvas.width - 130 - pad, pad - 4, 130, 52);
+    ctx.fillStyle = '#FFD700';
+    ctx.fillText(`标准杆: ${holePar}`, canvas.width - pad - 4, pad + fontSize);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText(`总杆: ${totalStrokes}`, canvas.width - pad - 4, pad + fontSize * 2 + 4);
+
+    // Power meter
+    if (aiming && aimPower > 0) {
+        const meterW = 16, meterH = 120;
+        const mx = pad + 4, my = canvas.height - meterH - pad - 30;
+
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.fillRect(mx - 2, my - 2, meterW + 4, meterH + 4);
+
+        // Background
+        ctx.fillStyle = '#333';
+        ctx.fillRect(mx, my, meterW, meterH);
+
+        // Fill
+        const fillH = meterH * aimPower;
+        const gradient = ctx.createLinearGradient(mx, my + meterH, mx, my);
+        gradient.addColorStop(0, '#22c55e');
+        gradient.addColorStop(0.5, '#eab308');
+        gradient.addColorStop(1, '#ef4444');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(mx, my + meterH - fillH, meterW, fillH);
+
+        // Border
+        ctx.strokeStyle = '#888';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(mx, my, meterW, meterH);
+
+        // Label
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = `bold ${fontSize - 2}px 'Segoe UI', sans-serif`;
+        ctx.fillText(`力度 ${Math.round(aimPower * 100)}%`, mx + meterW / 2, my + meterH + 18);
+    }
+
+    ctx.textAlign = 'left';
+    ctx.lineWidth = 1;
+}
+
+// Main game loop
+function gameLoop(timestamp) {
+    const dt = Math.min(50, timestamp - lastTime);
+    lastTime = timestamp;
+    frameCount++;
+
+    // Physics
+    if (gameStarted && ball && !transitioning) {
+        const events = step(ball, course, 1);
+
+        // Handle events
+        if (events.wallHit) {
+            Sound.playWallBounce();
+            spawnSparks(particles, ball.x, ball.y);
+        }
+        if (events.bumperHit) {
+            Sound.playBumper();
+            spawnSparks(particles, ball.x, ball.y);
+        }
+        if (events.windmillHit) {
+            Sound.playWindmillHit();
+            spawnSparks(particles, ball.x, ball.y);
+        }
+        if (events.sandHit && isBallMoving(ball)) {
+            spawnDust(particles, ball.x, ball.y);
+        }
+        if (events.waterHit) {
+            Sound.playWaterSplash();
+            spawnSplash(particles, ball.x, ball.y);
+            // Reset to last position after a delay
+            setTimeout(() => {
+                if (ball.inWater) {
+                    resetBall(ball, lastBallPos.x, lastBallPos.y);
+                    ball.inWater = false;
+                }
+            }, 600);
+        }
+        if (events.holeIn) {
+            Sound.playHoleIn();
+            spawnConfetti(particles, course.hole.x, course.hole.y);
+            startCelebration(celebration);
+            setTimeout(() => nextHole(), 2000);
+        }
+
+        // Save position when ball stops (for water reset)
+        if (!isBallMoving(ball) && !ball.inHole && !ball.inWater) {
+            lastBallPos = { x: ball.x, y: ball.y };
+        }
+
+        updateTrail(trail, ball.x, ball.y, isBallMoving(ball));
+    }
+
+    updateParticles(particles);
+    updateCelebration(celebration, dt);
+
+    // Render
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (gameStarted && course) {
+        drawCourse(ctx, course, toCanvasX, toCanvasY, scale, frameCount);
+        drawWalls(ctx, course, toCanvasX, toCanvasY, scale);
+        drawBumpers(ctx, course, toCanvasX, toCanvasY, scale);
+        drawWindmill(ctx, course.windmill, toCanvasX, toCanvasY, scale);
+        drawTrail(ctx, trail, toCanvasX, toCanvasY, scale);
+
+        if (aiming && aimPower > 0) {
+            drawAimLine(ctx, ball.x, ball.y, aimDragX, aimDragY,
+                       aimPower, trajectoryPoints, toCanvasX, toCanvasY, scale);
+        }
+
+        if (!ball.inHole) {
+            drawBall(ctx, ball, toCanvasX, toCanvasY, scale);
+        }
+
+        drawParticles(ctx, particles, toCanvasX, toCanvasY, scale);
+        drawCelebration(ctx, celebration, toCanvasX, toCanvasY, course.hole.x, course.hole.y);
+        drawHUD();
+    } else if (!gameStarted) {
+        // Idle background
+        ctx.fillStyle = '#1a1a2e';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    requestAnimationFrame(gameLoop);
+}
+
+// Expose for HTML
+window.startGame = init;
+
+// Module scripts are deferred, so DOM is ready — call init directly
+init();
+
+
+</script>
+
+</body>
+</html>

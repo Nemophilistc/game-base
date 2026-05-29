@@ -1,0 +1,497 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数独</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{background:#0a0a0a;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'Segoe UI',Tahoma,sans-serif;overflow:hidden;color:#fff}
+        .header{font-size:42px;color:#26c6da;text-shadow:0 0 30px rgba(38,198,218,0.5);margin-bottom:12px;letter-spacing:4px}
+        .info-bar{display:flex;gap:15px;margin-bottom:10px}
+        .info-box{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:8px 16px;text-align:center;min-width:80px}
+        .info-label{font-size:11px;color:#888;margin-bottom:4px}
+        .info-val{font-size:20px;font-weight:bold;color:#26c6da}
+        #board{display:grid;grid-template-columns:repeat(9,44px);gap:1px;background:#333;padding:2px;border-radius:6px;border:2px solid #444}
+        .cell{width:44px;height:44px;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:bold;background:#1a1a1a;cursor:pointer;transition:all 0.15s;user-select:none}
+        .cell.given{color:#26c6da}
+        .cell.user{color:#fff}
+        .cell.error{color:#f44336;background:rgba(244,67,54,0.15)}
+        .cell.selected{background:rgba(38,198,218,0.2);box-shadow:inset 0 0 0 2px #26c6da}
+        .cell.highlight{background:rgba(38,198,218,0.08)}
+        .cell.border-right{border-right:2px solid #444}
+        .cell.border-bottom{border-bottom:2px solid #444}
+        .controls{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;justify-content:center}
+        .num-btn{width:44px;height:44px;border-radius:8px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.08);color:#fff;font-size:20px;font-weight:bold;cursor:pointer;transition:all 0.15s}
+        .num-btn:hover{background:rgba(38,198,218,0.3);border-color:#26c6da}
+        .action-btns{display:flex;gap:8px;margin-top:8px}
+        .act-btn{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:8px 16px;font-size:13px;color:#888;cursor:pointer;transition:all 0.2s}
+        .act-btn:hover{background:rgba(38,198,218,0.2);color:#26c6da;border-color:#26c6da}
+        .overlay{position:fixed;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100;background:rgba(0,0,0,0.85)}
+        .overlay.hidden{display:none}
+        .overlay-title{font-size:48px;margin-bottom:15px;text-shadow:0 0 20px rgba(38,198,218,0.5)}
+        .menu-btn{background:linear-gradient(135deg,#26c6da 0%,#00838f 100%);border:none;padding:14px 40px;font-size:18px;color:#000;border-radius:8px;cursor:pointer;transition:all 0.3s;margin:6px;font-weight:bold}
+        .menu-btn:hover{transform:scale(1.08);box-shadow:0 0 25px rgba(38,198,218,0.5)}
+        .diff-btns{display:flex;gap:10px;margin-bottom:15px}
+        .diff-btn{background:rgba(255,255,255,0.1);border:2px solid #333;padding:12px 24px;font-size:15px;color:#aaa;border-radius:8px;cursor:pointer;transition:all 0.3s}
+        .diff-btn:hover,.diff-btn.active{border-color:#26c6da;color:#26c6da;background:rgba(38,198,218,0.1)}
+        .help-box{margin-top:15px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:14px 20px;max-width:350px;text-align:left;font-size:13px;color:#aaa;line-height:1.8;backdrop-filter:blur(5px)}
+        .help-box h3{color:#26c6da;font-size:14px;margin-bottom:6px;text-align:center}
+    </style>
+</head>
+<body>
+    <div class="header">数独</div>
+    <div class="info-bar">
+        <div class="info-box"><div class="info-label">错误</div><div class="info-val" id="errors">0</div></div>
+        <div class="info-box"><div class="info-label">时间</div><div class="info-val" id="timer">0:00</div></div>
+        <div class="info-box"><div class="info-label">提示</div><div class="info-val" id="hints">3</div></div>
+    </div>
+    <div id="board"></div>
+    <div class="controls">
+        <button class="num-btn" data-num="1">1</button>
+        <button class="num-btn" data-num="2">2</button>
+        <button class="num-btn" data-num="3">3</button>
+        <button class="num-btn" data-num="4">4</button>
+        <button class="num-btn" data-num="5">5</button>
+        <button class="num-btn" data-num="6">6</button>
+        <button class="num-btn" data-num="7">7</button>
+        <button class="num-btn" data-num="8">8</button>
+        <button class="num-btn" data-num="9">9</button>
+        <button class="num-btn" data-num="0" style="color:#888">✕</button>
+    </div>
+    <div class="action-btns">
+        <button class="act-btn" id="btnHint">💡 提示</button>
+        <button class="act-btn" id="btnCheck">✓ 检查</button>
+        <button class="act-btn" id="btnRestart">↺ 重新开始</button>
+    </div>
+
+    <div id="startOverlay" class="overlay">
+        <div class="overlay-title" style="color:#26c6da">数独</div>
+        <div class="diff-btns">
+            <button class="diff-btn active" data-givens="38">简单</button>
+            <button class="diff-btn" data-givens="30">中等</button>
+            <button class="diff-btn" data-givens="22">困难</button>
+        </div>
+        <button class="menu-btn" id="btnStart">开始游戏</button>
+        <div class="help-box">
+            <h3>操作说明</h3>
+            <div>点击格子选中，然后输入数字1-9</div>
+            <div>也可点击下方数字按钮</div>
+            <div>✕ 清除当前格子</div>
+            <div>R：重新开始</div>
+            <h3 style="margin-top:8px">游戏规则</h3>
+            <div>每行、每列、每宫(3×3)都包含1-9不重复</div>
+            <div>填满所有空格即获胜</div>
+        </div>
+    </div>
+
+    <div id="winOverlay" class="overlay hidden">
+        <div class="overlay-title" style="color:#4caf50;text-shadow:0 0 20px rgba(76,175,80,0.5)">完成！</div>
+        <div id="winStats" class="stats" style="font-size:20px;color:#aaa;margin-bottom:20px;text-align:center;line-height:1.6"></div>
+        <button class="menu-btn" id="btnWinRestart">再来一局</button>
+    </div>
+
+<script>
+// === ./config.js ===
+// 数独游戏常量配置
+const BOARD_SIZE = 9;
+const BOX_SIZE = 3;
+const DEFAULT_DIFF_GIVENS = 38; // 简单难度默认
+
+// === ./sound.js ===
+// Web Audio API 音效模块
+const Sound = {
+    ctx: null,
+    init() {
+        if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    },
+    play(type) {
+        if (!this.ctx) return;
+        const c = this.ctx, o = c.createOscillator(), g = c.createGain();
+        o.connect(g); g.connect(c.destination); const t = c.currentTime;
+        switch (type) {
+            case 'place':
+                o.type = 'sine'; o.frequency.value = 500;
+                g.gain.setValueAtTime(0.06, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
+                o.start(t); o.stop(t + 0.06); break;
+            case 'error':
+                o.type = 'square'; o.frequency.value = 200;
+                g.gain.setValueAtTime(0.08, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+                o.start(t); o.stop(t + 0.12); break;
+            case 'hint':
+                o.type = 'sine';
+                o.frequency.setValueAtTime(600, t); o.frequency.setValueAtTime(800, t + 0.05);
+                g.gain.setValueAtTime(0.08, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+                o.start(t); o.stop(t + 0.1); break;
+            case 'win':
+                o.type = 'sine';
+                o.frequency.setValueAtTime(500, t); o.frequency.setValueAtTime(700, t + 0.1);
+                o.frequency.setValueAtTime(900, t + 0.2); o.frequency.setValueAtTime(1200, t + 0.3);
+                g.gain.setValueAtTime(0.12, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+                o.start(t); o.stop(t + 0.5); break;
+        }
+    }
+};
+
+// === ./generator.js ===
+// 数独生成器模块：生成完整解 + 挖洞
+
+function isValid(board, r, c, n) {
+    for (let i = 0; i < BOARD_SIZE; i++) {
+        if (board[r][i] === n) return false;
+        if (board[i][c] === n) return false;
+    }
+    const br = Math.floor(r / BOX_SIZE) * BOX_SIZE;
+    const bc = Math.floor(c / BOX_SIZE) * BOX_SIZE;
+    for (let i = br; i < br + BOX_SIZE; i++) {
+        for (let j = bc; j < bc + BOX_SIZE; j++) {
+            if (board[i][j] === n) return false;
+        }
+    }
+    return true;
+}
+
+function solve(board) {
+    for (let r = 0; r < BOARD_SIZE; r++) {
+        for (let c = 0; c < BOARD_SIZE; c++) {
+            if (board[r][c] === 0) {
+                const nums = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+                for (let i = nums.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [nums[i], nums[j]] = [nums[j], nums[i]];
+                }
+                for (const n of nums) {
+                    if (isValid(board, r, c, n)) {
+                        board[r][c] = n;
+                        if (solve(board)) return true;
+                        board[r][c] = 0;
+                    }
+                }
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+/**
+ * 生成数独谜题
+ * @param {number} diffGivens - 保留的已知格子数（越大越简单）
+ * @returns {{ solution: number[][], board: number[][], given: boolean[][] }}
+ */
+function generateSudoku(diffGivens) {
+    const solution = Array.from({ length: BOARD_SIZE }, () => Array(BOARD_SIZE).fill(0));
+    solve(solution);
+
+    const board = solution.map(r => [...r]);
+    const given = Array.from({ length: BOARD_SIZE }, () => Array(BOARD_SIZE).fill(false));
+
+    // 随机打乱所有格子坐标
+    const cells = [];
+    for (let r = 0; r < BOARD_SIZE; r++) {
+        for (let c = 0; c < BOARD_SIZE; c++) cells.push({ r, c });
+    }
+    for (let i = cells.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [cells[i], cells[j]] = [cells[j], cells[i]];
+    }
+
+    // 挖洞
+    let removed = 0;
+    const toRemove = BOARD_SIZE * BOARD_SIZE - diffGivens;
+    for (const { r, c } of cells) {
+        if (removed >= toRemove) break;
+        board[r][c] = 0;
+        removed++;
+    }
+
+    // 标记已知格子
+    for (let r = 0; r < BOARD_SIZE; r++) {
+        for (let c = 0; c < BOARD_SIZE; c++) {
+            if (board[r][c] !== 0) given[r][c] = true;
+        }
+    }
+
+    return { solution, board, given };
+}
+
+// === ./ui.js ===
+// DOM 棋盘渲染模块
+
+/**
+ * 渲染棋盘
+ * @param {Object} opts
+ * @param {number[][]} opts.board - 当前棋盘
+ * @param {boolean[][]} opts.given - 已知格子标记
+ * @param {number[][]} opts.solution - 完整解
+ * @param {number} opts.selectedRow - 选中行 (-1 表示未选中)
+ * @param {number} opts.selectedCol - 选中列 (-1 表示未选中)
+ * @param {Set<string>} [opts.errorCells] - 错误格子集合 "r,c"
+ */
+function render({ board, given, solution, selectedRow, selectedCol, errorCells }) {
+    const boardEl = document.getElementById('board');
+    boardEl.innerHTML = '';
+
+    for (let r = 0; r < BOARD_SIZE; r++) {
+        for (let c = 0; c < BOARD_SIZE; c++) {
+            const cell = document.createElement('div');
+            cell.className = 'cell';
+
+            // 3x3 宫格粗边框
+            if (c === 2 || c === 5) cell.classList.add('border-right');
+            if (r === 2 || r === 5) cell.classList.add('border-bottom');
+
+            // 格子类型样式
+            if (given[r][c]) {
+                cell.classList.add('given');
+            } else if (board[r][c] !== 0) {
+                cell.classList.add('user');
+                if (board[r][c] !== solution[r][c]) cell.classList.add('error');
+            }
+
+            // 检查错误高亮（checkErrors 标记的）
+            if (errorCells && errorCells.has(r + ',' + c)) {
+                cell.classList.add('error');
+            }
+
+            // 选中与同行/列/宫高亮
+            if (r === selectedRow && c === selectedCol) {
+                cell.classList.add('selected');
+            } else if (selectedRow >= 0 && (
+                r === selectedRow ||
+                c === selectedCol ||
+                (Math.floor(r / BOX_SIZE) === Math.floor(selectedRow / BOX_SIZE) &&
+                 Math.floor(c / BOX_SIZE) === Math.floor(selectedCol / BOX_SIZE))
+            )) {
+                cell.classList.add('highlight');
+            }
+
+            if (board[r][c] !== 0) cell.textContent = board[r][c];
+            boardEl.appendChild(cell);
+        }
+    }
+}
+
+// === main.js ===
+// 数独游戏主模块
+
+// ── 游戏状态 ──
+let solution, board, given;
+let errors, selectedRow, selectedCol;
+let hintsRemaining, timerInterval, elapsed;
+let diffGivens;
+let gameActive; // Bug fix: 显式声明 gameActive
+
+// ── 辅助：重新渲染 ──
+function refresh(errorCells) {
+    render({ board, given, solution, selectedRow, selectedCol, errorCells });
+}
+
+// ── 难度选择 ──
+function setDiff(g, el) {
+    diffGivens = g;
+    document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('active'));
+    if (el) el.classList.add('active');
+}
+
+// ── 新游戏 ──
+function newGame() {
+    Sound.init();
+    document.getElementById('startOverlay').classList.add('hidden');
+    document.getElementById('winOverlay').classList.add('hidden');
+
+    const puzzle = generateSudoku(diffGivens);
+    solution = puzzle.solution;
+    board = puzzle.board;
+    given = puzzle.given;
+
+    errors = 0;
+    hintsRemaining = 3;
+    elapsed = 0;
+    selectedRow = -1;
+    selectedCol = -1;
+    gameActive = true; // Bug fix: 初始化 gameActive
+
+    if (timerInterval) clearInterval(timerInterval);
+    timerInterval = setInterval(() => {
+        elapsed++;
+        const m = Math.floor(elapsed / 60), s = elapsed % 60;
+        document.getElementById('timer').textContent = m + ':' + (s < 10 ? '0' : '') + s;
+    }, 1000);
+
+    document.getElementById('errors').textContent = '0';
+    document.getElementById('hints').textContent = '3';
+    refresh();
+}
+
+// ── 选中格子 ──
+function selectCell(r, c) {
+    selectedRow = r;
+    selectedCol = c;
+    refresh();
+}
+
+// ── 输入数字 ──
+function inputNum(n) {
+    if (!gameActive) return; // Bug fix: 游戏结束后禁止输入
+    if (selectedRow < 0 || selectedCol < 0) return;
+    if (given[selectedRow][selectedCol]) return;
+
+    if (n === 0) {
+        board[selectedRow][selectedCol] = 0;
+        Sound.play('place');
+        refresh();
+        return;
+    }
+
+    board[selectedRow][selectedCol] = n;
+
+    if (n !== solution[selectedRow][selectedCol]) {
+        errors++;
+        document.getElementById('errors').textContent = errors;
+        Sound.play('error');
+    } else {
+        Sound.play('place');
+    }
+
+    refresh();
+    checkWin();
+}
+
+// ── 提示 ──
+function useHint() {
+    if (!gameActive) return;
+    if (hintsRemaining <= 0) return;
+
+    const empty = [];
+    for (let r = 0; r < 9; r++) {
+        for (let c = 0; c < 9; c++) {
+            if (board[r][c] === 0 || board[r][c] !== solution[r][c]) empty.push({ r, c });
+        }
+    }
+    if (empty.length === 0) return;
+
+    const { r, c } = empty[Math.floor(Math.random() * empty.length)];
+    board[r][c] = solution[r][c];
+    hintsRemaining--;
+    document.getElementById('hints').textContent = hintsRemaining;
+    Sound.play('hint');
+    selectedRow = r;
+    selectedCol = c;
+    refresh();
+    checkWin();
+}
+
+// ── 检查错误（Bug fix: 实现实际的错误检查逻辑）──
+function checkErrors() {
+    if (!gameActive) return;
+
+    const errorCells = new Set();
+    for (let r = 0; r < 9; r++) {
+        for (let c = 0; c < 9; c++) {
+            if (!given[r][c] && board[r][c] !== 0 && board[r][c] !== solution[r][c]) {
+                errorCells.add(r + ',' + c);
+            }
+        }
+    }
+
+    // 重新渲染，高亮错误格子
+    refresh(errorCells);
+
+    // 若无错误且棋盘已满，检查是否胜利
+    if (errorCells.size === 0 && board.flat().every(v => v !== 0)) {
+        checkWin();
+    }
+}
+
+// ── 胜利检测 ──
+function checkWin() {
+    for (let r = 0; r < 9; r++) {
+        for (let c = 0; c < 9; c++) {
+            if (board[r][c] !== solution[r][c]) return;
+        }
+    }
+
+    // 胜利！
+    gameActive = false;
+    clearInterval(timerInterval);
+    Sound.play('win');
+
+    const m = Math.floor(elapsed / 60), s = elapsed % 60;
+    const diffName = diffGivens >= 38 ? '简单' : diffGivens >= 30 ? '中等' : '困难';
+
+    setTimeout(() => {
+        document.getElementById('winStats').innerHTML =
+            `时间: ${m}:${s < 10 ? '0' : ''}${s}<br>错误: ${errors}<br>难度: ${diffName}`;
+        document.getElementById('winOverlay').classList.remove('hidden');
+    }, 300);
+}
+
+// ── 绑定事件 ──
+function bindEvents() {
+    // 数字按钮
+    for (let i = 1; i <= 9; i++) {
+        const btn = document.querySelector(`.num-btn[data-num="${i}"]`);
+        if (btn) btn.addEventListener('click', () => inputNum(i));
+    }
+    const clearBtn = document.querySelector('.num-btn[data-num="0"]');
+    if (clearBtn) clearBtn.addEventListener('click', () => inputNum(0));
+
+    // 操作按钮
+    const hintBtn = document.getElementById('btnHint');
+    if (hintBtn) hintBtn.addEventListener('click', useHint);
+    const checkBtn = document.getElementById('btnCheck');
+    if (checkBtn) checkBtn.addEventListener('click', checkErrors);
+    const restartBtn = document.getElementById('btnRestart');
+    if (restartBtn) restartBtn.addEventListener('click', newGame);
+
+    // 难度按钮
+    document.querySelectorAll('.diff-btn').forEach(btn => {
+        btn.addEventListener('click', function () {
+            setDiff(parseInt(this.dataset.givens), this);
+        });
+    });
+
+    // 开始按钮
+    const startBtn = document.getElementById('btnStart');
+    if (startBtn) startBtn.addEventListener('click', newGame);
+
+    // 再来一局
+    const winBtn = document.getElementById('btnWinRestart');
+    if (winBtn) winBtn.addEventListener('click', newGame);
+
+    // 棋盘格子点击（事件委托）
+    document.getElementById('board').addEventListener('click', (e) => {
+        const cell = e.target.closest('.cell');
+        if (!cell) return;
+        const cells = Array.from(document.getElementById('board').children);
+        const idx = cells.indexOf(cell);
+        if (idx < 0) return;
+        const r = Math.floor(idx / 9);
+        const c = idx % 9;
+        selectCell(r, c);
+    });
+
+    // 键盘快捷键
+    window.addEventListener('keydown', e => {
+        if (e.code === 'KeyR') { e.preventDefault(); newGame(); return; }
+        if (e.code === 'KeyH') { e.preventDefault(); useHint(); return; }
+        const n = parseInt(e.key);
+        if (n >= 1 && n <= 9) { e.preventDefault(); inputNum(n); return; }
+        if (e.code === 'Backspace' || e.code === 'Delete') { e.preventDefault(); inputNum(0); return; }
+        if (e.code === 'ArrowUp' && selectedRow > 0) { selectedRow--; refresh(); e.preventDefault(); }
+        if (e.code === 'ArrowDown' && selectedRow < 8) { selectedRow++; refresh(); e.preventDefault(); }
+        if (e.code === 'ArrowLeft' && selectedCol > 0) { selectedCol--; refresh(); e.preventDefault(); }
+        if (e.code === 'ArrowRight' && selectedCol < 8) { selectedCol++; refresh(); e.preventDefault(); }
+    });
+}
+
+// ── 初始化 ──
+diffGivens = DEFAULT_DIFF_GIVENS;
+bindEvents();
+
+
+</script>
+
+</body>
+</html>

@@ -1,0 +1,2616 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>迷宫逃脱 - Maze Escape</title>
+    <style>
+        /* ============================================================
+           Global Reset & Base
+           ============================================================ */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #0a0f0a;
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            color: #e0ffe0;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* ============================================================
+           Glassmorphism Mixin via Classes
+           ============================================================ */
+        .glass {
+            background: rgba(10, 40, 10, 0.75);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(46, 204, 113, 0.3);
+            border-radius: 12px;
+        }
+
+        /* ============================================================
+           Overlay (Start / GameOver / Win)
+           ============================================================ */
+        #overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 10, 0, 0.92);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            animation: fadeIn 0.4s ease;
+        }
+
+        #overlay.hidden {
+            display: none;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        #overlay-content {
+            max-width: 520px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            padding: 32px 28px;
+            background: rgba(10, 40, 10, 0.8);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(46, 204, 113, 0.35);
+            border-radius: 18px;
+            box-shadow:
+                0 0 40px rgba(46, 204, 113, 0.1),
+                inset 0 0 30px rgba(0, 0, 0, 0.3);
+            text-align: center;
+        }
+
+        #overlay-content::-webkit-scrollbar {
+            width: 6px;
+        }
+        #overlay-content::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        #overlay-content::-webkit-scrollbar-thumb {
+            background: rgba(46, 204, 113, 0.3);
+            border-radius: 3px;
+        }
+
+        /* Title */
+        .title-area {
+            margin-bottom: 28px;
+        }
+
+        .game-title {
+            font-size: 52px;
+            font-weight: 900;
+            color: #2ecc71;
+            text-shadow:
+                0 0 20px rgba(46, 204, 113, 0.5),
+                0 0 40px rgba(46, 204, 113, 0.2);
+            letter-spacing: 8px;
+            margin-bottom: 4px;
+        }
+
+        .subtitle {
+            font-size: 16px;
+            color: rgba(46, 204, 113, 0.5);
+            letter-spacing: 12px;
+            font-weight: 300;
+        }
+
+        /* Sections */
+        .menu-section {
+            margin-bottom: 22px;
+        }
+
+        .section-title {
+            font-size: 15px;
+            color: rgba(46, 204, 113, 0.7);
+            margin-bottom: 10px;
+            font-weight: 500;
+            letter-spacing: 2px;
+        }
+
+        /* Difficulty Buttons */
+        .diff-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .diff-btn {
+            padding: 12px 22px;
+            font-size: 15px;
+            font-weight: 600;
+            color: #e0ffe0;
+            background: rgba(46, 204, 113, 0.12);
+            border: 1px solid rgba(46, 204, 113, 0.4);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            font-family: inherit;
+        }
+
+        .diff-btn:hover {
+            background: rgba(46, 204, 113, 0.25);
+            border-color: #2ecc71;
+            box-shadow: 0 0 15px rgba(46, 204, 113, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .diff-btn:active {
+            transform: translateY(0);
+            background: rgba(46, 204, 113, 0.35);
+        }
+
+        /* High Scores */
+        .hs-table {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .hs-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 16px;
+            font-size: 14px;
+            color: rgba(224, 255, 224, 0.7);
+            border-bottom: 1px solid rgba(46, 204, 113, 0.1);
+        }
+
+        .hs-val {
+            color: #f1c40f;
+            font-weight: 600;
+        }
+
+        /* Help Box */
+        .help-box {
+            text-align: left;
+            padding: 14px 16px;
+            background: rgba(0, 20, 0, 0.5);
+            border: 1px solid rgba(46, 204, 113, 0.2);
+            border-radius: 10px;
+            margin-top: 8px;
+        }
+
+        .help-box h3 {
+            font-size: 13px;
+            color: rgba(46, 204, 113, 0.6);
+            margin-bottom: 8px;
+            letter-spacing: 1px;
+        }
+
+        .help-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .help-item {
+            font-size: 13px;
+            color: rgba(224, 255, 224, 0.65);
+            line-height: 1.5;
+        }
+
+        .key {
+            display: inline-block;
+            padding: 1px 6px;
+            background: rgba(46, 204, 113, 0.15);
+            border: 1px solid rgba(46, 204, 113, 0.3);
+            border-radius: 4px;
+            font-size: 12px;
+            color: #2ecc71;
+            font-weight: 600;
+        }
+
+        /* ============================================================
+           Result Screens (Game Over / Win)
+           ============================================================ */
+        .result-screen {
+            animation: slideUp 0.5s ease;
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .result-title {
+            font-size: 42px;
+            font-weight: 900;
+            margin-bottom: 4px;
+        }
+
+        .result-title.danger {
+            color: #e74c3c;
+            text-shadow: 0 0 20px rgba(231, 76, 60, 0.4);
+        }
+
+        .result-title.gold {
+            color: #f1c40f;
+            text-shadow: 0 0 20px rgba(241, 196, 15, 0.4);
+        }
+
+        .result-sub {
+            font-size: 14px;
+            color: rgba(224, 255, 224, 0.4);
+            letter-spacing: 6px;
+            margin-bottom: 24px;
+        }
+
+        .new-high {
+            font-size: 18px;
+            color: #f1c40f;
+            font-weight: 700;
+            text-shadow: 0 0 10px rgba(241, 196, 15, 0.5);
+            margin-bottom: 16px;
+            animation: pulse 1s ease infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 24px;
+        }
+
+        .stat-item {
+            padding: 12px;
+            background: rgba(0, 20, 0, 0.5);
+            border: 1px solid rgba(46, 204, 113, 0.15);
+            border-radius: 8px;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: rgba(224, 255, 224, 0.5);
+            margin-bottom: 4px;
+        }
+
+        .stat-val {
+            font-size: 22px;
+            font-weight: 700;
+            color: #e0ffe0;
+        }
+
+        .stat-val.gold {
+            color: #f1c40f;
+        }
+
+        .restart-btn {
+            padding: 14px 40px;
+            font-size: 16px;
+            font-weight: 700;
+            color: #0a0f0a;
+            background: linear-gradient(135deg, #2ecc71, #27ae60);
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            font-family: inherit;
+            letter-spacing: 2px;
+        }
+
+        .restart-btn:hover {
+            box-shadow: 0 0 25px rgba(46, 204, 113, 0.5);
+            transform: translateY(-2px);
+        }
+
+        /* ============================================================
+           HUD
+           ============================================================ */
+        #hud {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            padding: 10px 20px;
+            background: rgba(0, 15, 0, 0.8);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border-bottom: 1px solid rgba(46, 204, 113, 0.2);
+            z-index: 50;
+            font-size: 14px;
+        }
+
+        .hud-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .hud-icon {
+            font-size: 16px;
+        }
+
+        .hud-val {
+            font-weight: 600;
+            color: #e0ffe0;
+            font-size: 15px;
+        }
+
+        .hud-item.lives .hud-val {
+            font-size: 16px;
+            letter-spacing: 2px;
+        }
+
+        .hud-item.diff .hud-val {
+            font-size: 12px;
+            color: rgba(46, 204, 113, 0.6);
+        }
+
+        /* ============================================================
+           Minimap
+           ============================================================ */
+        #minimap {
+            position: fixed;
+            bottom: 12px;
+            right: 12px;
+            width: 160px;
+            height: 160px;
+            border-radius: 10px;
+            border: 1px solid rgba(46, 204, 113, 0.3);
+            background: rgba(0, 10, 0, 0.7);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            z-index: 50;
+        }
+
+        /* ============================================================
+           Notification
+           ============================================================ */
+        #notification {
+            position: fixed;
+            top: 60px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-20px);
+            padding: 10px 24px;
+            background: rgba(10, 40, 10, 0.85);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(46, 204, 113, 0.4);
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            color: #2ecc71;
+            z-index: 60;
+            opacity: 0;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            pointer-events: none;
+            display: none;
+        }
+
+        #notification.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        /* ============================================================
+           Responsive
+           ============================================================ */
+        @media (max-width: 600px) {
+            .game-title {
+                font-size: 36px;
+                letter-spacing: 4px;
+            }
+
+            .subtitle {
+                font-size: 12px;
+                letter-spacing: 8px;
+            }
+
+            #overlay-content {
+                padding: 22px 18px;
+            }
+
+            .diff-btn {
+                padding: 10px 16px;
+                font-size: 13px;
+            }
+
+            .result-title {
+                font-size: 32px;
+            }
+
+            .stat-val {
+                font-size: 18px;
+            }
+
+            #hud {
+                gap: 10px;
+                padding: 8px 12px;
+                font-size: 12px;
+            }
+
+            .hud-val {
+                font-size: 13px;
+            }
+
+            #minimap {
+                width: 110px;
+                height: 110px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Game Canvas -->
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- HUD -->
+    <div id="hud"></div>
+
+    <!-- Minimap -->
+    <canvas id="minimap" width="160" height="160"></canvas>
+
+    <!-- Notification -->
+    <div id="notification"></div>
+
+    <!-- Overlay -->
+    <div id="overlay">
+        <div id="overlay-content"></div>
+    </div>
+
+    <!-- Game Modules -->
+    <script>
+// === ./config.js ===
+// ============================================================
+// config.js - Maze Escape Game Configuration
+// ============================================================
+
+const DIFFICULTY = {
+    small:  { cols: 10, rows: 10, enemies: 2,  keys: 3,  name: '简单 (10×10)'  },
+    medium: { cols: 15, rows: 15, enemies: 4,  keys: 5,  name: '中等 (15×15)'  },
+    large:  { cols: 20, rows: 20, enemies: 6,  keys: 8,  name: '困难 (20×20)'  },
+};
+
+const CFG = {
+    CELL_SIZE: 48,           // rendered cell size in px
+    WALL_THICKNESS: 3,
+    PLAYER_RADIUS: 0.35,     // fraction of cell size
+    ENEMY_RADIUS: 0.32,
+    ITEM_RADIUS: 0.25,
+
+    PLAYER_SPEED: 5.5,       // cells per second
+    ENEMY_SPEED: 2.0,
+    ENEMY_CHASE_SPEED: 3.2,
+    ENEMY_CHASE_RANGE: 6,    // cells
+    ENEMY_FREEZE_DURATION: 5,// seconds
+
+    TORCH_RADIUS: 3,         // cells revealed
+    MAP_REVEAL_DURATION: 4,  // seconds
+    SPEED_BOOST_DURATION: 6,
+    SPEED_BOOST_MULT: 1.6,
+
+    STARTING_LIVES: 3,
+    INVULN_DURATION: 2,      // seconds after hit
+
+    // Scoring
+    SCORE_PER_SECOND: 10,
+    SCORE_PER_KEY: 200,
+    SCORE_PER_TORCH: 50,
+    SCORE_PER_POWERUP: 100,
+    SCORE_FINISH_BONUS: 2000,
+
+    // Visual
+    BG_COLOR: '#0a0f0a',
+    WALL_COLOR: '#1a3a1a',
+    WALL_GLOW: '#2ecc71',
+    FLOOR_COLOR: '#0d1a0d',
+    FOG_COLOR: 'rgba(0,0,0,0.95)',
+    FOG_SEMI: 'rgba(0,0,0,0.55)',
+    PLAYER_COLOR: '#2ecc71',
+    PLAYER_GLOW: '#00ff88',
+    ENEMY_COLOR: '#e74c3c',
+    ENEMY_GLOW: '#ff4444',
+    EXIT_COLOR: '#f1c40f',
+    EXIT_GLOW: '#ffdd00',
+    KEY_COLOR: '#f1c40f',
+    TORCH_COLOR: '#e67e22',
+    DOOR_COLOR: '#8b4513',
+    LOCKED_COLOR: '#c0392b',
+    SPEED_COLOR: '#3498db',
+    FREEZE_COLOR: '#9b59b6',
+    REVEAL_COLOR: '#1abc9c',
+    HUD_BG: 'rgba(0,20,0,0.8)',
+    OVERLAY_BG: 'rgba(0,10,0,0.92)',
+    GLASS_BG: 'rgba(10,40,10,0.75)',
+    GLASS_BORDER: 'rgba(46,204,113,0.3)',
+    TEXT_PRIMARY: '#e0ffe0',
+    TEXT_ACCENT: '#2ecc71',
+    TEXT_GOLD: '#f1c40f',
+    TEXT_DANGER: '#e74c3c',
+};
+
+const POWERUP_TYPES = {
+    speed:  { label: '加速', icon: '⚡', color: CFG.SPEED_COLOR },
+    freeze: { label: '冻结', icon: '❄', color: CFG.FREEZE_COLOR },
+    reveal: { label: '全图', icon: '🗺', color: CFG.REVEAL_COLOR },
+};
+
+// === ./sound.js ===
+// ============================================================
+// sound.js - Web Audio API Sound Engine
+// ============================================================
+
+let ctx = null;
+let masterGain = null;
+
+function ensureCtx() {
+    if (!ctx) {
+        ctx = new (window.AudioContext || window.webkitAudioContext)();
+        masterGain = ctx.createGain();
+        masterGain.gain.value = 0.3;
+        masterGain.connect(ctx.destination);
+    }
+    if (ctx.state === 'suspended') ctx.resume();
+    return ctx;
+}
+
+function playTone(freq, duration, type = 'sine', vol = 0.3, detune = 0) {
+    const c = ensureCtx();
+    const osc = c.createOscillator();
+    const gain = c.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    osc.detune.value = detune;
+    gain.gain.setValueAtTime(vol, c.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, c.currentTime + duration);
+    osc.connect(gain);
+    gain.connect(masterGain);
+    osc.start(c.currentTime);
+    osc.stop(c.currentTime + duration);
+}
+
+function playNoise(duration, vol = 0.1) {
+    const c = ensureCtx();
+    const bufferSize = c.sampleRate * duration;
+    const buffer = c.createBuffer(1, bufferSize, c.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+        data[i] = (Math.random() * 2 - 1) * vol;
+    }
+    const source = c.createBufferSource();
+    source.buffer = buffer;
+    const gain = c.createGain();
+    gain.gain.setValueAtTime(vol, c.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, c.currentTime + duration);
+    source.connect(gain);
+    gain.connect(masterGain);
+    source.start();
+}
+
+const Sound = {
+    move() {
+        playTone(220, 0.06, 'sine', 0.08);
+    },
+    collectKey() {
+        playTone(880, 0.08, 'sine', 0.25);
+        setTimeout(() => playTone(1100, 0.12, 'sine', 0.2), 60);
+        setTimeout(() => playTone(1320, 0.15, 'sine', 0.18), 120);
+    },
+    openDoor() {
+        playTone(300, 0.15, 'square', 0.15);
+        setTimeout(() => playTone(400, 0.15, 'square', 0.12), 100);
+        setTimeout(() => playTone(500, 0.2, 'square', 0.1), 200);
+    },
+    collectTorch() {
+        playNoise(0.15, 0.12);
+        playTone(600, 0.2, 'sawtooth', 0.08);
+    },
+    collectPowerup() {
+        const notes = [523, 659, 784, 1047];
+        notes.forEach((n, i) => {
+            setTimeout(() => playTone(n, 0.15, 'sine', 0.2 - i * 0.03), i * 70);
+        });
+    },
+    enemySpot() {
+        playTone(150, 0.3, 'sawtooth', 0.2);
+        playTone(100, 0.4, 'square', 0.15, -20);
+    },
+    hit() {
+        playTone(80, 0.3, 'sawtooth', 0.3);
+        playNoise(0.2, 0.2);
+    },
+    doorLocked() {
+        playTone(200, 0.1, 'square', 0.15);
+        setTimeout(() => playTone(150, 0.15, 'square', 0.12), 80);
+    },
+    levelComplete() {
+        const melody = [523, 659, 784, 1047, 784, 1047, 1319];
+        melody.forEach((n, i) => {
+            setTimeout(() => playTone(n, 0.25, 'sine', 0.25 - i * 0.02), i * 120);
+        });
+    },
+    gameOver() {
+        const melody = [400, 350, 300, 200];
+        melody.forEach((n, i) => {
+            setTimeout(() => playTone(n, 0.3, 'sawtooth', 0.2), i * 200);
+        });
+    },
+    tick() {
+        playTone(1000, 0.03, 'sine', 0.05);
+    },
+    explore() {
+        playTone(180, 0.05, 'sine', 0.04);
+    },
+};
+
+// === ./maze.js ===
+// ============================================================
+// maze.js - Maze Generation (Recursive Backtracker / DFS)
+// ============================================================
+// Each cell: { row, col, walls: {N,S,E,W}, visited, revealed, doorDir, locked }
+// Walls: true = wall present
+
+class Maze {
+    constructor(rows, cols) {
+        this.rows = rows;
+        this.cols = cols;
+        this.grid = [];
+        this.doors = [];       // [{row, col, dir, locked}]
+        this.generate();
+    }
+
+    generate() {
+        // Init grid
+        this.grid = [];
+        for (let r = 0; r < this.rows; r++) {
+            this.grid[r] = [];
+            for (let c = 0; c < this.cols; c++) {
+                this.grid[r][c] = {
+                    row: r,
+                    col: c,
+                    walls: { N: true, S: true, E: true, W: true },
+                    visited: false,
+                    revealed: false,
+                    doorDir: null,
+                    locked: false,
+                };
+            }
+        }
+
+        // Recursive backtracker
+        const stack = [];
+        const start = this.grid[0][0];
+        start.visited = true;
+        stack.push(start);
+
+        while (stack.length > 0) {
+            const current = stack[stack.length - 1];
+            const neighbors = this._getUnvisitedNeighbors(current);
+
+            if (neighbors.length === 0) {
+                stack.pop();
+            } else {
+                const next = neighbors[Math.floor(Math.random() * neighbors.length)];
+                this._removeWall(current, next);
+                next.visited = true;
+                stack.push(next);
+            }
+        }
+
+        // Reset visited flags for game use
+        for (let r = 0; r < this.rows; r++) {
+            for (let c = 0; c < this.cols; c++) {
+                this.grid[r][c].visited = false;
+            }
+        }
+    }
+
+    _getUnvisitedNeighbors(cell) {
+        const { row, col } = cell;
+        const neighbors = [];
+        if (row > 0 && !this.grid[row - 1][col].visited) neighbors.push(this.grid[row - 1][col]);
+        if (row < this.rows - 1 && !this.grid[row + 1][col].visited) neighbors.push(this.grid[row + 1][col]);
+        if (col > 0 && !this.grid[row][col - 1].visited) neighbors.push(this.grid[row][col - 1]);
+        if (col < this.cols - 1 && !this.grid[row][col + 1].visited) neighbors.push(this.grid[row][col + 1]);
+        return neighbors;
+    }
+
+    _removeWall(a, b) {
+        const dr = b.row - a.row;
+        const dc = b.col - a.col;
+        if (dr === -1) { a.walls.N = false; b.walls.S = false; }
+        if (dr === 1)  { a.walls.S = false; b.walls.N = false; }
+        if (dc === -1) { a.walls.W = false; b.walls.E = false; }
+        if (dc === 1)  { a.walls.E = false; b.walls.W = false; }
+    }
+
+    getCell(row, col) {
+        if (row < 0 || row >= this.rows || col < 0 || col >= this.cols) return null;
+        return this.grid[row][col];
+    }
+
+    canMove(row, col, dir) {
+        const cell = this.getCell(row, col);
+        if (!cell) return false;
+        if (cell.walls[dir]) return false;
+        // Check for locked door on current cell
+        if (cell.doorDir === dir && cell.locked) return false;
+        // Check for locked door on adjacent cell (approaching from other side)
+        const opp = { N: 'S', S: 'N', E: 'W', W: 'E' };
+        const deltas = { N: [-1, 0], S: [1, 0], E: [0, 1], W: [0, -1] };
+        const [dr, dc] = deltas[dir];
+        const adj = this.getCell(row + dr, col + dc);
+        if (adj && adj.doorDir === opp[dir] && adj.locked) return false;
+        return true;
+    }
+
+    // Place locked doors along passages
+    placeDoors(keyCount) {
+        this.doors = [];
+        const candidates = [];
+
+        for (let r = 0; r < this.rows; r++) {
+            for (let c = 0; c < this.cols; c++) {
+                const cell = this.grid[r][c];
+                // Don't place doors near start or end
+                if (r + c < 3 || (this.rows - 1 - r) + (this.cols - 1 - c) < 3) continue;
+
+                ['E', 'S'].forEach(dir => {
+                    if (!cell.walls[dir]) {
+                        candidates.push({ row: r, col: c, dir });
+                    }
+                });
+            }
+        }
+
+        // Shuffle and pick
+        this._shuffle(candidates);
+        const count = Math.min(keyCount, candidates.length);
+
+        for (let i = 0; i < count; i++) {
+            const d = candidates[i];
+            const cell = this.grid[d.row][d.col];
+            cell.doorDir = d.dir;
+            cell.locked = true;
+            this.doors.push(d);
+        }
+    }
+
+    unlockDoor(row, col) {
+        const cell = this.getCell(row, col);
+        if (cell && cell.locked) {
+            cell.locked = false;
+            return true;
+        }
+        // Check adjacent cell if we're approaching from the other side
+        const dirs = { N: [-1, 0, 'S'], S: [1, 0, 'N'], E: [0, 1, 'W'], W: [0, -1, 'E'] };
+        for (const [dir, [dr, dc, opp]] of Object.entries(dirs)) {
+            const adj = this.getCell(row + dr, col + dc);
+            if (adj && adj.doorDir === opp && adj.locked) {
+                adj.locked = false;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    isDoorAt(row, col, dir) {
+        const cell = this.getCell(row, col);
+        return cell && cell.doorDir === dir && cell.locked;
+    }
+
+    // Check if a locked door blocks movement from adjacent cell
+    hasLockedDoorTo(row, col, dir) {
+        const opp = { N: 'S', S: 'N', E: 'W', W: 'E' };
+        const deltas = { N: [-1, 0], S: [1, 0], E: [0, 1], W: [0, -1] };
+        const [dr, dc] = deltas[dir];
+        const adj = this.getCell(row + dr, col + dc);
+        return adj && adj.doorDir === opp[dir] && adj.locked;
+    }
+
+    // Reveal cells in radius around position
+    reveal(centerRow, centerCol, radius) {
+        for (let r = centerRow - radius; r <= centerRow + radius; r++) {
+            for (let c = centerCol - radius; c <= centerCol + radius; c++) {
+                const dist = Math.sqrt((r - centerRow) ** 2 + (c - centerCol) ** 2);
+                if (dist <= radius) {
+                    const cell = this.getCell(r, c);
+                    if (cell) cell.revealed = true;
+                }
+            }
+        }
+    }
+
+    revealAll() {
+        for (let r = 0; r < this.rows; r++) {
+            for (let c = 0; c < this.cols; c++) {
+                this.grid[r][c].revealed = true;
+            }
+        }
+    }
+
+    resetRevealed() {
+        for (let r = 0; r < this.rows; r++) {
+            for (let c = 0; c < this.cols; c++) {
+                this.grid[r][c].revealed = false;
+            }
+        }
+    }
+
+    // Validate that the maze is solvable: player can reach exit by collecting keys and unlocking doors
+    validateSolvability(keyPositions) {
+        const exitRow = this.rows - 1;
+        const exitCol = this.cols - 1;
+        const keySet = new Set(keyPositions.map(p => `${p.row},${p.col}`));
+        const collectedKeyPositions = new Set();
+        const unlockedDoorIndices = new Set();
+
+        for (let iter = 0; iter <= this.doors.length + 1; iter++) {
+            // BFS from start with currently unlocked doors
+            const reachable = this._bfsReachable(0, 0, unlockedDoorIndices);
+
+            // Check if exit is reachable
+            if (reachable.has(`${exitRow},${exitCol}`)) return true;
+
+            // Collect keys in reachable area
+            let foundNewKey = false;
+            for (const k of keySet) {
+                if (reachable.has(k) && !collectedKeyPositions.has(k)) {
+                    collectedKeyPositions.add(k);
+                    foundNewKey = true;
+                }
+            }
+
+            // Try to unlock doors we can reach (if we have spare keys)
+            let unlockedNew = false;
+            for (let i = 0; i < this.doors.length; i++) {
+                if (unlockedDoorIndices.has(i)) continue;
+                if (collectedKeyPositions.size - unlockedDoorIndices.size <= 0) break;
+
+                const d = this.doors[i];
+                if (reachable.has(`${d.row},${d.col}`)) {
+                    unlockedDoorIndices.add(i);
+                    unlockedNew = true;
+                }
+            }
+
+            // No progress possible = unsolvable
+            if (!foundNewKey && !unlockedNew) return false;
+        }
+
+        return false;
+    }
+
+    // BFS from start, treating locked (not-yet-unlocked) doors as walls
+    _bfsReachable(startRow, startCol, unlockedDoorIndices) {
+        const reachable = new Set();
+        const queue = [[startRow, startCol]];
+        reachable.add(`${startRow},${startCol}`);
+
+        const allDirs = [
+            { dir: 'N', dr: -1, dc: 0 },
+            { dir: 'S', dr: 1, dc: 0 },
+            { dir: 'E', dr: 0, dc: 1 },
+            { dir: 'W', dr: 0, dc: -1 },
+        ];
+        const opp = { N: 'S', S: 'N', E: 'W', W: 'E' };
+
+        while (queue.length > 0) {
+            const [row, col] = queue.shift();
+            const cell = this.getCell(row, col);
+
+            for (const { dir, dr, dc } of allDirs) {
+                if (cell.walls[dir]) continue;
+
+                // Check for locked door on current cell
+                if (cell.doorDir === dir && cell.locked) {
+                    const doorIdx = this._findDoorIndex(row, col, dir);
+                    if (doorIdx === -1 || !unlockedDoorIndices.has(doorIdx)) continue;
+                }
+
+                const nr = row + dr;
+                const nc = col + dc;
+
+                // Check for locked door on adjacent cell (approaching from other side)
+                const adj = this.getCell(nr, nc);
+                if (adj && adj.doorDir === opp[dir] && adj.locked) {
+                    const doorIdx = this._findDoorIndex(nr, nc, opp[dir]);
+                    if (doorIdx === -1 || !unlockedDoorIndices.has(doorIdx)) continue;
+                }
+
+                const key = `${nr},${nc}`;
+                if (!reachable.has(key)) {
+                    reachable.add(key);
+                    queue.push([nr, nc]);
+                }
+            }
+        }
+
+        return reachable;
+    }
+
+    _findDoorIndex(row, col, dir) {
+        for (let i = 0; i < this.doors.length; i++) {
+            const d = this.doors[i];
+            if (d.row === row && d.col === col && d.dir === dir) return i;
+        }
+        return -1;
+    }
+
+    _shuffle(arr) {
+        for (let i = arr.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+    }
+
+    // Find a path from start to goal using BFS (for enemy pathfinding)
+    findPath(startRow, startCol, goalRow, goalCol) {
+        const key = (r, c) => `${r},${c}`;
+        const queue = [{ row: startRow, col: startCol, path: [] }];
+        const visited = new Set();
+        visited.add(key(startRow, startCol));
+
+        while (queue.length > 0) {
+            const { row, col, path } = queue.shift();
+            if (row === goalRow && col === goalCol) return path;
+
+            const dirs = [
+                { dir: 'N', dr: -1, dc: 0 },
+                { dir: 'S', dr: 1, dc: 0 },
+                { dir: 'E', dr: 0, dc: 1 },
+                { dir: 'W', dr: 0, dc: -1 },
+            ];
+
+            for (const { dir, dr, dc } of dirs) {
+                const nr = row + dr;
+                const nc = col + dc;
+                if (this.canMove(row, col, dir) && !visited.has(key(nr, nc))) {
+                    visited.add(key(nr, nc));
+                    queue.push({ row: nr, col: nc, path: [...path, dir] });
+                }
+            }
+        }
+        return null; // No path
+    }
+}
+
+// === ./player.js ===
+// ============================================================
+// player.js - Player Entity
+// ============================================================
+
+
+class Player {
+    constructor(row, col) {
+        this.row = row;
+        this.col = col;
+        // Visual position (smooth interpolation)
+        this.x = col + 0.5;
+        this.y = row + 0.5;
+        this.targetX = this.x;
+        this.targetY = this.y;
+
+        this.lives = CFG.STARTING_LIVES;
+        this.keys = 0;
+        this.torches = 0;
+        this.score = 0;
+        this.moveTimer = 0;
+        this.invulnTimer = 0;
+        this.speedMult = 1;
+        this.speedTimer = 0;
+        this.facing = 'S';      // N S E W
+        this.moving = false;
+        this.animFrame = 0;
+        this.animTimer = 0;
+        this.alive = true;
+        this.torchRadius = CFG.TORCH_RADIUS;
+
+        // Trail particles
+        this.trail = [];
+    }
+
+    get rowI() { return Math.round(this.y - 0.5); }
+    get colI() { return Math.round(this.x - 0.5); }
+
+    reset(row, col) {
+        this.row = row;
+        this.col = col;
+        this.x = col + 0.5;
+        this.y = row + 0.5;
+        this.targetX = this.x;
+        this.targetY = this.y;
+        this.moveTimer = 0;
+        this.invulnTimer = 0;
+        this.speedMult = 1;
+        this.speedTimer = 0;
+        this.moving = false;
+        this.alive = true;
+        this.trail = [];
+    }
+
+    update(dt, maze, inputDir) {
+        if (!this.alive) return;
+
+        // Update timers
+        this.invulnTimer = Math.max(0, this.invulnTimer - dt);
+        if (this.speedTimer > 0) {
+            this.speedTimer -= dt;
+            if (this.speedTimer <= 0) this.speedMult = 1;
+        }
+
+        // Movement cooldown
+        this.moveTimer = Math.max(0, this.moveTimer - dt);
+
+        // Smooth interpolation toward target
+        const lerpSpeed = 12 * dt;
+        this.x += (this.targetX - this.x) * Math.min(lerpSpeed, 1);
+        this.y += (this.targetY - this.y) * Math.min(lerpSpeed, 1);
+
+        // Snap if close enough
+        if (Math.abs(this.x - this.targetX) < 0.01) this.x = this.targetX;
+        if (Math.abs(this.y - this.targetY) < 0.01) this.y = this.targetY;
+
+        // Animation
+        if (this.moving) {
+            this.animTimer += dt;
+            if (this.animTimer > 0.12) {
+                this.animTimer = 0;
+                this.animFrame = (this.animFrame + 1) % 4;
+            }
+        } else {
+            this.animFrame = 0;
+            this.animTimer = 0;
+        }
+
+        // Trail
+        if (this.moving) {
+            this.trail.push({ x: this.x, y: this.y, life: 0.4 });
+        }
+        this.trail = this.trail.filter(t => {
+            t.life -= dt;
+            return t.life > 0;
+        });
+
+        // Process movement input
+        this.moving = false;
+        if (!inputDir || this.moveTimer > 0) return;
+
+        const currentRow = this.rowI;
+        const currentCol = this.colI;
+
+        // Check if still moving toward target
+        if (Math.abs(this.x - this.targetX) > 0.1 || Math.abs(this.y - this.targetY) > 0.1) return;
+
+        // Snap to grid
+        this.x = currentCol + 0.5;
+        this.y = currentRow + 0.5;
+        this.targetX = this.x;
+        this.targetY = this.y;
+
+        const dirs = {
+            N: { dr: -1, dc: 0 },
+            S: { dr: 1, dc: 0 },
+            E: { dr: 0, dc: 1 },
+            W: { dr: 0, dc: -1 },
+        };
+
+        if (dirs[inputDir]) {
+            this.facing = inputDir;
+            const { dr, dc } = dirs[inputDir];
+
+            // First check if there's a wall (ignoring doors)
+            const cell = maze.getCell(currentRow, currentCol);
+            if (cell && cell.walls[inputDir]) return null; // Wall blocks, no interaction
+
+            // Path is open (no wall) - check for locked door
+            const hasLockedDoor = maze.isDoorAt(currentRow, currentCol, inputDir) ||
+                maze.hasLockedDoorTo(currentRow, currentCol, inputDir);
+
+            if (hasLockedDoor) {
+                if (this.keys > 0) {
+                    this.keys--;
+                    maze.unlockDoor(currentRow, currentCol);
+                    maze.unlockDoor(currentRow + dr, currentCol + dc);
+                    return 'door_open';
+                } else {
+                    return 'door_locked';
+                }
+            }
+
+            // No wall, no locked door - move
+            this.row = currentRow + dr;
+            this.col = currentCol + dc;
+            this.targetX = this.col + 0.5;
+            this.targetY = this.row + 0.5;
+            this.moveTimer = 1 / (CFG.PLAYER_SPEED * this.speedMult);
+            this.moving = true;
+            return 'move';
+        }
+
+        return null;
+    }
+
+    takeDamage() {
+        if (this.invulnTimer > 0 || !this.alive) return false;
+        this.lives--;
+        this.invulnTimer = CFG.INVULN_DURATION;
+        if (this.lives <= 0) {
+            this.alive = false;
+        }
+        return true;
+    }
+
+    addKey() { this.keys++; }
+    addTorch() {
+        this.torches++;
+        this.torchRadius = CFG.TORCH_RADIUS + this.torches * 0.8;
+    }
+    addScore(pts) { this.score += pts; }
+
+    applySpeedBoost() {
+        this.speedMult = CFG.SPEED_BOOST_MULT;
+        this.speedTimer = CFG.SPEED_BOOST_DURATION;
+    }
+
+    draw(ctx, cellSize) {
+        const px = this.x * cellSize;
+        const py = this.y * cellSize;
+        const r = CFG.PLAYER_RADIUS * cellSize;
+
+        // Trail
+        for (const t of this.trail) {
+            const alpha = (t.life / 0.4) * 0.3;
+            ctx.beginPath();
+            ctx.arc(t.x * cellSize, t.y * cellSize, r * 0.5, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(46, 204, 113, ${alpha})`;
+            ctx.fill();
+        }
+
+        // Glow
+        if (this.invulnTimer > 0 && Math.floor(this.invulnTimer * 10) % 2 === 0) {
+            // Flashing when invulnerable
+            return;
+        }
+
+        const glow = ctx.createRadialGradient(px, py, r * 0.3, px, py, r * 2.5);
+        glow.addColorStop(0, 'rgba(0, 255, 136, 0.3)');
+        glow.addColorStop(1, 'rgba(0, 255, 136, 0)');
+        ctx.beginPath();
+        ctx.arc(px, py, r * 2.5, 0, Math.PI * 2);
+        ctx.fillStyle = glow;
+        ctx.fill();
+
+        // Body
+        ctx.beginPath();
+        ctx.arc(px, py, r, 0, Math.PI * 2);
+        ctx.fillStyle = CFG.PLAYER_COLOR;
+        ctx.fill();
+        ctx.strokeStyle = CFG.PLAYER_GLOW;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Eyes
+        const eyeOffset = r * 0.35;
+        const eyeR = r * 0.18;
+        let ex1, ey1, ex2, ey2;
+        const bounce = this.moving ? Math.sin(this.animTimer * 30) * 2 : 0;
+
+        switch (this.facing) {
+            case 'N':
+                ex1 = px - eyeOffset; ey1 = py - eyeOffset * 0.5 + bounce;
+                ex2 = px + eyeOffset; ey2 = py - eyeOffset * 0.5 + bounce;
+                break;
+            case 'S':
+                ex1 = px - eyeOffset; ey1 = py + eyeOffset * 0.3 + bounce;
+                ex2 = px + eyeOffset; ey2 = py + eyeOffset * 0.3 + bounce;
+                break;
+            case 'E':
+                ex1 = px + eyeOffset * 0.3; ey1 = py - eyeOffset + bounce;
+                ex2 = px + eyeOffset * 0.3; ey2 = py + eyeOffset * 0.3 + bounce;
+                break;
+            case 'W':
+                ex1 = px - eyeOffset * 0.3; ey1 = py - eyeOffset + bounce;
+                ex2 = px - eyeOffset * 0.3; ey2 = py + eyeOffset * 0.3 + bounce;
+                break;
+        }
+
+        ctx.beginPath();
+        ctx.arc(ex1, ey1, eyeR, 0, Math.PI * 2);
+        ctx.fillStyle = '#fff';
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(ex2, ey2, eyeR, 0, Math.PI * 2);
+        ctx.fillStyle = '#fff';
+        ctx.fill();
+
+        // Pupils
+        const pupilOff = eyeR * 0.4;
+        let pdx = 0, pdy = 0;
+        if (this.facing === 'N') pdy = -pupilOff;
+        if (this.facing === 'S') pdy = pupilOff;
+        if (this.facing === 'E') pdx = pupilOff;
+        if (this.facing === 'W') pdx = -pupilOff;
+
+        ctx.beginPath();
+        ctx.arc(ex1 + pdx, ey1 + pdy, eyeR * 0.5, 0, Math.PI * 2);
+        ctx.fillStyle = '#111';
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(ex2 + pdx, ey2 + pdy, eyeR * 0.5, 0, Math.PI * 2);
+        ctx.fillStyle = '#111';
+        ctx.fill();
+    }
+}
+
+// === ./enemies.js ===
+// ============================================================
+// enemies.js - Enemy AI (Patrol + Chase)
+// ============================================================
+
+
+class Enemy {
+    constructor(row, col, id) {
+        this.id = id;
+        this.row = row;
+        this.col = col;
+        this.x = col + 0.5;
+        this.y = row + 0.5;
+        this.targetX = this.x;
+        this.targetY = this.y;
+        this.facing = 'S';
+        this.speed = CFG.ENEMY_SPEED;
+        this.moveTimer = 0;
+        this.patrolDir = ['N', 'S', 'E', 'W'][Math.floor(Math.random() * 4)];
+        this.patrolTimer = Math.random() * 2;
+        this.chasing = false;
+        this.frozen = false;
+        this.freezeTimer = 0;
+        this.animFrame = 0;
+        this.animTimer = 0;
+        this.visible = false; // For fog of war
+        this.spotted = false; // Just became visible
+    }
+
+    get rowI() { return Math.round(this.y - 0.5); }
+    get colI() { return Math.round(this.x - 0.5); }
+
+    freeze(duration) {
+        this.frozen = true;
+        this.freezeTimer = duration;
+        this.chasing = false;
+    }
+
+    update(dt, maze, playerRow, playerCol) {
+        // Freeze
+        if (this.frozen) {
+            this.freezeTimer -= dt;
+            if (this.freezeTimer <= 0) {
+                this.frozen = false;
+            }
+            return;
+        }
+
+        // Animation
+        this.animTimer += dt;
+        if (this.animTimer > 0.15) {
+            this.animTimer = 0;
+            this.animFrame = (this.animFrame + 1) % 4;
+        }
+
+        // Smooth movement
+        const lerpSpeed = 10 * dt;
+        this.x += (this.targetX - this.x) * Math.min(lerpSpeed, 1);
+        this.y += (this.targetY - this.y) * Math.min(lerpSpeed, 1);
+        if (Math.abs(this.x - this.targetX) < 0.01) this.x = this.targetX;
+        if (Math.abs(this.y - this.targetY) < 0.01) this.y = this.targetY;
+
+        this.moveTimer = Math.max(0, this.moveTimer - dt);
+        if (this.moveTimer > 0) return;
+
+        // Snap to grid
+        const cr = this.rowI;
+        const cc = this.colI;
+        if (Math.abs(this.x - (cc + 0.5)) > 0.15 || Math.abs(this.y - (cr + 0.5)) > 0.15) return;
+        this.x = cc + 0.5;
+        this.y = cr + 0.5;
+        this.row = cr;
+        this.col = cc;
+
+        // Chase mode detection
+        const dist = Math.abs(playerRow - cr) + Math.abs(playerCol - cc);
+        const eucDist = Math.sqrt((playerRow - cr) ** 2 + (playerCol - cc) ** 2);
+        this.chasing = eucDist <= CFG.ENEMY_CHASE_RANGE;
+
+        let dir = null;
+
+        if (this.chasing) {
+            // Use pathfinding to chase
+            const path = maze.findPath(cr, cc, playerRow, playerCol);
+            if (path && path.length > 0) {
+                dir = path[0];
+            }
+            this.speed = CFG.ENEMY_CHASE_SPEED;
+        } else {
+            // Patrol: random wandering with preference
+            this.speed = CFG.ENEMY_SPEED;
+            this.patrolTimer -= dt;
+
+            const validDirs = [];
+            ['N', 'S', 'E', 'W'].forEach(d => {
+                if (maze.canMove(cr, cc, d)) validDirs.push(d);
+            });
+
+            if (validDirs.length > 0) {
+                // Prefer current direction, but change periodically
+                if (this.patrolTimer <= 0 || !validDirs.includes(this.patrolDir)) {
+                    this.patrolDir = validDirs[Math.floor(Math.random() * validDirs.length)];
+                    this.patrolTimer = 1.5 + Math.random() * 2;
+                }
+                dir = this.patrolDir;
+            }
+        }
+
+        if (dir && maze.canMove(cr, cc, dir)) {
+            const dirs = { N: [-1, 0], S: [1, 0], E: [0, 1], W: [0, -1] };
+            const [dr, dc] = dirs[dir];
+            this.row = cr + dr;
+            this.col = cc + dc;
+            this.targetX = this.col + 0.5;
+            this.targetY = this.row + 0.5;
+            this.facing = dir;
+            this.moveTimer = 1 / this.speed;
+        }
+    }
+
+    draw(ctx, cellSize, frozen) {
+        if (!this.visible) return;
+
+        const px = this.x * cellSize;
+        const py = this.y * cellSize;
+        const r = CFG.ENEMY_RADIUS * cellSize;
+
+        // Glow
+        const glowColor = frozen ? 'rgba(155, 89, 182, 0.2)' : 'rgba(231, 76, 60, 0.2)';
+        const glow = ctx.createRadialGradient(px, py, r * 0.3, px, py, r * 2);
+        glow.addColorStop(0, glowColor);
+        glow.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.beginPath();
+        ctx.arc(px, py, r * 2, 0, Math.PI * 2);
+        ctx.fillStyle = glow;
+        ctx.fill();
+
+        // Body
+        const color = frozen ? CFG.FREEZE_COLOR : CFG.ENEMY_COLOR;
+        const strokeColor = frozen ? '#bb77dd' : CFG.ENEMY_GLOW;
+
+        // Spiky body
+        ctx.beginPath();
+        const spikes = 5;
+        for (let i = 0; i < spikes * 2; i++) {
+            const angle = (i * Math.PI) / spikes - Math.PI / 2;
+            const rad = i % 2 === 0 ? r : r * 0.65;
+            const sx = px + Math.cos(angle) * rad;
+            const sy = py + Math.sin(angle) * rad;
+            if (i === 0) ctx.moveTo(sx, sy);
+            else ctx.lineTo(sx, sy);
+        }
+        ctx.closePath();
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Eyes
+        const eyeOffset = r * 0.25;
+        const eyeR = r * 0.16;
+
+        ctx.beginPath();
+        ctx.arc(px - eyeOffset, py - eyeOffset * 0.3, eyeR, 0, Math.PI * 2);
+        ctx.fillStyle = '#fff';
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(px + eyeOffset, py - eyeOffset * 0.3, eyeR, 0, Math.PI * 2);
+        ctx.fillStyle = '#fff';
+        ctx.fill();
+
+        // Pupils (look toward player when chasing)
+        const pdx = this.chasing ? (this.facing === 'E' ? 1 : this.facing === 'W' ? -1 : 0) * eyeR * 0.4 : 0;
+        const pdy = this.chasing ? (this.facing === 'S' ? 1 : this.facing === 'N' ? -1 : 0) * eyeR * 0.4 : 0;
+
+        ctx.beginPath();
+        ctx.arc(px - eyeOffset + pdx, py - eyeOffset * 0.3 + pdy, eyeR * 0.55, 0, Math.PI * 2);
+        ctx.fillStyle = frozen ? '#ddd' : '#111';
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(px + eyeOffset + pdx, py - eyeOffset * 0.3 + pdy, eyeR * 0.55, 0, Math.PI * 2);
+        ctx.fillStyle = frozen ? '#ddd' : '#111';
+        ctx.fill();
+
+        // Frozen indicator
+        if (frozen) {
+            ctx.beginPath();
+            ctx.arc(px, py - r * 1.3, r * 0.3, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(155, 89, 182, 0.6)';
+            ctx.fill();
+            ctx.font = `${r * 0.6}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.fillStyle = '#fff';
+            ctx.fillText('❄', px, py - r * 1.0);
+        }
+
+        // Chase indicator
+        if (this.chasing && !frozen) {
+            ctx.font = `bold ${r * 0.7}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.fillStyle = '#ff6666';
+            ctx.fillText('!', px, py - r * 1.2);
+        }
+    }
+}
+
+class EnemyManager {
+    constructor() {
+        this.enemies = [];
+    }
+
+    spawn(maze, count, playerRow, playerCol) {
+        this.enemies = [];
+        const positions = this._findPositions(maze, count, playerRow, playerCol);
+        positions.forEach((pos, i) => {
+            this.enemies.push(new Enemy(pos.row, pos.col, i));
+        });
+    }
+
+    _findPositions(maze, count, playerRow, playerCol) {
+        const positions = [];
+        const minDist = Math.max(4, Math.floor(maze.rows * 0.3));
+
+        for (let r = 0; r < maze.rows; r++) {
+            for (let c = 0; c < maze.cols; c++) {
+                const eucDist = Math.sqrt((r - playerRow) ** 2 + (c - playerCol) ** 2);
+                if (eucDist >= minDist) {
+                    positions.push({ row: r, col: c });
+                }
+            }
+        }
+
+        // Shuffle and pick
+        for (let i = positions.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [positions[i], positions[j]] = [positions[j], positions[i]];
+        }
+
+        return positions.slice(0, count);
+    }
+
+    update(dt, maze, playerRow, playerCol) {
+        for (const e of this.enemies) {
+            e.update(dt, maze, playerRow, playerCol);
+        }
+    }
+
+    checkCollision(playerRow, playerCol) {
+        for (const e of this.enemies) {
+            if (!e.visible || e.frozen) continue;
+            const dist = Math.sqrt((e.rowI - playerRow) ** 2 + (e.colI - playerCol) ** 2);
+            if (dist < 0.8) return e;
+        }
+        return null;
+    }
+
+    freezeAll(duration) {
+        for (const e of this.enemies) {
+            e.freeze(duration);
+        }
+    }
+
+    updateVisibility(playerRow, playerCol, radius, maze) {
+        for (const e of this.enemies) {
+            const dist = Math.sqrt((e.rowI - playerRow) ** 2 + (e.colI - playerCol) ** 2);
+            const wasVisible = e.visible;
+            e.visible = dist <= radius + 1 && this._hasLineOfSight(maze, playerRow, playerCol, e.rowI, e.colI);
+            if (e.visible && !wasVisible) {
+                e.spotted = true;
+            } else {
+                e.spotted = false;
+            }
+        }
+    }
+
+    _hasLineOfSight(maze, r1, c1, r2, c2) {
+        // Simple line check - step through cells
+        const dr = r2 - r1;
+        const dc = c2 - c1;
+        const steps = Math.max(Math.abs(dr), Math.abs(dc));
+        if (steps === 0) return true;
+
+        for (let i = 0; i <= steps; i++) {
+            const r = Math.round(r1 + (dr * i) / steps);
+            const c = Math.round(c1 + (dc * i) / steps);
+            const cell = maze.getCell(r, c);
+            if (!cell || !cell.revealed) return false;
+        }
+        return true;
+    }
+
+    freeze(duration) {
+        for (const e of this.enemies) {
+            e.freeze(duration);
+        }
+    }
+
+    draw(ctx, cellSize) {
+        for (const e of this.enemies) {
+            e.draw(ctx, cellSize, e.frozen);
+        }
+    }
+}
+
+// === ./items.js ===
+// ============================================================
+// items.js - Keys, Torches, Power-ups
+// ============================================================
+
+
+class Item {
+    constructor(row, col, type) {
+        this.row = row;
+        this.col = col;
+        this.type = type; // 'key', 'torch', 'speed', 'freeze', 'reveal'
+        this.collected = false;
+        this.bobTimer = Math.random() * Math.PI * 2;
+        this.glowTimer = 0;
+    }
+
+    update(dt) {
+        this.bobTimer += dt * 3;
+        this.glowTimer += dt;
+    }
+
+    draw(ctx, cellSize) {
+        if (this.collected) return;
+
+        const px = (this.col + 0.5) * cellSize;
+        const py = (this.row + 0.5) * cellSize;
+        const bob = Math.sin(this.bobTimer) * 3;
+        const r = CFG.ITEM_RADIUS * cellSize;
+
+        let color, glowColor, symbol;
+        switch (this.type) {
+            case 'key':
+                color = CFG.KEY_COLOR;
+                glowColor = 'rgba(241, 196, 15, 0.25)';
+                symbol = '🔑';
+                break;
+            case 'torch':
+                color = CFG.TORCH_COLOR;
+                glowColor = 'rgba(230, 126, 34, 0.25)';
+                symbol = '🔥';
+                break;
+            case 'speed':
+                color = CFG.SPEED_COLOR;
+                glowColor = 'rgba(52, 152, 219, 0.25)';
+                symbol = '⚡';
+                break;
+            case 'freeze':
+                color = CFG.FREEZE_COLOR;
+                glowColor = 'rgba(155, 89, 182, 0.25)';
+                symbol = '❄';
+                break;
+            case 'reveal':
+                color = CFG.REVEAL_COLOR;
+                glowColor = 'rgba(26, 188, 156, 0.25)';
+                symbol = '🗺';
+                break;
+            default:
+                return;
+        }
+
+        // Glow
+        const pulse = 0.7 + Math.sin(this.glowTimer * 2) * 0.3;
+        const glow = ctx.createRadialGradient(px, py + bob, r * 0.3, px, py + bob, r * 2.2 * pulse);
+        glow.addColorStop(0, glowColor);
+        glow.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.beginPath();
+        ctx.arc(px, py + bob, r * 2.2 * pulse, 0, Math.PI * 2);
+        ctx.fillStyle = glow;
+        ctx.fill();
+
+        // Background circle
+        ctx.beginPath();
+        ctx.arc(px, py + bob, r, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.fill();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // Symbol
+        ctx.font = `${r * 1.4}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#fff';
+        ctx.fillText(symbol, px, py + bob + 1);
+    }
+}
+
+class ItemManager {
+    constructor() {
+        this.items = [];
+    }
+
+    spawn(maze, keyCount) {
+        this.items = [];
+        const occupied = new Set();
+        occupied.add('0,0');
+        occupied.add(`${maze.rows - 1},${maze.cols - 1}`);
+
+        // Mark door positions as occupied
+        for (const d of maze.doors) {
+            occupied.add(`${d.row},${d.col}`);
+        }
+
+        const allCells = [];
+        for (let r = 0; r < maze.rows; r++) {
+            for (let c = 0; c < maze.cols; c++) {
+                if (!occupied.has(`${r},${c}`)) {
+                    allCells.push({ row: r, col: c });
+                }
+            }
+        }
+
+        // Shuffle
+        for (let i = allCells.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [allCells[i], allCells[j]] = [allCells[j], allCells[i]];
+        }
+
+        let idx = 0;
+
+        // Place keys (spread them out)
+        const keyPositions = this._spreadPositions(allCells, keyCount, idx);
+        for (const pos of keyPositions) {
+            this.items.push(new Item(pos.row, pos.col, 'key'));
+            occupied.add(`${pos.row},${pos.col}`);
+        }
+        idx += keyCount;
+
+        // Place torches
+        const torchCount = Math.max(2, Math.floor(keyCount * 0.6));
+        const torchPositions = this._spreadPositions(allCells, torchCount, idx);
+        for (const pos of torchPositions) {
+            if (!occupied.has(`${pos.row},${pos.col}`)) {
+                this.items.push(new Item(pos.row, pos.col, 'torch'));
+                occupied.add(`${pos.row},${pos.col}`);
+            }
+        }
+        idx += torchCount;
+
+        // Place power-ups
+        const powerupTypes = ['speed', 'freeze', 'reveal'];
+        for (const type of powerupTypes) {
+            const count = Math.max(1, Math.floor(maze.rows * maze.cols / 50));
+            for (let i = 0; i < count; i++) {
+                const posIdx = idx + i;
+                if (posIdx < allCells.length) {
+                    const pos = allCells[posIdx];
+                    if (!occupied.has(`${pos.row},${pos.col}`)) {
+                        this.items.push(new Item(pos.row, pos.col, type));
+                        occupied.add(`${pos.row},${pos.col}`);
+                    }
+                }
+            }
+            idx += count;
+        }
+    }
+
+    _spreadPositions(cells, count, startIdx) {
+        const result = [];
+        const available = cells.slice(startIdx);
+
+        if (available.length === 0) return result;
+
+        // Pick evenly spaced from shuffled array
+        const step = Math.max(1, Math.floor(available.length / (count + 1)));
+        for (let i = 0; i < count && i * step < available.length; i++) {
+            result.push(available[i * step]);
+        }
+
+        return result;
+    }
+
+    update(dt) {
+        for (const item of this.items) {
+            item.update(dt);
+        }
+    }
+
+    checkPickup(playerRow, playerCol) {
+        const picked = [];
+        for (const item of this.items) {
+            if (!item.collected && item.row === playerRow && item.col === playerCol) {
+                item.collected = true;
+                picked.push(item.type);
+            }
+        }
+        return picked;
+    }
+
+    draw(ctx, cellSize, revealedSet) {
+        for (const item of this.items) {
+            if (item.collected) continue;
+            // Only draw if cell is revealed
+            const key = `${item.row},${item.col}`;
+            if (revealedSet && !revealedSet.has(key)) continue;
+            item.draw(ctx, cellSize);
+        }
+    }
+}
+
+// === ./ui.js ===
+// ============================================================
+// ui.js - UI Overlays and HUD (Chinese Interface)
+// ============================================================
+
+
+class UI {
+    constructor(canvas) {
+        this.canvas = canvas;
+        this.overlay = document.getElementById('overlay');
+        this.overlayContent = document.getElementById('overlay-content');
+        this.hud = document.getElementById('hud');
+        this.notification = document.getElementById('notification');
+        this.notifTimer = 0;
+        this.minimapCanvas = document.getElementById('minimap');
+        this.minimapCtx = this.minimapCanvas.getContext('2d');
+    }
+
+    showStartScreen(highScores, onStart) {
+        const diffButtons = Object.entries(DIFFICULTY).map(([key, val]) => {
+            return `<button class="diff-btn" data-diff="${key}">${val.name}</button>`;
+        }).join('');
+
+        const hsRows = Object.entries(highScores).map(([key, val]) => {
+            const d = DIFFICULTY[key];
+            return `<div class="hs-row"><span>${d.name}</span><span class="hs-val">${val || '---'}</span></div>`;
+        }).join('');
+
+        this.overlayContent.innerHTML = `
+            <div class="title-area">
+                <h1 class="game-title">迷宫逃脱</h1>
+                <p class="subtitle">MAZE ESCAPE</p>
+            </div>
+            <div class="menu-section">
+                <h2 class="section-title">选择难度</h2>
+                <div class="diff-buttons">${diffButtons}</div>
+            </div>
+            <div class="menu-section">
+                <h2 class="section-title">最高分</h2>
+                <div class="hs-table">${hsRows}</div>
+            </div>
+            <div class="help-box">
+                <h3>操作说明</h3>
+                <div class="help-grid">
+                    <div class="help-item"><span class="key">W A S D</span> 或 <span class="key">方向键</span> 移动</div>
+                    <div class="help-item"><span class="key">🔑</span> 收集钥匙开门</div>
+                    <div class="help-item"><span class="key">🔥</span> 火把扩大视野</div>
+                    <div class="help-item"><span class="key">⚡</span> 加速 <span class="key">❄</span> 冻结敌人 <span class="key">🗺</span> 全图</div>
+                    <div class="help-item"><span class="key">★</span> 到达右下角出口逃脱!</div>
+                </div>
+            </div>
+        `;
+
+        this.overlay.classList.remove('hidden');
+
+        // Bind buttons
+        this.overlayContent.querySelectorAll('.diff-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const diff = btn.dataset.diff;
+                this.overlay.classList.add('hidden');
+                onStart(diff);
+            });
+        });
+    }
+
+    showGameOver(score, time, keys, difficulty) {
+        const diffName = DIFFICULTY[difficulty]?.name || difficulty;
+        this.overlayContent.innerHTML = `
+            <div class="result-screen gameover">
+                <h1 class="result-title danger">游戏结束</h1>
+                <p class="result-sub">GAME OVER</p>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-label">得分</div>
+                        <div class="stat-val">${score}</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">用时</div>
+                        <div class="stat-val">${this.formatTime(time)}</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">难度</div>
+                        <div class="stat-val">${diffName}</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">钥匙</div>
+                        <div class="stat-val">${keys}</div>
+                    </div>
+                </div>
+                <button class="restart-btn" id="btn-restart">重新开始</button>
+            </div>
+        `;
+        this.overlay.classList.remove('hidden');
+
+        document.getElementById('btn-restart').addEventListener('click', () => {
+            this.overlay.classList.add('hidden');
+            window.startGame(difficulty);
+        });
+    }
+
+    showWin(score, time, keys, difficulty, isNewHigh) {
+        const diffName = DIFFICULTY[difficulty]?.name || difficulty;
+        this.overlayContent.innerHTML = `
+            <div class="result-screen win">
+                <h1 class="result-title gold">逃脱成功!</h1>
+                <p class="result-sub">ESCAPE COMPLETE</p>
+                ${isNewHigh ? '<p class="new-high">新纪录!</p>' : ''}
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-label">得分</div>
+                        <div class="stat-val gold">${score}</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">用时</div>
+                        <div class="stat-val">${this.formatTime(time)}</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">难度</div>
+                        <div class="stat-val">${diffName}</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">钥匙</div>
+                        <div class="stat-val">${keys}</div>
+                    </div>
+                </div>
+                <button class="restart-btn" id="btn-restart">再来一局</button>
+            </div>
+        `;
+        this.overlay.classList.remove('hidden');
+
+        document.getElementById('btn-restart').addEventListener('click', () => {
+            this.overlay.classList.add('hidden');
+            window.startGame(difficulty);
+        });
+    }
+
+    updateHUD(player, time, difficulty) {
+        const diffName = DIFFICULTY[difficulty]?.name || difficulty;
+        const hearts = '❤'.repeat(player.lives) + '🖤'.repeat(CFG.STARTING_LIVES - player.lives);
+
+        this.hud.innerHTML = `
+            <div class="hud-item">
+                <span class="hud-icon">⏱</span>
+                <span class="hud-val">${this.formatTime(time)}</span>
+            </div>
+            <div class="hud-item">
+                <span class="hud-icon">⭐</span>
+                <span class="hud-val">${player.score}</span>
+            </div>
+            <div class="hud-item">
+                <span class="hud-icon">🔑</span>
+                <span class="hud-val">${player.keys}</span>
+            </div>
+            <div class="hud-item lives">
+                <span class="hud-val">${hearts}</span>
+            </div>
+            <div class="hud-item diff">
+                <span class="hud-val">${diffName}</span>
+            </div>
+        `;
+    }
+
+    showNotification(text, duration = 2) {
+        this.notification.textContent = text;
+        this.notification.style.display = 'block';
+        // Force reflow before adding show class for transition
+        this.notification.offsetHeight;
+        this.notification.classList.add('show');
+        this.notifTimer = duration;
+    }
+
+    updateNotification(dt) {
+        if (this.notifTimer > 0) {
+            this.notifTimer -= dt;
+            if (this.notifTimer <= 0) {
+                this.notification.classList.remove('show');
+                // Hide after transition completes
+                setTimeout(() => {
+                    if (!this.notification.classList.contains('show')) {
+                        this.notification.style.display = 'none';
+                    }
+                }, 350);
+            }
+        }
+    }
+
+    drawMinimap(maze, player, enemies, cellSize) {
+        const mc = this.minimapCanvas;
+        const mctx = this.minimapCtx;
+        const scale = Math.min(mc.width / maze.cols, mc.height / maze.rows);
+        const ox = (mc.width - maze.cols * scale) / 2;
+        const oy = (mc.height - maze.rows * scale) / 2;
+
+        mctx.clearRect(0, 0, mc.width, mc.height);
+
+        // Background
+        mctx.fillStyle = 'rgba(0, 10, 0, 0.8)';
+        mctx.fillRect(0, 0, mc.width, mc.height);
+
+        // Draw cells
+        for (let r = 0; r < maze.rows; r++) {
+            for (let c = 0; c < maze.cols; c++) {
+                const cell = maze.getCell(r, c);
+                if (!cell.revealed) continue;
+
+                const x = ox + c * scale;
+                const y = oy + r * scale;
+
+                // Floor
+                mctx.fillStyle = 'rgba(20, 60, 20, 0.6)';
+                mctx.fillRect(x, y, scale, scale);
+
+                // Walls
+                mctx.strokeStyle = 'rgba(46, 204, 113, 0.4)';
+                mctx.lineWidth = 0.5;
+
+                if (cell.walls.N) { mctx.beginPath(); mctx.moveTo(x, y); mctx.lineTo(x + scale, y); mctx.stroke(); }
+                if (cell.walls.S) { mctx.beginPath(); mctx.moveTo(x, y + scale); mctx.lineTo(x + scale, y + scale); mctx.stroke(); }
+                if (cell.walls.W) { mctx.beginPath(); mctx.moveTo(x, y); mctx.lineTo(x, y + scale); mctx.stroke(); }
+                if (cell.walls.E) { mctx.beginPath(); mctx.moveTo(x + scale, y); mctx.lineTo(x + scale, y + scale); mctx.stroke(); }
+
+                // Doors
+                if (cell.locked) {
+                    mctx.fillStyle = CFG.LOCKED_COLOR;
+                    if (cell.doorDir === 'E') mctx.fillRect(x + scale - 1, y + 1, 2, scale - 2);
+                    if (cell.doorDir === 'S') mctx.fillRect(x + 1, y + scale - 1, scale - 2, 2);
+                }
+            }
+        }
+
+        // Exit
+        mctx.fillStyle = CFG.EXIT_COLOR;
+        mctx.fillRect(ox + (maze.cols - 1) * scale + 1, oy + (maze.rows - 1) * scale + 1, scale - 2, scale - 2);
+
+        // Enemies (visible only)
+        for (const e of enemies) {
+            if (!e.visible) continue;
+            mctx.fillStyle = e.frozen ? CFG.FREEZE_COLOR : CFG.ENEMY_COLOR;
+            mctx.fillRect(ox + e.colI * scale + 1, oy + e.rowI * scale + 1, scale - 2, scale - 2);
+        }
+
+        // Player
+        mctx.fillStyle = CFG.PLAYER_GLOW;
+        mctx.fillRect(ox + player.colI * scale, oy + player.rowI * scale, scale, scale);
+
+        // Border
+        mctx.strokeStyle = CFG.GLASS_BORDER;
+        mctx.lineWidth = 1;
+        mctx.strokeRect(0, 0, mc.width, mc.height);
+    }
+
+    formatTime(seconds) {
+        const m = Math.floor(seconds / 60);
+        const s = Math.floor(seconds % 60);
+        return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    }
+}
+
+// === main.js ===
+// ============================================================
+// main.js - Game Loop & Initialization
+// ============================================================
+
+
+class Game {
+    constructor() {
+        this.canvas = document.getElementById('gameCanvas');
+        this.ctx = this.canvas.getContext('2d');
+        this.ui = new UI(this.canvas);
+
+        this.running = false;
+        this.difficulty = 'medium';
+        this.maze = null;
+        this.player = null;
+        this.enemyMgr = new EnemyManager();
+        this.itemMgr = new ItemManager();
+
+        this.time = 0;
+        this.inputDir = null;
+        this.mapRevealTimer = 0;
+        this.mapRevealed = false;
+
+        // Camera shake
+        this.shakeX = 0;
+        this.shakeY = 0;
+        this.shakeTimer = 0;
+        this.shakeIntensity = 0;
+
+        this.lastTime = 0;
+        this.animId = null;
+
+        this.highScores = this._loadHighScores();
+
+        this._setupInput();
+        this._resizeCanvas();
+        window.addEventListener('resize', () => this._resizeCanvas());
+
+        // Show start screen
+        this.ui.showStartScreen(this.highScores, (diff) => this.startGame(diff));
+    }
+
+    _loadHighScores() {
+        try {
+            return JSON.parse(localStorage.getItem('mazeEscapeScores')) || {};
+        } catch {
+            return {};
+        }
+    }
+
+    _saveHighScore(diff, score) {
+        const current = this.highScores[diff] || 0;
+        if (score > current) {
+            this.highScores[diff] = score;
+            try {
+                localStorage.setItem('mazeEscapeScores', JSON.stringify(this.highScores));
+            } catch {}
+            return true;
+        }
+        return false;
+    }
+
+    _resizeCanvas() {
+        this.canvas.width = window.innerWidth;
+        this.canvas.height = window.innerHeight;
+    }
+
+    _setupInput() {
+        const keyMap = {
+            'KeyW': 'N', 'ArrowUp': 'N',
+            'KeyS': 'S', 'ArrowDown': 'S',
+            'KeyA': 'W', 'ArrowLeft': 'W',
+            'KeyD': 'E', 'ArrowRight': 'E',
+        };
+
+        this.keysDown = new Set();
+
+        document.addEventListener('keydown', (e) => {
+            if (!this.running) return;
+            const dir = keyMap[e.code];
+            if (dir) {
+                e.preventDefault();
+                this.keysDown.add(dir);
+                this.inputDir = dir;
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            const dir = keyMap[e.code];
+            if (dir) {
+                this.keysDown.delete(dir);
+                // Set input to last held key
+                const remaining = [...this.keysDown];
+                this.inputDir = remaining.length > 0 ? remaining[remaining.length - 1] : null;
+            }
+        });
+
+        // Touch / swipe support
+        let touchStartX = 0, touchStartY = 0;
+        this.canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const t = e.touches[0];
+            touchStartX = t.clientX;
+            touchStartY = t.clientY;
+        }, { passive: false });
+
+        this.canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (!this.running) return;
+            const t = e.touches[0];
+            const dx = t.clientX - touchStartX;
+            const dy = t.clientY - touchStartY;
+            const threshold = 20;
+
+            if (Math.abs(dx) > threshold || Math.abs(dy) > threshold) {
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    this.inputDir = dx > 0 ? 'E' : 'W';
+                } else {
+                    this.inputDir = dy > 0 ? 'S' : 'N';
+                }
+                touchStartX = t.clientX;
+                touchStartY = t.clientY;
+            }
+        }, { passive: false });
+
+        this.canvas.addEventListener('touchend', () => {
+            this.inputDir = null;
+        });
+    }
+
+    startGame(difficulty) {
+        this.difficulty = difficulty;
+        const cfg = DIFFICULTY[difficulty];
+
+        // Generate solvable maze (retry if layout is unsolvable)
+        let solvable = false;
+        for (let attempt = 0; attempt < 50 && !solvable; attempt++) {
+            this.maze = new Maze(cfg.rows, cfg.cols);
+            this.maze.placeDoors(cfg.keys);
+            this.itemMgr.spawn(this.maze, cfg.keys);
+
+            const keyPositions = this.itemMgr.items
+                .filter(i => i.type === 'key')
+                .map(i => ({ row: i.row, col: i.col }));
+
+            solvable = this.maze.validateSolvability(keyPositions);
+        }
+
+        // Player
+        this.player = new Player(0, 0);
+
+        // Enemies (placed after maze is finalized)
+        this.enemyMgr.spawn(this.maze, cfg.enemies, 0, 0);
+
+        // State
+        this.time = 0;
+        this.inputDir = null;
+        this.mapRevealTimer = 0;
+        this.mapRevealed = false;
+        this.shakeTimer = 0;
+        this.shakeX = 0;
+        this.shakeY = 0;
+        this.running = true;
+
+        // Reveal starting area
+        this.maze.reveal(0, 0, this.player.torchRadius);
+
+        this.ui.updateHUD(this.player, this.time, this.difficulty);
+
+        // Start loop
+        if (this.animId) cancelAnimationFrame(this.animId);
+        this.lastTime = performance.now();
+        this._loop(this.lastTime);
+    }
+
+    _triggerShake(intensity = 6, duration = 0.3) {
+        this.shakeTimer = duration;
+        this.shakeIntensity = intensity;
+    }
+
+    _loop(timestamp) {
+        if (!this.running) return;
+
+        const dt = Math.min((timestamp - this.lastTime) / 1000, 0.05); // cap dt
+        this.lastTime = timestamp;
+        this.currentDt = dt;
+
+        this._update(dt);
+        this._render();
+
+        this.animId = requestAnimationFrame((t) => this._loop(t));
+    }
+
+    _update(dt) {
+        this.time += dt;
+
+        // Player update
+        const result = this.player.update(dt, this.maze, this.inputDir);
+
+        // Handle movement result
+        if (result === 'move') {
+            Sound.move();
+            Sound.explore();
+            this.maze.reveal(this.player.rowI, this.player.colI, this.player.torchRadius);
+        } else if (result === 'door_open') {
+            Sound.openDoor();
+            this.ui.showNotification('门已开启!', 1.5);
+        } else if (result === 'door_locked') {
+            Sound.doorLocked();
+            this.ui.showNotification('需要钥匙!', 1.5);
+        }
+
+        // Map reveal power-up
+        if (this.mapRevealTimer > 0) {
+            this.mapRevealTimer -= dt;
+            if (this.mapRevealTimer <= 0) {
+                this.mapRevealed = false;
+                this.maze.resetRevealed();
+                this.maze.reveal(this.player.rowI, this.player.colI, this.player.torchRadius);
+            }
+        }
+
+        // Item pickup
+        const picked = this.itemMgr.checkPickup(this.player.rowI, this.player.colI);
+        for (const type of picked) {
+            switch (type) {
+                case 'key':
+                    Sound.collectKey();
+                    this.player.addKey();
+                    this.player.addScore(CFG.SCORE_PER_KEY);
+                    this.ui.showNotification('获得钥匙!', 1.5);
+                    break;
+                case 'torch':
+                    Sound.collectTorch();
+                    this.player.addTorch();
+                    this.player.addScore(CFG.SCORE_PER_TORCH);
+                    this.maze.reveal(this.player.rowI, this.player.colI, this.player.torchRadius);
+                    this.ui.showNotification('获得火把! 视野扩大', 1.5);
+                    break;
+                case 'speed':
+                    Sound.collectPowerup();
+                    this.player.applySpeedBoost();
+                    this.player.addScore(CFG.SCORE_PER_POWERUP);
+                    this.ui.showNotification('加速!', 1.5);
+                    break;
+                case 'freeze':
+                    Sound.collectPowerup();
+                    this.enemyMgr.freezeAll(CFG.ENEMY_FREEZE_DURATION);
+                    this.player.addScore(CFG.SCORE_PER_POWERUP);
+                    this.ui.showNotification('敌人冻结!', 1.5);
+                    break;
+                case 'reveal':
+                    Sound.collectPowerup();
+                    this.maze.revealAll();
+                    this.mapRevealed = true;
+                    this.mapRevealTimer = CFG.MAP_REVEAL_DURATION;
+                    this.player.addScore(CFG.SCORE_PER_POWERUP);
+                    this.ui.showNotification('全图显示!', 1.5);
+                    break;
+            }
+        }
+
+        // Update enemies
+        this.enemyMgr.update(dt, this.maze, this.player.rowI, this.player.colI);
+        this.enemyMgr.updateVisibility(this.player.rowI, this.player.colI, this.player.torchRadius, this.maze);
+
+        // Check enemy spotted
+        for (const e of this.enemyMgr.enemies) {
+            if (e.spotted) {
+                Sound.enemySpot();
+            }
+        }
+
+        // Check enemy collision
+        const hitEnemy = this.enemyMgr.checkCollision(this.player.rowI, this.player.colI);
+        if (hitEnemy && this.player.takeDamage()) {
+            Sound.hit();
+            this._triggerShake(8, 0.4);
+            this.ui.showNotification(`受到攻击! 剩余生命: ${this.player.lives}`, 2);
+        }
+
+        // Items animation
+        this.itemMgr.update(dt);
+
+        // UI
+        this.ui.updateHUD(this.player, this.time, this.difficulty);
+        this.ui.updateNotification(dt);
+
+        // Check game over
+        if (!this.player.alive) {
+            this.running = false;
+            Sound.gameOver();
+            setTimeout(() => {
+                this.ui.showGameOver(this.player.score, this.time, this.player.keys, this.difficulty);
+            }, 800);
+            return;
+        }
+
+        // Check win (reached exit)
+        if (this.player.rowI === this.maze.rows - 1 && this.player.colI === this.maze.cols - 1) {
+            this.running = false;
+            this.player.addScore(CFG.SCORE_FINISH_BONUS);
+            // Time bonus: faster = more points
+            const timeBonus = Math.max(0, Math.floor((300 - this.time) * CFG.SCORE_PER_SECOND));
+            this.player.addScore(timeBonus);
+            Sound.levelComplete();
+            const isNewHigh = this._saveHighScore(this.difficulty, this.player.score);
+            setTimeout(() => {
+                this.ui.showWin(this.player.score, this.time, this.player.keys, this.difficulty, isNewHigh);
+            }, 800);
+            return;
+        }
+    }
+
+    _render() {
+        const ctx = this.ctx;
+        const w = this.canvas.width;
+        const h = this.canvas.height;
+        const cs = CFG.CELL_SIZE;
+
+        // Camera follow player with clamping
+        let camX = this.player.x * cs - w / 2;
+        let camY = this.player.y * cs - h / 2;
+        // Clamp camera to maze bounds (with some padding)
+        const mazeW = this.maze.cols * cs;
+        const mazeH = this.maze.rows * cs;
+        camX = Math.max(-w * 0.2, Math.min(mazeW - w * 0.8, camX));
+        camY = Math.max(-h * 0.2, Math.min(mazeH - h * 0.8, camY));
+
+        // Camera shake
+        if (this.shakeTimer > 0) {
+            this.shakeTimer -= this.currentDt || 0.016;
+            const intensity = this.shakeIntensity * (this.shakeTimer / 0.3);
+            this.shakeX = (Math.random() - 0.5) * intensity;
+            this.shakeY = (Math.random() - 0.5) * intensity;
+        } else {
+            this.shakeX = 0;
+            this.shakeY = 0;
+        }
+
+        // Clear
+        ctx.fillStyle = CFG.BG_COLOR;
+        ctx.fillRect(0, 0, w, h);
+
+        ctx.save();
+        ctx.translate(-camX + this.shakeX, -camY + this.shakeY);
+
+        // Draw maze
+        this._drawMaze(ctx, cs);
+
+        // Draw items
+        const revealedSet = new Set();
+        for (let r = 0; r < this.maze.rows; r++) {
+            for (let c = 0; c < this.maze.cols; c++) {
+                if (this.maze.getCell(r, c).revealed) revealedSet.add(`${r},${c}`);
+            }
+        }
+        this.itemMgr.draw(ctx, cs, revealedSet);
+
+        // Draw enemies
+        this.enemyMgr.draw(ctx, cs);
+
+        // Draw player
+        this.player.draw(ctx, cs);
+
+        // Draw fog of war
+        this._drawFog(ctx, cs, w, h, camX, camY);
+
+        ctx.restore();
+
+        // Draw exit indicator
+        this._drawExitIndicator(ctx, w, h, cs, camX, camY);
+
+        // Minimap
+        this.ui.drawMinimap(this.maze, this.player, this.enemyMgr.enemies, cs);
+    }
+
+    _drawMaze(ctx, cs) {
+        const maze = this.maze;
+        const wallW = CFG.WALL_THICKNESS;
+
+        for (let r = 0; r < maze.rows; r++) {
+            for (let c = 0; c < maze.cols; c++) {
+                const cell = maze.getCell(r, c);
+                if (!cell.revealed && !this.mapRevealed) continue;
+
+                const x = c * cs;
+                const y = r * cs;
+
+                // Floor
+                ctx.fillStyle = CFG.FLOOR_COLOR;
+                ctx.fillRect(x, y, cs, cs);
+
+                // Walls
+                ctx.strokeStyle = CFG.WALL_COLOR;
+                ctx.lineWidth = wallW;
+                ctx.lineCap = 'round';
+
+                if (cell.walls.N) {
+                    ctx.beginPath();
+                    ctx.moveTo(x, y);
+                    ctx.lineTo(x + cs, y);
+                    ctx.stroke();
+                }
+                if (cell.walls.S) {
+                    ctx.beginPath();
+                    ctx.moveTo(x, y + cs);
+                    ctx.lineTo(x + cs, y + cs);
+                    ctx.stroke();
+                }
+                if (cell.walls.W) {
+                    ctx.beginPath();
+                    ctx.moveTo(x, y);
+                    ctx.lineTo(x, y + cs);
+                    ctx.stroke();
+                }
+                if (cell.walls.E) {
+                    ctx.beginPath();
+                    ctx.moveTo(x + cs, y);
+                    ctx.lineTo(x + cs, y + cs);
+                    ctx.stroke();
+                }
+
+                // Door
+                if (cell.doorDir && cell.locked) {
+                    ctx.strokeStyle = CFG.LOCKED_COLOR;
+                    ctx.lineWidth = wallW + 1;
+                    const doorLen = cs * 0.6;
+                    const doorOff = (cs - doorLen) / 2;
+
+                    switch (cell.doorDir) {
+                        case 'N':
+                            ctx.beginPath();
+                            ctx.moveTo(x + doorOff, y);
+                            ctx.lineTo(x + doorOff + doorLen, y);
+                            ctx.stroke();
+                            break;
+                        case 'S':
+                            ctx.beginPath();
+                            ctx.moveTo(x + doorOff, y + cs);
+                            ctx.lineTo(x + doorOff + doorLen, y + cs);
+                            ctx.stroke();
+                            break;
+                        case 'E':
+                            ctx.beginPath();
+                            ctx.moveTo(x + cs, y + doorOff);
+                            ctx.lineTo(x + cs, y + doorOff + doorLen);
+                            ctx.stroke();
+                            break;
+                        case 'W':
+                            ctx.beginPath();
+                            ctx.moveTo(x, y + doorOff);
+                            ctx.lineTo(x, y + doorOff + doorLen);
+                            ctx.stroke();
+                            break;
+                    }
+
+                    // Lock icon
+                    ctx.font = `${cs * 0.3}px sans-serif`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillStyle = CFG.LOCKED_COLOR;
+                    ctx.fillText('🔒', x + cs / 2, y + cs / 2);
+                }
+            }
+        }
+
+        // Exit marker
+        const ex = (maze.cols - 1) * cs;
+        const ey = (maze.rows - 1) * cs;
+        const exitCell = maze.getCell(maze.rows - 1, maze.cols - 1);
+        if (exitCell.revealed || this.mapRevealed) {
+            // Glow
+            const glow = ctx.createRadialGradient(ex + cs / 2, ey + cs / 2, cs * 0.1, ex + cs / 2, ey + cs / 2, cs * 0.8);
+            glow.addColorStop(0, 'rgba(241, 196, 15, 0.4)');
+            glow.addColorStop(1, 'rgba(241, 196, 15, 0)');
+            ctx.fillStyle = glow;
+            ctx.fillRect(ex, ey, cs, cs);
+
+            // Star
+            ctx.font = `${cs * 0.6}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = CFG.EXIT_COLOR;
+            ctx.fillText('★', ex + cs / 2, ey + cs / 2);
+        }
+    }
+
+    _drawFog(ctx, cs, screenW, screenH, camX, camY) {
+        // Draw fog over unrevealed cells
+        const startCol = Math.max(0, Math.floor(camX / cs) - 1);
+        const endCol = Math.min(this.maze.cols, Math.ceil((camX + screenW) / cs) + 1);
+        const startRow = Math.max(0, Math.floor(camY / cs) - 1);
+        const endRow = Math.min(this.maze.rows, Math.ceil((camY + screenH) / cs) + 1);
+
+        for (let r = startRow; r < endRow; r++) {
+            for (let c = startCol; c < endCol; c++) {
+                const cell = this.maze.getCell(r, c);
+                if (!cell) continue;
+
+                const x = c * cs;
+                const y = r * cs;
+
+                if (!cell.revealed && !this.mapRevealed) {
+                    ctx.fillStyle = CFG.FOG_COLOR;
+                    ctx.fillRect(x - 1, y - 1, cs + 2, cs + 2);
+                } else {
+                    // Distance-based fog for revealed but far cells
+                    const dist = Math.sqrt((r - this.player.rowI) ** 2 + (c - this.player.colI) ** 2);
+                    const visRadius = this.player.torchRadius;
+
+                    if (dist > visRadius && !this.mapRevealed) {
+                        const fogAlpha = Math.min(0.7, (dist - visRadius) / 3);
+                        ctx.fillStyle = `rgba(0,0,0,${fogAlpha})`;
+                        ctx.fillRect(x - 1, y - 1, cs + 2, cs + 2);
+                    }
+                }
+            }
+        }
+    }
+
+    _drawExitIndicator(ctx, screenW, screenH, cs, camX, camY) {
+        // Arrow pointing to exit if not visible
+        const exitX = (this.maze.cols - 0.5) * cs;
+        const exitY = (this.maze.rows - 0.5) * cs;
+        const screenExitX = exitX - camX;
+        const screenExitY = exitY - camY;
+
+        // If exit is off-screen, show arrow
+        if (screenExitX < 0 || screenExitX > screenW || screenExitY < 0 || screenExitY > screenH) {
+            const centerX = screenW / 2;
+            const centerY = screenH / 2;
+            const angle = Math.atan2(screenExitY - centerY, screenExitX - centerX);
+
+            const arrowDist = 60;
+            const ax = Math.max(40, Math.min(screenW - 40, centerX + Math.cos(angle) * arrowDist));
+            const ay = Math.max(60, Math.min(screenH - 40, centerY + Math.sin(angle) * arrowDist));
+
+            ctx.save();
+            ctx.translate(ax, ay);
+            ctx.rotate(angle);
+
+            ctx.beginPath();
+            ctx.moveTo(12, 0);
+            ctx.lineTo(-6, -8);
+            ctx.lineTo(-6, 8);
+            ctx.closePath();
+            ctx.fillStyle = 'rgba(241, 196, 15, 0.6)';
+            ctx.fill();
+
+            ctx.restore();
+
+            ctx.font = '11px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = 'rgba(241, 196, 15, 0.5)';
+            ctx.fillText('出口', ax, ay + 20);
+        }
+    }
+}
+
+// ============================================================
+// Bootstrap
+// ============================================================
+
+window.startGame = function(difficulty) {
+    if (window._game) {
+        window._game.startGame(difficulty);
+    }
+};
+
+window._game = new Game();
+
+
+</script>
+
+</body>
+</html>
