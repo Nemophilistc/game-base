@@ -282,71 +282,57 @@ export class UI {
         }
     }
 
-    // 绘制建筑标记
+    // 绘制地产所有权 + 建筑标记
     drawBuildings(players) {
         const ctx = this.ctx;
         for (const player of players) {
             if (player.bankrupt) continue;
             for (const sid of player.properties) {
-                const houses = player.getHousesOn(sid);
-                if (houses <= 0) continue;
-
                 const sq = SQUARES[sid];
-                if (!sq || sq.type !== 'property') continue;
+                if (!sq) continue;
 
                 const r = this.cellRects[sid];
-                let bx, by;
+                const cx = r.x + r.w / 2;
+                const cy = r.y + r.h / 2;
+                const houses = player.getHousesOn(sid);
 
-                // 建筑显示在色带对面
-                if (sid >= 1 && sid <= 9) {
-                    bx = r.x + 16;
-                    by = r.y + r.h - 40;
-                } else if (sid >= 11 && sid <= 19) {
-                    bx = r.x + 16;
-                    by = r.y + 16;
-                } else if (sid >= 21 && sid <= 29) {
-                    bx = r.x + 16;
-                    by = r.y + 16;
-                } else if (sid >= 31 && sid <= 39) {
-                    bx = r.x + r.w - 56;
-                    by = r.y + 16;
-                } else {
-                    continue;
-                }
-
-                if (houses === 5) {
-                    // 酒店 - 玩家颜色大矩形 + H标记
-                    ctx.fillStyle = player.color;
-                    ctx.fillRect(bx, by, 48, 36);
-                    ctx.strokeStyle = 'rgba(0,0,0,0.5)';
-                    ctx.lineWidth = 2;
-                    ctx.strokeRect(bx, by, 48, 36);
-                    ctx.fillStyle = '#fff';
-                    ctx.font = 'bold 24px Arial';
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    ctx.fillText('H', bx + 24, by + 20);
-                } else {
-                    // 房屋 - 玩家颜色小方块 + 屋顶三角
-                    for (let h = 0; h < houses; h++) {
-                        const hx = bx + h * 26;
-                        // 方块底座
-                        ctx.fillStyle = player.color;
-                        ctx.fillRect(hx, by + 6, 22, 16);
-                        ctx.strokeStyle = 'rgba(0,0,0,0.3)';
-                        ctx.lineWidth = 1;
-                        ctx.strokeRect(hx, by + 6, 22, 16);
-                        // 屋顶三角
+                if (sq.type === 'property' && houses > 0) {
+                    if (houses === 5) {
+                        // 酒店 - 大红色方块 + H
+                        ctx.fillStyle = '#e74c3c';
+                        ctx.fillRect(cx - 28, cy - 20, 56, 40);
+                        ctx.strokeStyle = '#c0392b';
+                        ctx.lineWidth = 2;
+                        ctx.strokeRect(cx - 28, cy - 20, 56, 40);
+                        ctx.fillStyle = '#fff';
+                        ctx.font = 'bold 28px Arial';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText('H', cx, cy + 2);
+                    } else {
+                        // 房屋 - 绿色圆圈 + 数字
+                        ctx.fillStyle = '#27ae60';
                         ctx.beginPath();
-                        ctx.moveTo(hx - 2, by + 8);
-                        ctx.lineTo(hx + 11, by);
-                        ctx.lineTo(hx + 24, by + 8);
-                        ctx.closePath();
-                        ctx.fillStyle = player.color;
+                        ctx.arc(cx, cy, 24, 0, Math.PI * 2);
                         ctx.fill();
-                        ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+                        ctx.strokeStyle = '#1e8449';
+                        ctx.lineWidth = 2;
                         ctx.stroke();
+                        ctx.fillStyle = '#fff';
+                        ctx.font = 'bold 22px Arial';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(String(houses), cx, cy + 2);
                     }
+                } else {
+                    // 无建筑 - 玩家颜色小圆点标记所有权
+                    ctx.fillStyle = player.color;
+                    ctx.beginPath();
+                    ctx.arc(r.x + r.w - 16, r.y + r.h - 16, 12, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = '#fff';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
                 }
             }
         }

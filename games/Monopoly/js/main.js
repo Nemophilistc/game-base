@@ -469,10 +469,22 @@ class MonopolyGame {
         const card = type === 'chance' ? this.cards.drawChance() : this.cards.drawChest();
         const result = this.cards.resolve(card, player, this.board, this.players);
 
+        // 在右侧面板显示卡牌
+        const cardPanel = document.getElementById('cardPanel');
+        const cardTitle = document.getElementById('cardTitle');
+        const cardText = document.getElementById('cardText');
+        const cardResult = document.getElementById('cardResult');
+        cardTitle.textContent = type === 'chance' ? '机会' : '命运';
+        cardTitle.style.color = type === 'chance' ? '#FFA07A' : '#FFB6C1';
+        cardText.textContent = card.text;
+        cardResult.textContent = '';
+        cardPanel.style.display = 'block';
+
         this.ui.showMessage(card.text, 2500);
 
         // 执行卡牌动作
         setTimeout(() => {
+            let resultText = '';
             for (const action of result.actions) {
                 switch (action.type) {
                     case 'moveTo':
@@ -488,10 +500,12 @@ class MonopolyGame {
 
                     case 'collect':
                         player.receive(action.amount);
+                        resultText += `获得 $${action.amount}  `;
                         break;
 
                     case 'pay':
                         player.pay(action.amount);
+                        resultText += `支付 $${action.amount}  `;
                         this._checkBankrupt(player);
                         break;
 
@@ -500,6 +514,7 @@ class MonopolyGame {
                         if (from && !from.bankrupt) {
                             from.pay(action.amount);
                             player.receive(action.amount);
+                            resultText += `从 ${from.name} 获得 $${action.amount}  `;
                             this._checkBankrupt(from);
                         }
                         break;
@@ -507,14 +522,17 @@ class MonopolyGame {
                     case 'goToJail':
                         player.goToJail();
                         Sound.jail();
+                        cardResult.textContent = '入狱！';
                         this._endAction();
                         return;
 
                     case 'getOutOfJail':
                         player.getOutOfJailCards++;
+                        resultText += '获得出狱卡  ';
                         break;
                 }
             }
+            if (resultText) cardResult.textContent = resultText;
             this._endAction();
         }, 2000);
     }
@@ -546,6 +564,7 @@ class MonopolyGame {
         document.getElementById('actionPanel').style.display = 'none';
         document.getElementById('buildPanel').style.display = 'none';
         document.getElementById('tradePanel').style.display = 'none';
+        document.getElementById('cardPanel').style.display = 'none';
 
         // 双数再掷（但刚从监狱出来不算）
         if (this.dice1 === this.dice2 && !this.wasInJail && !player.inJail && !player.bankrupt) {
