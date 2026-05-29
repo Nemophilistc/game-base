@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -19,50 +19,6 @@
             border-radius: 12px;
             box-shadow: 0 0 40px rgba(74, 222, 128, 0.15), 0 0 80px rgba(0, 0, 0, 0.5);
             touch-action: none;
-        }
-        .overlay {
-            position: fixed;
-            left: 0; top: 0; right: 0; bottom: 0;
-            background: rgba(10, 10, 26, 0.92);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 100;
-            opacity: 1;
-            transition: opacity 0.4s;
-            padding: 20px;
-        }
-        .overlay.fade-out { opacity: 0; pointer-events: none; }
-        .overlay.fade-fast { animation: fadeInOut 1.2s ease-in-out; }
-        @keyframes fadeInOut {
-            0% { opacity: 0; }
-            20% { opacity: 1; }
-            80% { opacity: 1; }
-            100% { opacity: 0; }
-        }
-        .overlay-content {
-            background: rgba(30, 30, 50, 0.95);
-            border: 1px solid rgba(74, 222, 128, 0.2);
-            border-radius: 16px;
-            padding: 28px 32px;
-            box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
-            color: #fff;
-        }
-        .course-btn {
-            background: rgba(255, 255, 255, 0.08);
-            color: #aaa;
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            padding: 8px 16px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 0.9em;
-            transition: all 0.2s;
-        }
-        .course-btn:hover { background: rgba(255, 255, 255, 0.15); color: #fff; }
-        .course-btn.active {
-            background: rgba(74, 222, 128, 0.2);
-            border-color: #4ADE80;
-            color: #4ADE80;
         }
         button:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(34, 197, 94, 0.5) !important; }
         button:active { transform: translateY(0); }
@@ -1620,7 +1576,6 @@ function drawCelebration(ctx, celeb, toCanvasX, toCanvasY, holeX, holeY) {
 
 // Start overlay
 function createStartOverlay(onStart) {
-    console.log('[MiniGolf] createStartOverlay called');
     // Create overlay background
     var overlay = document.createElement('div');
     overlay.id = 'startOverlay';
@@ -1684,7 +1639,6 @@ function createStartOverlay(onStart) {
 
     overlay.appendChild(content);
     document.body.appendChild(overlay);
-    console.log('[MiniGolf] overlay appended, startBtn:', startBtn, 'parent:', startBtn.parentNode);
 
     // Course selection handlers
     var courseBtns = content.querySelectorAll('.course-btn');
@@ -1707,9 +1661,7 @@ function createStartOverlay(onStart) {
     }
 
     // Start button click handler
-    console.log('[MiniGolf] attaching onclick to startBtn:', startBtn);
     startBtn.onclick = function() {
-        console.log('[MiniGolf] START BUTTON CLICKED! courseMode:', courseMode);
         overlay.style.opacity = '0';
         overlay.style.pointerEvents = 'none';
         overlay.style.transition = 'opacity 0.4s';
@@ -1719,10 +1671,8 @@ function createStartOverlay(onStart) {
         }, 400);
         var s = (courseMode === 'back') ? 9 : 0;
         var en = (courseMode === 'front') ? 9 : 18;
-        console.log('[MiniGolf] calling onStart with:', s, en);
         onStart(s, en);
     };
-    console.log('[MiniGolf] onclick attached, startBtn.onclick:', startBtn.onclick);
 
     return overlay;
 }
@@ -1826,6 +1776,7 @@ function showGameComplete(totalStrokes, totalPar, holeScores, startHole, onRepla
 // Mini Golf - Main Game Loop
 // ============================================
 
+const Sound = { resumeAudio, playHit, playWallBounce, playBumper, playHoleIn, playWaterSplash, playSandThud, playWindmillHit };
 
 // Game state
 let canvas, ctx;
@@ -1840,9 +1791,7 @@ let gameStarted, transitioning;
 let lastBallPos; // for water reset
 
 function init() {
-    console.log('[MiniGolf] init() called, stack:', new Error().stack);
     canvas = document.getElementById('gameCanvas');
-    console.log('[MiniGolf] canvas:', canvas);
     ctx = canvas.getContext('2d');
 
     resize();
@@ -1864,15 +1813,12 @@ function init() {
     gameStarted = false;
     transitioning = false;
 
-    console.log('[MiniGolf] calling createStartOverlay...');
     createStartOverlay((s, e) => {
-        console.log('[MiniGolf] onStart callback fired! startHole:', s, 'endHole:', e);
         startHole = s;
         endHole = e;
-        startGame();
+        doStartGame();
     });
 
-    console.log('[MiniGolf] starting gameLoop');
     requestAnimationFrame(gameLoop);
 }
 
@@ -1900,14 +1846,12 @@ function toCanvasY(y) { return canvasOffY + y * scale; }
 function toCourseX(cx) { return (cx - canvasOffX) / scale; }
 function toCourseY(cy) { return (cy - canvasOffY) / scale; }
 
-function startGame() {
-    console.log('[MiniGolf] startGame() called, startHole:', startHole, 'endHole:', endHole);
+function doStartGame() {
     Sound.resumeAudio();
     totalStrokes = 0;
     holeScores = [];
     currentHole = startHole;
     gameStarted = true;
-    console.log('[MiniGolf] loading hole:', currentHole);
     loadHole(currentHole);
 }
 
@@ -2046,7 +1990,7 @@ function nextHole() {
             createStartOverlay((s, e) => {
                 startHole = s;
                 endHole = e;
-                startGame();
+                doStartGame();
             });
         });
         gameStarted = false;
