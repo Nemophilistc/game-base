@@ -52,6 +52,12 @@ class Game {
         document.getElementById('btn-end-turn').addEventListener('click', () => this.endTurn());
         document.getElementById('btn-help').addEventListener('click', () => this.ui.toggleHelp());
 
+        // Player count buttons
+        document.getElementById('btn-2p').addEventListener('click', () => this.startGame(2));
+        document.getElementById('btn-3p').addEventListener('click', () => this.startGame(3));
+        document.getElementById('btn-4p').addEventListener('click', () => this.startGame(4));
+        document.getElementById('btn-rules').addEventListener('click', () => document.getElementById('help-box').classList.toggle('visible'));
+
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') this.deselect();
             if (e.key === 'Enter' || e.key === ' ') {
