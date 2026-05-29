@@ -300,7 +300,7 @@ export class UI {
                 // 建筑显示在色带对面
                 if (sid >= 1 && sid <= 9) {
                     bx = r.x + 16;
-                    by = r.y + r.h - 36;
+                    by = r.y + r.h - 40;
                 } else if (sid >= 11 && sid <= 19) {
                     bx = r.x + 16;
                     by = r.y + 16;
@@ -308,31 +308,44 @@ export class UI {
                     bx = r.x + 16;
                     by = r.y + 16;
                 } else if (sid >= 31 && sid <= 39) {
-                    bx = r.x + r.w - 52;
+                    bx = r.x + r.w - 56;
                     by = r.y + 16;
                 } else {
                     continue;
                 }
 
                 if (houses === 5) {
-                    // 酒店 - 红色矩形
-                    ctx.fillStyle = '#e74c3c';
+                    // 酒店 - 玩家颜色大矩形 + H标记
+                    ctx.fillStyle = player.color;
                     ctx.fillRect(bx, by, 48, 36);
-                    ctx.strokeStyle = '#c0392b';
+                    ctx.strokeStyle = 'rgba(0,0,0,0.5)';
                     ctx.lineWidth = 2;
                     ctx.strokeRect(bx, by, 48, 36);
                     ctx.fillStyle = '#fff';
                     ctx.font = 'bold 24px Arial';
                     ctx.textAlign = 'center';
-                    ctx.fillText('H', bx + 24, by + 26);
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('H', bx + 24, by + 20);
                 } else {
-                    // 房屋 - 绿色小方块
+                    // 房屋 - 玩家颜色小方块 + 屋顶三角
                     for (let h = 0; h < houses; h++) {
-                        ctx.fillStyle = '#27ae60';
-                        ctx.fillRect(bx + h * 24, by, 22, 22);
-                        ctx.strokeStyle = '#1e8449';
+                        const hx = bx + h * 26;
+                        // 方块底座
+                        ctx.fillStyle = player.color;
+                        ctx.fillRect(hx, by + 6, 22, 16);
+                        ctx.strokeStyle = 'rgba(0,0,0,0.3)';
                         ctx.lineWidth = 1;
-                        ctx.strokeRect(bx + h * 24, by, 22, 22);
+                        ctx.strokeRect(hx, by + 6, 22, 16);
+                        // 屋顶三角
+                        ctx.beginPath();
+                        ctx.moveTo(hx - 2, by + 8);
+                        ctx.lineTo(hx + 11, by);
+                        ctx.lineTo(hx + 24, by + 8);
+                        ctx.closePath();
+                        ctx.fillStyle = player.color;
+                        ctx.fill();
+                        ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+                        ctx.stroke();
                     }
                 }
             }
